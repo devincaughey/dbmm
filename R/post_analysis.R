@@ -19,7 +19,7 @@
 #' @import cmdstanr
 #'
 #' @export
-extract <- function (fit, drop_rex = "^z_", format = "df")
+extract_draws <- function (fit, drop_rex = "^z_", format = "df")
 {
   draws <- fit$draws(format = format) %>%
     dplyr::select(-dplyr::matches(drop_rex))
@@ -46,8 +46,8 @@ extract <- function (fit, drop_rex = "^z_", format = "df")
 #' @import magrittr
 #'
 #' @export
-identify <- function(raw_draws, rotate = FALSE, varimax = TRUE,
-                     normalize = TRUE, id_with = NULL)
+identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
+                          normalize = TRUE, id_with = NULL)
 {
   if (rotate) {
     outcomes_id <- identify_rotation(raw_draws, varimax = varimax,
@@ -494,7 +494,7 @@ identify_sign <- function (raw_draws, sign) {
 #' @import magrittr
 #'
 #' @export
-label <- function (draws, regex_pars = NULL)
+label_draws <- function (draws, regex_pars = NULL)
 {
   # TODO: what to do with regex_pars
   if (is.null(regex_pars)) {

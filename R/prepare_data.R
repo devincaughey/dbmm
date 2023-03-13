@@ -17,17 +17,17 @@
 #' @import magrittr
 #'
 #' @export
-shape <- function (long_data,
-                  unit_var,
-                  time_var,
-                  item_var,
-                  value_var,
-                  ordinal_items = NA,
-                  binary_items = NA,
-                  max_cats = 10,
-                  standardize = TRUE,
-                  make_indicator_for_zeros = TRUE,
-                  periods_to_estimate = NULL)
+shape_data <- function (long_data,
+                        unit_var,
+                        time_var,
+                        item_var,
+                        value_var,
+                        ordinal_items = NA,
+                        binary_items = NA,
+                        max_cats = 10,
+                        standardize = TRUE,
+                        make_indicator_for_zeros = TRUE,
+                        periods_to_estimate = NULL)
 {
   # TODO: check the input
 
