@@ -1,12 +1,13 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# dynIRTtest
+# (temporary name) dynIRTtest
 
 <!-- badges: start -->
 <!-- badges: end -->
 
-The goal of dynIRTtest is to …
+We will change the package name later. Please edit the `README.Rmd` file
+and do not directly edit the `README.md` file.
 
 ## Installation
 
