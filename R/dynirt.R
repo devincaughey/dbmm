@@ -130,7 +130,7 @@ fit <- function (data,
   data$nonzero_metric <- nonzero_metric
 
   ## Compile model
-  file <- system.file(paste0("stan/model.stan"), package = "dynIRT")
+  file <- system.file(paste0("stan/model.stan"), package = "dynIRTtest")
 
   m0 <- cmdstan_model(stan_file = file)
 
