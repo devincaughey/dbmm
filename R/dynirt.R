@@ -132,7 +132,7 @@ fit <- function (data,
   ## Compile model
   file <- system.file(paste0("stan/model.stan"), package = "dynIRT")
 
-  m0 <- cmdstan_model(stan_file = file, compile = FALSE)
+  m0 <- cmdstan_model(stan_file = file)
 
   cpp_opts <- list(stan_threads = as.logical(data$parallelize))
 
