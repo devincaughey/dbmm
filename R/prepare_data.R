@@ -175,5 +175,7 @@ shape_data <- function (long_data,
   attr(stan_data, "ordinal_item_labels") <- levels(ordinal_data$ITEM)
   attr(stan_data, "metric_item_labels") <- levels(metric_data$ITEM)
 
+  class(stan_data) <- c("dynIRT_data", class(stan_data))
+
   return(stan_data)
 }
