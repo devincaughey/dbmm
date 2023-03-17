@@ -24,6 +24,7 @@ Imports:
     coda,
     dplyr,
     factor.switching,
+    ggrepel,
     magrittr,
     methods,
     posterior,
