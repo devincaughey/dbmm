@@ -47,15 +47,23 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df")
 #'
 #' @export
 identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
-                          normalize = TRUE, id_with = NULL)
+                          normalize = TRUE, id_with = NULL, sign = NULL)
 {
   if (rotate) {
+    if (is.null(sign)) {
+      sign <- -1
+      cat("Using `sign`=", sign, "\n")
+    }
     outcomes_id <- identify_rotation(raw_draws, varimax = varimax,
                                      normalize = normalize, id_with = id_with)
     outcomes_id$id_draws <-
-      identify_sign(outcomes_id$id_draws, sign = -1)$id_draws
+      identify_sign(outcomes_id$id_draws, sign = sign)$id_draws
   } else {
-    outcomes_id <- identify_sign(raw_draws, sign = c(-1, -1))
+    if (is.null(sign)) {
+      sign <- c(-1, -1)
+      cat("Using `sign`=", sign, "\n")
+    }
+    outcomes_id <- identify_sign(raw_draws, sign = sign)
 
   }
   return(outcomes_id)
@@ -182,46 +190,45 @@ identify_rotation <- function (raw_draws, varimax,
   for (c_cur in 1:C) {
     if (id_with == "binary") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lb1,
-                                      c_cur = c_cur,
+                                      c = c_cur,
                                       lcols = lcols_b,
                                       id_with = "binary")
     } else if (id_with == "ordinal") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lo1,
-                                      c_cur = c_cur,
+                                      c = c_cur,
                                       lcols = lcols_o,
                                       id_with = "ordinal")
     } else if (id_with == "metric") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lm1,
-                                      c_cur = c_cur,
+                                      c = c_cur,
                                       lcols = lcols_m,
                                       id_with = "metric")
     } else {
       stop("Invalid")
     }
-
-    sv <- sp_out[[c]]$sign_vectors
-    pv <- sp_out[[c]]$permute_vectors
+    sv <- sp_out[[c_cur]]$sign_vectors
+    pv <- sp_out[[c_cur]]$permute_vectors
     sm <- apply(sv, 1, function (row) data.frame(diag(row)))
     pm <- apply(pv, 1, function (row)
       data.frame(seriation::permutation_vector2matrix(row)))
 
     for (s in 1:S) {
-      Q2[s, c, 1:D, 1:D] <- t(as.matrix(sm[[s]]) %*% as.matrix(pm[[s]]))
+      Q2[s, c_cur, 1:D, 1:D] <- t(as.matrix(sm[[s]]) %*% as.matrix(pm[[s]]))
     }
   }
   Q3 <- Q0
 
   cat("**** Harmonizing rotations across chains...\n")
 
-
   hv_out <- harmonize_varimax(sp_out)
-  for (c in 1:C) {
-    (sv <- hv_out$sign_vectors[c, , drop = FALSE])
-    (pv <- hv_out$permute_vectors[c, , drop = FALSE])
+
+  for (c_cur in 1:C) {
+    (sv <- hv_out$sign_vectors[c_cur, , drop = FALSE])
+    (pv <- hv_out$permute_vectors[c_cur, , drop = FALSE])
     (sm <- diag(as.numeric(sv)))
     (pm <- seriation::permutation_vector2matrix(pv))
     for (s in 1:S) {
-      Q3[s, c, 1:D, 1:D] <- t(as.matrix(sm) %*% as.matrix(pm))
+      Q3[s, c_cur, 1:D, 1:D] <- t(as.matrix(sm) %*% as.matrix(pm))
     }
   }
   Lb3 <- Lb0
@@ -229,17 +236,17 @@ identify_rotation <- function (raw_draws, varimax,
   Lm3 <- Lm0
   E3 <- E0
   S3 <- S0
-  for (c in 1:C) {
-    cat("\n** Rotating chain", c, "...")
+  for (c_cur in 1:C) {
+    cat("\n** Rotating chain", c_cur, "...")
     for (s in 1:S) {
-      row <- E0$.chain == c & E0$.iteration == s
+      row <- E0$.chain == c_cur & E0$.iteration == s
       if (Ib > 0) {
         Lb0_cs <- matrix(unlist(Lb0[row, lcols_b]), nrow = Ib, ncol = D)
         Lb3[row, lcols_b] <-
           Lb0_cs %*%
-          Q1[s, c, 1:D, 1:D] %*%
-          Q2[s, c, 1:D, 1:D] %*%
-          Q3[s, c, 1:D, 1:D] %>%
+          Q1[s, c_cur, 1:D, 1:D] %*%
+          Q2[s, c_cur, 1:D, 1:D] %*%
+          Q3[s, c_cur, 1:D, 1:D] %>%
           as.numeric() %>%
           t()
       }
@@ -247,9 +254,9 @@ identify_rotation <- function (raw_draws, varimax,
         Lo0_cs <- matrix(unlist(Lo0[row, lcols_o]), nrow = Io, ncol = D)
         Lo3[row, lcols_o] <-
           Lo0_cs %*%
-          Q1[s, c, 1:D, 1:D] %*%
-          Q2[s, c, 1:D, 1:D] %*%
-          Q3[s, c, 1:D, 1:D] %>%
+          Q1[s, c_cur, 1:D, 1:D] %*%
+          Q2[s, c_cur, 1:D, 1:D] %*%
+          Q3[s, c_cur, 1:D, 1:D] %>%
           as.numeric() %>%
           t()
       }
@@ -257,16 +264,16 @@ identify_rotation <- function (raw_draws, varimax,
         Lm0_cs <- matrix(unlist(Lm0[row, lcols_m]), nrow = Im, ncol = D)
         Lm3[row, lcols_m] <-
           Lm0_cs %*%
-          Q1[s, c, 1:D, 1:D] %*%
-          Q2[s, c, 1:D, 1:D] %*%
-          Q3[s, c, 1:D, 1:D] %>%
+          Q1[s, c_cur, 1:D, 1:D] %*%
+          Q2[s, c_cur, 1:D, 1:D] %*%
+          Q3[s, c_cur, 1:D, 1:D] %>%
           as.numeric() %>%
           t()
         S0_cs <- matrix(unlist(S0[row, 1:D, drop = FALSE]))
         S3[row, 1:D] <-    # might need to transpose for conformability
           t(S0_cs) %*%
-          abs(Q2[s, c, 1:D, 1:D]) %*%
-          abs(Q3[s, c, 1:D, 1:D])
+          abs(Q2[s, c_cur, 1:D, 1:D]) %*%
+          abs(Q3[s, c_cur, 1:D, 1:D])
       }
       for (t in 1:T) {
         E0_cst <- matrix(
@@ -275,9 +282,9 @@ identify_rotation <- function (raw_draws, varimax,
         )
         E3[row, ecols[as.integer(ecols_t) == t]] <-
           E0_cst %*%
-          Q1[s, c, 1:D, 1:D] %*%
-          Q2[s, c, 1:D, 1:D] %*%
-          Q3[s, c, 1:D, 1:D] %>%
+          Q1[s, c_cur, 1:D, 1:D] %*%
+          Q2[s, c_cur, 1:D, 1:D] %*%
+          Q3[s, c_cur, 1:D, 1:D] %>%
           as.numeric() %>%
           t()
       }
@@ -302,11 +309,11 @@ identify_rotation <- function (raw_draws, varimax,
   result$rotmats$Q2 <- Q2
   result$rotmats$Q3 <- Q3
   for (s in 1:S) {
-    for (c in 1:C) {
-      result$rotmats$Q[s, c, 1:D, 1:D] <-
-        Q1[s, c, 1:D, 1:D] %*%
-        Q2[s, c, 1:D, 1:D] %*%
-        Q3[s, c, 1:D, 1:D]
+    for (c_cur in 1:C) {
+      result$rotmats$Q[s, c_cur, 1:D, 1:D] <-
+        Q1[s, c_cur, 1:D, 1:D] %*%
+        Q2[s, c_cur, 1:D, 1:D] %*%
+        Q3[s, c_cur, 1:D, 1:D]
     }
   }
   return(result)
@@ -695,13 +702,8 @@ label_draws <- function (draws, regex_pars = NULL)
         dplyr::rename(par = "name") %>%
         dplyr::select("par", "value", dplyr::everything())
     } else {
-      stop(
-        paste0(
-        "Provide valid regular expressions to",
-        p,
-        "-th element of `regex_p` argument"
-        )
-      )
+      # pass the element that does not match regex
+      next
     }
   }
 

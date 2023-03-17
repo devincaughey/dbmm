@@ -9,7 +9,8 @@ identify_draws(
   rotate = FALSE,
   varimax = TRUE,
   normalize = TRUE,
-  id_with = NULL
+  id_with = NULL,
+  sign = NULL
 )
 }
 \arguments{
