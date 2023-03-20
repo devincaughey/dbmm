@@ -320,6 +320,7 @@ identify_rotation <- function (raw_draws, varimax,
 }
 
 
+#' @import magrittr
 extract_draws_match <- function(raw_draws, regex_pars) {
   dplyr::select(raw_draws, dplyr::matches(regex_pars)) %>%
     as.data.frame()
@@ -490,7 +491,6 @@ identify_sign <- function (raw_draws, sign) {
 
   return(list(id_draws = identified_draws))
 }
-
 
 
 #' Label the output
