@@ -1,18 +1,36 @@
-#' prepare data for dynIRT
+#' Prepare data for dynIRT
 #'
-#' @param long_data
-#' @param unit_var
-#' @param time_var
-#' @param item_var
-#' @param value_var
-#' @param ordinal_items
-#' @param binary_items
-#' @param max_cats
-#' @param standardize
-#' @param make_indicator_for_zeros
-#' @param periods_to_estimate
+#' @param long_data (data frame) Data in long (unit-period-item) form
+#' @param unit_var (string) Name of variable identifying units
+#' @param time_var (string) Name of variable identifying time periods
+#' @param item_var (string) Name of variable identifying items
+#' @param value_var (string) Name of the response variable
+#' @param ordinal_items (character vector) Items that should be treated as
+#'     ordinal. If `NA` (the default), then any item with between 3 and
+#'     `max_cats` unique values will be treated as ordinal.
+#' @param binary_items (character vector) Items that should be treated as
+#'     binary. If `NA` (the default), then any item with 2 unique values will be
+#'     treated as binary.
+#' @param max_cats (positive integer) Maximum number of response categories for
+#'     ordinal items. Defaults to `10`.
+#' @param standardize (logical) Should metric items be standardized? Defaults to
+#'     `TRUE`.
+#' @param make_indicator_for_zeros (logical) Should metric items with a lower
+#'     bound of zero be modeled as zero-inflated? If `TRUE` (the default), then
+#'     for each such variable observations with a response value of zero will be
+#'     set to missing and dropped, and a separate dummy variable ending in "_zi"
+#'     will be created to indicate observations with responses greater than
+#'     zero.
+#' @param periods_to_estimate (vector) Values of `time_var` for which to
+#'     estimate parameter values. If `NULL` (the default), `periods_to_estimate`
+#'     will be set to
+#'     `min(long_data[[time_var]]):max(long_data[[time_var]])`, under the
+#'     assumption that `long_data[[time_var]]` is an integer vector. Data from
+#'     periods not in `periods_to_estimate` will be dropped. If
+#'     `periods_to_estimate` includes a period for which there is no data,
+#'     parameter values for that year will be imputed by the dynamic model.
 #'
-#' @return A list that is formatted for stan
+#' @return A list formatted for Stan
 #'
 #' @import magrittr
 #'

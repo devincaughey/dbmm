@@ -2,8 +2,9 @@
 #'
 #' Fit a dynIRT model using stan
 #'
-#' @param data
-#' @param chains
+#' @param data (list) Data formatted for Stan (typically created by `shape()`).
+#' @param chains (positive integer) The number of Markov chains to run. The
+#'     default is 4.
 #' @param parallelize_within_chains
 #' @param threads_per_chain
 #' @param force_recompile
