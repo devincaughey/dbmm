@@ -150,15 +150,15 @@ data {
   array[T, 2] int<lower=0> tob_m;	    /* time ranges */
   matrix[I_metric, D] nonzero_metric;       /* nonzero loadings */
   // Priors //
-  real df_sigma_metric;
-  real df_sigma_alpha_evol;
-  real df_sigma_eta_evol;
-  real mu_sigma_metric;
-  real mu_sigma_alpha_evol;
-  real mu_sigma_eta_evol;
-  real sd_sigma_metric;
-  real sd_sigma_alpha_evol;
-  real sd_sigma_eta_evol;
+  real<lower=0> df_sigma_metric;
+  real<lower=0> df_sigma_alpha_evol;
+  real<lower=0> df_sigma_eta_evol;
+  real<lower=0> mu_sigma_metric;
+  real<lower=0> mu_sigma_alpha_evol;
+  real<lower=0> mu_sigma_eta_evol;
+  real<lower=0> sd_sigma_metric;
+  real<lower=0> sd_sigma_alpha_evol;
+  real<lower=0> sd_sigma_eta_evol;
 }
 transformed data {
 }
