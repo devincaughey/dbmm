@@ -33,6 +33,7 @@
 #' @return A list formatted for Stan
 #'
 #' @import magrittr
+#' @importFrom rlang .data
 #'
 #' @export
 shape_data <- function (long_data,
