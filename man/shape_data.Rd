@@ -2,7 +2,7 @@
 % Please edit documentation in R/prepare_data.R
 \name{shape_data}
 \alias{shape_data}
-\title{prepare data for dynIRT}
+\title{Prepare data for dynIRT}
 \usage{
 shape_data(
   long_data,
@@ -19,11 +19,49 @@ shape_data(
 )
 }
 \arguments{
-\item{periods_to_estimate}{}
+\item{long_data}{(data frame) Data in long (unit-period-item) form}
+
+\item{unit_var}{(string) Name of variable identifying units}
+
+\item{time_var}{(string) Name of variable identifying time periods}
+
+\item{item_var}{(string) Name of variable identifying items}
+
+\item{value_var}{(string) Name of the response variable}
+
+\item{ordinal_items}{(character vector) Items that should be treated as
+ordinal. If \code{NA} (the default), then any item with between 3 and
+\code{max_cats} unique values will be treated as ordinal.}
+
+\item{binary_items}{(character vector) Items that should be treated as
+binary. If \code{NA} (the default), then any item with 2 unique values will be
+treated as binary.}
+
+\item{max_cats}{(positive integer) Maximum number of response categories for
+ordinal items. Defaults to \code{10}.}
+
+\item{standardize}{(logical) Should metric items be standardized? Defaults to
+\code{TRUE}.}
+
+\item{make_indicator_for_zeros}{(logical) Should metric items with a lower
+bound of zero be modeled as zero-inflated? If \code{TRUE} (the default), then
+for each such variable observations with a response value of zero will be
+set to missing and dropped, and a separate dummy variable ending in "_zi"
+will be created to indicate observations with responses greater than
+zero.}
+
+\item{periods_to_estimate}{(vector) Values of \code{time_var} for which to
+estimate parameter values. If \code{NULL} (the default), \code{periods_to_estimate}
+will be set to
+\code{min(long_data[[time_var]]):max(long_data[[time_var]])}, under the
+assumption that \code{long_data[[time_var]]} is an integer vector. Data from
+periods not in \code{periods_to_estimate} will be dropped. If
+\code{periods_to_estimate} includes a period for which there is no data,
+parameter values for that year will be imputed by the dynamic model.}
 }
 \value{
-A list that is formatted for stan
+A list formatted for Stan
 }
 \description{
-prepare data for dynIRT
+Prepare data for dynIRT
 }

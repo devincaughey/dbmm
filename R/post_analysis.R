@@ -190,17 +190,17 @@ identify_rotation <- function (raw_draws, varimax,
   for (c_cur in 1:C) {
     if (id_with == "binary") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lb1,
-                                      c = c_cur,
+                                      c_cur = c_cur,
                                       lcols = lcols_b,
                                       id_with = "binary")
     } else if (id_with == "ordinal") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lo1,
-                                      c = c_cur,
+                                      c_cur = c_cur,
                                       lcols = lcols_o,
                                       id_with = "ordinal")
     } else if (id_with == "metric") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lm1,
-                                      c = c_cur,
+                                      c_cur = c_cur,
                                       lcols = lcols_m,
                                       id_with = "metric")
     } else {
