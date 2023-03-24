@@ -124,8 +124,8 @@ identify_rotation <- function (raw_draws, varimax,
   Q0 <- array(NA, dim = c(S, C, D, D))
 
   for (s in 1:S) {
-    for (c in 1:C) {
-      Q0[s, c, 1:D, 1:D] <- diag(rep(1, D))
+    for (c_cur in 1:C) {
+      Q0[s, c_cur, 1:D, 1:D] <- diag(rep(1, D))
     }
   }
   Q1 <- Q0
@@ -149,9 +149,9 @@ identify_rotation <- function (raw_draws, varimax,
     ## 1. Apply varimax rotation
     cat("\n**** Applying varimax rotations...")
     for (s in 1:S) {
-      for (c in 1:C) {
+      for (c_cur in 1:C) {
         if (id_with == "binary") {
-          row <- Lb0$.chain == c & Lb0$.iteration == s
+          row <- Lb0$.chain == c_cur & Lb0$.iteration == s
           Lb0_cs <- matrix(
             as.numeric(Lb0[row, lcols_b]), nrow = Ib, ncol = D
           )
@@ -159,7 +159,7 @@ identify_rotation <- function (raw_draws, varimax,
           Lb1[row, lcols_b] <- t(as.numeric(vm$loadings))
         }
         else if (id_with == "ordinal") {
-          row <- Lo0$.chain == c & Lo0$.iteration == s
+          row <- Lo0$.chain == c_cur & Lo0$.iteration == s
           Lo0_cs <- matrix(
             as.numeric(Lo0[row, lcols_o]), nrow = Io, ncol = D
           )
@@ -167,7 +167,7 @@ identify_rotation <- function (raw_draws, varimax,
           Lo1[row, lcols_o] <- t(as.numeric(vm$loadings))
         }
         else if (id_with == "metric") {
-          row <- Lm0$.chain == c & Lm0$.iteration == s
+          row <- Lm0$.chain == c_cur & Lm0$.iteration == s
           Lm0_cs <- matrix(
             as.numeric(Lm0[row, lcols_m]), nrow = Im, ncol = D
           )
@@ -177,7 +177,7 @@ identify_rotation <- function (raw_draws, varimax,
         else {
           stop("Invalid")
         }
-        Q1[s, c, 1:D, 1:D] <- vm$rotmat
+        Q1[s, c_cur, 1:D, 1:D] <- vm$rotmat
       }
     }
     cat("done.\n")
@@ -444,6 +444,7 @@ harmonize_varimax <- function (beta_rsp) {
 #' @return
 #'
 #' @import magrittr
+#' @importFrom rlang .data
 #'
 identify_sign <- function (raw_draws, sign) {
   raw_draws_df <- posterior::as_draws_df(raw_draws)
@@ -499,6 +500,7 @@ identify_sign <- function (raw_draws, sign) {
 #' @param regex_pars
 #'
 #' @import magrittr
+#' @importFrom rlang .data
 #'
 #' @export
 label_draws <- function (draws, regex_pars = NULL)

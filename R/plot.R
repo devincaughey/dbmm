@@ -21,6 +21,7 @@ create_metric_label <- function(outcomes_labeled) {
 #' @return plot
 #'
 #' @import magrittr ggplot2
+#' @importFrom rlang .data
 #'
 #' @export
 plot_intercept <- function(outcomes_labeled) {
@@ -63,6 +64,7 @@ plot_intercept <- function(outcomes_labeled) {
 #' @return plot
 #'
 #' @import magrittr ggplot2
+#' @importFrom rlang .data
 #'
 #' @export
 plot_loadings <- function(outcomes_labeled) {
@@ -102,6 +104,7 @@ plot_loadings <- function(outcomes_labeled) {
 
 
 #' @import magrittr
+#' @importFrom rlang .data
 create_factor_scores <- function(outcomes_labeled) {
   eta_ave <- outcomes_labeled$eta %>%
     dplyr::group_by(.data$UNIT, .data$dim, .data$.draw) %>%
@@ -122,6 +125,7 @@ create_factor_scores <- function(outcomes_labeled) {
 #' @return plot
 #'
 #' @import magrittr ggplot2
+#' @importFrom rlang .data
 #'
 #' @export
 plot_scores_ave <- function(outcomes_labeled) {
@@ -162,6 +166,7 @@ plot_scores_ave <- function(outcomes_labeled) {
 #' @return plot
 #'
 #' @import magrittr ggplot2
+#' @importFrom rlang .data
 #'
 #' @export
 plot_scores_timetrend <- function(outcomes_labeled) {
