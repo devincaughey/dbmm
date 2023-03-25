@@ -9,6 +9,9 @@ extract_draws(fit, drop_rex = "^z_", format = "df")
 \arguments{
 \item{format}{}
 }
+\value{
+Draws
+}
 \description{
 Extract object from a stan output
 }
