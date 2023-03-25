@@ -28,23 +28,29 @@ plot_intercept <- function(outcomes_labeled) {
   metric_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
   outcomes_labeled$alpha_metric %>%
     dplyr::group_by(.data$TIME, .data$ITEM) %>%
-    dplyr::summarise(est = mean(.data$value),
-      err = stats::sd(.data$value), .groups = "drop") %>%
+    dplyr::summarise(
+      est = mean(.data$value),
+      err = stats::sd(.data$value),
+      .groups = "drop"
+    ) %>%
     dplyr::mutate(
       ITEM = dplyr::recode(.data$ITEM, !!!metric_labels),
       # ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd),
       year = as.integer(as.character(.data$TIME))
     ) %>%
-    dplyr::mutate(ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd)) %>%
+    dplyr::mutate(
+      ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd)
+    ) %>%
     ggplot(aes(x = .data$year, y = .data$est)) +
-      facet_wrap(~.data$ITEM, ncol = 5) +
+      # facet_wrap(~.data$ITEM, ncol = 5) +
+      facet_wrap(~.data$ITEM) +
       geom_line() +
       geom_ribbon(
         aes(ymin = .data$est - 1.96 * .data$err,
             ymax = .data$est + 1.96 * .data$err),
             color = NA, alpha = 1/4
       ) +
-      scale_x_continuous(breaks = seq(1960, 2020, 20)) +
+      # scale_x_continuous(breaks = seq(1960, 2020, 20)) +
       labs(
         title = "Item Intercepts over Time",
         y = "Estimated Intercept",
@@ -92,11 +98,11 @@ plot_loadings <- function(outcomes_labeled) {
             alpha = 1/4, linewidth = 2
       ) +
       ggrepel::geom_text_repel() +
-      labs(
-          title = "Item Loadings",
-          x = "Dimension 1 (Valence)",
-          y = "Dimension 2 (Spatial)"
-      ) +
+      # labs(
+      #     title = "Item Loadings",
+      #     x = "Dimension 1 (Valence)",
+      #     y = "Dimension 2 (Spatial)"
+      # ) +
       coord_fixed() -> p
 
   p
@@ -139,17 +145,17 @@ plot_scores_ave <- function(outcomes_labeled) {
       geom_linerange(
         aes(xmin = .data$est_1 - 1.96 * .data$err_1,
             xmax = .data$est_1 + 1.96 * .data$err_1),
-            alpha = 1/4, linewidth = 2
+        alpha = 1/4, linewidth = 2
       ) +
       geom_linerange(
         aes(ymin = .data$est_2 - 1.96 * .data$err_2,
             ymax = .data$est_2 + 1.96 * .data$err_2),
-            alpha = 1/4, linewidth = 2
+        alpha = 1/4, linewidth = 2
       ) +
       geom_point() +
       ggrepel::geom_text_repel()  +
       labs(
-        title = "Average State Outcome Scores",
+        # title = "Average State Outcome Scores",
         x = "Dimension 1 (Valence)",
         y = "Dimension 2 (Spatial)"
       ) +
@@ -172,7 +178,9 @@ plot_scores_ave <- function(outcomes_labeled) {
 plot_scores_timetrend <- function(outcomes_labeled) {
   outcomes_labeled$eta %>%
     dplyr::group_by(.data$TIME, .data$UNIT, .data$dim) %>%
-    dplyr::summarise(est = mean(.data$value), err = stats::sd(.data$value), .groups = "drop") %>%
+    dplyr::summarise(est = mean(.data$value),
+                    err = stats::sd(.data$value),
+                    .groups = "drop") %>%
     dplyr::mutate(
       DIMENSION = dplyr::if_else(.data$dim == 1, "Dimension 1 (Valence)",
                                 "Dimension 2 (Spatial)"),
@@ -180,26 +188,27 @@ plot_scores_timetrend <- function(outcomes_labeled) {
       year = as.integer(as.character(.data$TIME))
     ) %>%
     ggplot() +
-      facet_wrap(~ .data$faUNIT, ncol = 5) +
+      # facet_wrap(~ .data$faUNIT, ncol = 5) +
+      facet_wrap(~ .data$faUNIT) +
       aes(x = .data$year, y = .data$est,
           color = .data$DIMENSION, fill = .data$DIMENSION) +
       geom_ribbon(
         aes(ymin = .data$est - 1.96 * .data$err,
             ymax = .data$est + 1.96 * .data$err),
-            color = NA, alpha = 1/4
+        color = NA, alpha = 1/4
       ) +
       geom_line() +
-      scale_x_continuous(breaks = seq(1960, 2020, 20)) +
+      # scale_x_continuous(breaks = xbreaks) +
       scale_color_brewer(type = "qual") +
       scale_fill_brewer(type = "qual") +
-      coord_cartesian(ylim = c(-3.2, 3.2)) +
-      labs(
-        title = "State Outcome Scores over Time",
-        y = "Estimated Factor Score",
-        x = NULL,
-        color = NULL,
-        fill = NULL
-      ) +
+      # coord_cartesian(ylim = c(-3.2, 3.2)) +
+      # labs(
+      #   title = "State Outcome Scores over Time",
+      #   y = "Estimated Factor Score",
+      #   x = NULL,
+      #   color = NULL,
+      #   fill = NULL
+      # ) +
       theme(legend.position = "bottom") -> p
 
   p

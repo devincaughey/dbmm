@@ -56,8 +56,8 @@ identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
     }
     outcomes_id <- identify_rotation(raw_draws, varimax = varimax,
                                      normalize = normalize, id_with = id_with)
-    outcomes_id$id_draws <-
-      identify_sign(outcomes_id$id_draws, sign = sign)$id_draws
+    outcomes_id$id_draws <- identify_sign(outcomes_id$id_draws,
+                                          sign = sign)$id_draws
   } else {
     if (is.null(sign)) {
       sign <- c(-1, -1)
@@ -157,25 +157,22 @@ identify_rotation <- function (raw_draws, varimax,
           )
           vm <- stats::varimax(Lb0_cs, normalize = normalize)
           Lb1[row, lcols_b] <- t(as.numeric(vm$loadings))
-        }
-        else if (id_with == "ordinal") {
+        } else if (id_with == "ordinal") {
           row <- Lo0$.chain == c_cur & Lo0$.iteration == s
           Lo0_cs <- matrix(
             as.numeric(Lo0[row, lcols_o]), nrow = Io, ncol = D
           )
           vm <- varimax(Lo0_cs, normalize = normalize)
           Lo1[row, lcols_o] <- t(as.numeric(vm$loadings))
-        }
-        else if (id_with == "metric") {
+        } else if (id_with == "metric") {
           row <- Lm0$.chain == c_cur & Lm0$.iteration == s
           Lm0_cs <- matrix(
             as.numeric(Lm0[row, lcols_m]), nrow = Im, ncol = D
           )
           vm <- varimax(Lm0_cs, normalize = normalize)
           Lm1[row, lcols_m] <- t(as.numeric(vm$loadings))
-        }
-        else {
-          stop("Invalid")
+        } else {
+          stop("Invalid `id_with` argument")
         }
         Q1[s, c_cur, 1:D, 1:D] <- vm$rotmat
       }
@@ -204,7 +201,7 @@ identify_rotation <- function (raw_draws, varimax,
                                       lcols = lcols_m,
                                       id_with = "metric")
     } else {
-      stop("Invalid")
+      stop("Invalid `id_with` argument")
     }
     sv <- sp_out[[c_cur]]$sign_vectors
     pv <- sp_out[[c_cur]]$permute_vectors
@@ -231,11 +228,13 @@ identify_rotation <- function (raw_draws, varimax,
       Q3[s, c_cur, 1:D, 1:D] <- t(as.matrix(sm) %*% as.matrix(pm))
     }
   }
+
   Lb3 <- Lb0
   Lo3 <- Lo0
   Lm3 <- Lm0
   E3 <- E0
   S3 <- S0
+
   for (c_cur in 1:C) {
     cat("\n** Rotating chain", c_cur, "...")
     for (s in 1:S) {
@@ -290,6 +289,7 @@ identify_rotation <- function (raw_draws, varimax,
       }
     }
   }
+
   id_draws <- raw_draws
   id_draws[, stringr::str_detect(names(id_draws), "^lambda_binary\\[")] <-
     Lb3[, lcols_b]
@@ -300,14 +300,17 @@ identify_rotation <- function (raw_draws, varimax,
   id_draws[, stringr::str_detect(names(id_draws), "^eta\\[")] <- E3[, ecols]
   id_draws[, stringr::str_detect(names(id_draws), "^sigma_eta_evol\\[")] <-
     S3[, 1:D]
+
   result <- list(
     id_draws = id_draws,
     rotmats = list()
   )
+
   result$rotmats$Q <- Q0
   result$rotmats$Q1 <- Q1
   result$rotmats$Q2 <- Q2
   result$rotmats$Q3 <- Q3
+
   for (s in 1:S) {
     for (c_cur in 1:C) {
       result$rotmats$Q[s, c_cur, 1:D, 1:D] <-
@@ -316,6 +319,7 @@ identify_rotation <- function (raw_draws, varimax,
         Q3[s, c_cur, 1:D, 1:D]
     }
   }
+
   return(result)
 }
 
@@ -358,7 +362,7 @@ sign_permute <- function(lambda_item, c_cur, lcols,
   } else if (id_with == "metric") {
     replace_original <- "lambda_metric\\[([0-9]+),([0-9]+)\\]$"
   } else {
-    stop("Inavlud `id_with` argument")
+    stop("Invalid `id_with` argument")
   }
 
   colord <- order(var, dim)
@@ -377,7 +381,6 @@ sign_permute <- function(lambda_item, c_cur, lcols,
   )
 
   return(out)
-
 }
 
 
@@ -395,9 +398,11 @@ harmonize_varimax <- function (beta_rsp) {
   lambda_hat_values <- matrix(nrow = nChains, ncol = d)
   colnames(lambda_hat_values) <-
     colnames(beta_rsp[[1]]$lambda_reordered_mcmc)
+
   for (i in 1:nChains) {
     lambda_hat_values[i, ] <- c(t(beta_rsp[[i]]$lambda_hat))
   }
+
   tankard <- factor.switching::rsp_exact(
     lambda_mcmc = lambda_hat_values,
     maxIter = 100,
@@ -431,6 +436,7 @@ harmonize_varimax <- function (beta_rsp) {
       )
   }
   reorderedChains <- coda::as.mcmc.list(reorderedChains)
+
   return(list(mcmc = reorderedChains,
               sign_vectors = tankard$sign_vectors,
               permute_vectors = tankard$permute_vectors))
