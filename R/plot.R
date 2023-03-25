@@ -28,16 +28,22 @@ plot_intercept <- function(outcomes_labeled) {
   metric_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
   outcomes_labeled$alpha_metric %>%
     dplyr::group_by(.data$TIME, .data$ITEM) %>%
-    dplyr::summarise(est = mean(.data$value),
-      err = stats::sd(.data$value), .groups = "drop") %>%
+    dplyr::summarise(
+      est = mean(.data$value),
+      err = stats::sd(.data$value),
+      .groups = "drop"
+    ) %>%
     dplyr::mutate(
       ITEM = dplyr::recode(.data$ITEM, !!!metric_labels),
       # ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd),
       year = as.integer(as.character(.data$TIME))
     ) %>%
-    dplyr::mutate(ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd)) %>%
+    dplyr::mutate(
+      ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd)
+    ) %>%
     ggplot(aes(x = .data$year, y = .data$est)) +
-      facet_wrap(~.data$ITEM, ncol = 5) +
+      # facet_wrap(~.data$ITEM, ncol = 5) +
+      facet_wrap(~.data$ITEM) +
       geom_line() +
       geom_ribbon(
         aes(ymin = .data$est - 1.96 * .data$err,
@@ -139,12 +145,12 @@ plot_scores_ave <- function(outcomes_labeled) {
       geom_linerange(
         aes(xmin = .data$est_1 - 1.96 * .data$err_1,
             xmax = .data$est_1 + 1.96 * .data$err_1),
-            alpha = 1/4, linewidth = 2
+        alpha = 1/4, linewidth = 2
       ) +
       geom_linerange(
         aes(ymin = .data$est_2 - 1.96 * .data$err_2,
             ymax = .data$est_2 + 1.96 * .data$err_2),
-            alpha = 1/4, linewidth = 2
+        alpha = 1/4, linewidth = 2
       ) +
       geom_point() +
       ggrepel::geom_text_repel()  +
@@ -182,7 +188,8 @@ plot_scores_timetrend <- function(outcomes_labeled) {
       year = as.integer(as.character(.data$TIME))
     ) %>%
     ggplot() +
-      facet_wrap(~ .data$faUNIT, ncol = 5) +
+      # facet_wrap(~ .data$faUNIT, ncol = 5) +
+      facet_wrap(~ .data$faUNIT) +
       aes(x = .data$year, y = .data$est,
           color = .data$DIMENSION, fill = .data$DIMENSION) +
       geom_ribbon(
