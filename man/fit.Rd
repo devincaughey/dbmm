@@ -133,11 +133,11 @@ state of Stan’s pseudo-random number generator. Defaults to \code{123}.}
 \value{
 A dynIRT object containing
 \describe{
-\item{unit_labels}
-\item{time_labels}
-\item{binary_item_labels}
-\item{ordinal_item_labels}
-\item{metric_item_labels}
+\item{unit_labels}{}
+\item{time_labels}{}
+\item{binary_item_labels}{}
+\item{ordinal_item_labels}{}
+\item{metric_item_labels}{}
 }
 }
 \description{
