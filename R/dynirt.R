@@ -82,11 +82,11 @@
 #'
 #' @return A dynIRT object containing
 #'  \describe{
-#'    \item{unit_labels}
-#'    \item{time_labels}
-#'    \item{binary_item_labels}
-#'    \item{ordinal_item_labels}
-#'    \item{metric_item_labels}
+#'    \item{unit_labels}{}
+#'    \item{time_labels}{}
+#'    \item{binary_item_labels}{}
+#'    \item{ordinal_item_labels}{}
+#'    \item{metric_item_labels}{}
 #' }
 #'
 #' @import cmdstanr
