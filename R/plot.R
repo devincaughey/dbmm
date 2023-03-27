@@ -1,3 +1,4 @@
+
 #' @import magrittr
 create_metric_label <- function(outcomes_labeled) {
   metric_labels <- attr(outcomes_labeled, "metric_item_labels") %>%
@@ -127,6 +128,8 @@ create_factor_scores <- function(outcomes_labeled) {
 #' plot average factor scores
 #'
 #' @param outcomes_labeled
+#' @param xdim (string) x-axis label for the plot
+#' @param ydim (string) y-axis label for the plot
 #'
 #' @return plot
 #'
@@ -171,6 +174,8 @@ plot_scores_ave <- function(outcomes_labeled,
 #' plot time series factor scores
 #'
 #' @param outcomes_labeled
+#' @param xdim (string) x-axis label for the plot
+#' @param ydim (string) y-axis label for the plot
 #'
 #' @return plot
 #'
