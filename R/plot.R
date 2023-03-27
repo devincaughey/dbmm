@@ -134,7 +134,10 @@ create_factor_scores <- function(outcomes_labeled) {
 #' @importFrom rlang .data
 #'
 #' @export
-plot_scores_ave <- function(outcomes_labeled) {
+plot_scores_ave <- function(outcomes_labeled,
+                            xdim = "Dimension 1 (Valence)",
+                            ydim = "Dimension 2 (Spatial)")
+{
   eta_ave <- create_factor_scores(outcomes_labeled = outcomes_labeled)
 
   eta_ave %>%
@@ -156,8 +159,8 @@ plot_scores_ave <- function(outcomes_labeled) {
       ggrepel::geom_text_repel()  +
       labs(
         # title = "Average State Outcome Scores",
-        x = "Dimension 1 (Valence)",
-        y = "Dimension 2 (Spatial)"
+        x = xdim,
+        y = ydim
       ) +
       coord_fixed() -> p
 
@@ -175,15 +178,18 @@ plot_scores_ave <- function(outcomes_labeled) {
 #' @importFrom rlang .data
 #'
 #' @export
-plot_scores_timetrend <- function(outcomes_labeled) {
+plot_scores_timetrend <- function(outcomes_labeled,
+                                  xdim = "Dimension 1 (Valence)",
+                                  ydim = "Dimension 2 (Spatial)")
+{
   outcomes_labeled$eta %>%
     dplyr::group_by(.data$TIME, .data$UNIT, .data$dim) %>%
     dplyr::summarise(est = mean(.data$value),
                     err = stats::sd(.data$value),
                     .groups = "drop") %>%
     dplyr::mutate(
-      DIMENSION = dplyr::if_else(.data$dim == 1, "Dimension 1 (Valence)",
-                                "Dimension 2 (Spatial)"),
+      DIMENSION = dplyr::if_else(.data$dim == 1, xdim,
+                                ydim),
       UNIT = stats::reorder(.data$UNIT, -.data$est, FUN = mean),
       year = as.integer(as.character(.data$TIME))
     ) %>%
