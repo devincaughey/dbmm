@@ -208,6 +208,7 @@ fit <- function (data,
     )
     init <- kappa_inits
   }
+
   ## Fit model
   dynfac_fit <- m1$sample(data, chains = chains, init = init,
                           threads_per_chain = threads_per_chain, seed = seed,
