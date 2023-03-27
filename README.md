@@ -18,3 +18,8 @@ You can install the development version of dynIRTtest from
 # install.packages("devtools")
 devtools::install_github("tomoya-sasaki/dynIRTtest")
 ```
+
+## TODOs
+
+- \[\] Add descriptions
+- \[\] Figure specifications
