@@ -86,7 +86,6 @@ identify_rotation <- function (raw_draws, varimax,
                                normalize, id_with)
 {
 
-  # TODO: create a function
   Lb0 <- extract_draws_match(raw_draws = raw_draws,
                             regex_pars = "(^lambda_binary\\[)|(^\\.)")
   Lo0 <- extract_draws_match(raw_draws = raw_draws,
@@ -460,10 +459,10 @@ identify_sign <- function (raw_draws, sign) {
       dplyr::select(dplyr::matches("^\\.|^lambda")) %>%
       tidyr::pivot_longer(cols = -dplyr::matches("^\\."),
                           names_to = "variable") %>%
-      dplyr::group_by(.data$.chain, .data$variable) %>%
+      dplyr::group_by(.data$.chain, .data$variable) %>% # nolint
       dplyr::summarise(est = mean.default(.data$value), .groups = "drop") %>%
       tidyr::separate(
-        col = variable,
+        col = .data$variable,
         into = c("parameter", "type", "item", "dimension", "extra"),
         convert = TRUE
       )
