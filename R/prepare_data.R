@@ -66,8 +66,8 @@ shape_data <- function (long_data,
   long_data$item <- long_data[[item_var]]
   long_data$value <- as.numeric(long_data[[value_var]])
   long_data <- dplyr::select(long_data,
-                            .data$unit, .data$UNIT,
-                            .data$time, .data$TIME, .data$item, .data$value)
+                            .data$unit, .data$UNIT, .data$time,
+                            .data$TIME, .data$item, .data$value)
   items <- sort(unique(long_data$item))
 
   unique_df <- long_data %>%
