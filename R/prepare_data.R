@@ -33,6 +33,7 @@
 #' @return A list formatted for Stan
 #'
 #' @import magrittr
+#' @importFrom rlang .data
 #'
 #' @export
 shape_data <- function (long_data,
@@ -64,8 +65,9 @@ shape_data <- function (long_data,
   long_data$TIME <- factor(long_data[[time_var]], periods_to_estimate)
   long_data$item <- long_data[[item_var]]
   long_data$value <- as.numeric(long_data[[value_var]])
-  long_data <- dplyr::select(long_data, unit, UNIT,
-                            time, TIME, item, value)
+  long_data <- dplyr::select(long_data,
+                            .data$unit, .data$UNIT,
+                            .data$time, .data$TIME, .data$item, .data$value)
   items <- sort(unique(long_data$item))
 
   unique_df <- long_data %>%

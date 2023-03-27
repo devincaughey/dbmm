@@ -16,6 +16,9 @@ identify_draws(
 \arguments{
 \item{id_with}{}
 }
+\value{
+Identified draws
+}
 \description{
 Identify the sign and rotation of the output
 }

@@ -14,7 +14,7 @@
 #'     expressions. Parameters that match any of the regular expressions will be dropped
 #' @param format
 #'
-#' @return
+#' @return Draws
 #'
 #' @import magrittr
 #' @import cmdstanr
@@ -42,7 +42,7 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df")
 #' @param normalize
 #' @param id_with
 #'
-#' @return
+#' @return Identified draws
 #'
 #' @import magrittr
 #'
@@ -57,8 +57,8 @@ identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
     }
     outcomes_id <- identify_rotation(raw_draws, varimax = varimax,
                                      normalize = normalize, id_with = id_with)
-    outcomes_id$id_draws <-
-      identify_sign(outcomes_id$id_draws, sign = sign)$id_draws
+    outcomes_id$id_draws <- identify_sign(outcomes_id$id_draws,
+                                          sign = sign)$id_draws
   } else {
     if (is.null(sign)) {
       sign <- c(-1, -1)
@@ -71,13 +71,14 @@ identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
 }
 
 
+#' Identify the rotation of the output
 #'
 #' @param raw_draws
 #' @param varimax
 #' @param normalize
 #' @param id_with
 #'
-#' @return
+#' @return Rotated object
 #'
 #' @import magrittr
 #'
@@ -125,8 +126,8 @@ identify_rotation <- function (raw_draws, varimax,
   Q0 <- array(NA, dim = c(S, C, D, D))
 
   for (s in 1:S) {
-    for (c in 1:C) {
-      Q0[s, c, 1:D, 1:D] <- diag(rep(1, D))
+    for (c_cur in 1:C) {
+      Q0[s, c_cur, 1:D, 1:D] <- diag(rep(1, D))
     }
   }
   Q1 <- Q0
@@ -150,35 +151,32 @@ identify_rotation <- function (raw_draws, varimax,
     ## 1. Apply varimax rotation
     cat("\n**** Applying varimax rotations...")
     for (s in 1:S) {
-      for (c in 1:C) {
+      for (c_cur in 1:C) {
         if (id_with == "binary") {
-          row <- Lb0$.chain == c & Lb0$.iteration == s
+          row <- Lb0$.chain == c_cur & Lb0$.iteration == s
           Lb0_cs <- matrix(
             as.numeric(Lb0[row, lcols_b]), nrow = Ib, ncol = D
           )
           vm <- stats::varimax(Lb0_cs, normalize = normalize)
           Lb1[row, lcols_b] <- t(as.numeric(vm$loadings))
-        }
-        else if (id_with == "ordinal") {
-          row <- Lo0$.chain == c & Lo0$.iteration == s
+        } else if (id_with == "ordinal") {
+          row <- Lo0$.chain == c_cur & Lo0$.iteration == s
           Lo0_cs <- matrix(
             as.numeric(Lo0[row, lcols_o]), nrow = Io, ncol = D
           )
           vm <- varimax(Lo0_cs, normalize = normalize)
           Lo1[row, lcols_o] <- t(as.numeric(vm$loadings))
-        }
-        else if (id_with == "metric") {
-          row <- Lm0$.chain == c & Lm0$.iteration == s
+        } else if (id_with == "metric") {
+          row <- Lm0$.chain == c_cur & Lm0$.iteration == s
           Lm0_cs <- matrix(
             as.numeric(Lm0[row, lcols_m]), nrow = Im, ncol = D
           )
           vm <- varimax(Lm0_cs, normalize = normalize)
           Lm1[row, lcols_m] <- t(as.numeric(vm$loadings))
+        } else {
+          stop("Invalid `id_with` argument")
         }
-        else {
-          stop("Invalid")
-        }
-        Q1[s, c, 1:D, 1:D] <- vm$rotmat
+        Q1[s, c_cur, 1:D, 1:D] <- vm$rotmat
       }
     }
     cat("done.\n")
@@ -191,21 +189,21 @@ identify_rotation <- function (raw_draws, varimax,
   for (c_cur in 1:C) {
     if (id_with == "binary") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lb1,
-                                      c = c_cur,
+                                      c_cur = c_cur,
                                       lcols = lcols_b,
                                       id_with = "binary")
     } else if (id_with == "ordinal") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lo1,
-                                      c = c_cur,
+                                      c_cur = c_cur,
                                       lcols = lcols_o,
                                       id_with = "ordinal")
     } else if (id_with == "metric") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lm1,
-                                      c = c_cur,
+                                      c_cur = c_cur,
                                       lcols = lcols_m,
                                       id_with = "metric")
     } else {
-      stop("Invalid")
+      stop("Invalid `id_with` argument")
     }
     sv <- sp_out[[c_cur]]$sign_vectors
     pv <- sp_out[[c_cur]]$permute_vectors
@@ -232,11 +230,13 @@ identify_rotation <- function (raw_draws, varimax,
       Q3[s, c_cur, 1:D, 1:D] <- t(as.matrix(sm) %*% as.matrix(pm))
     }
   }
+
   Lb3 <- Lb0
   Lo3 <- Lo0
   Lm3 <- Lm0
   E3 <- E0
   S3 <- S0
+
   for (c_cur in 1:C) {
     cat("\n** Rotating chain", c_cur, "...")
     for (s in 1:S) {
@@ -291,6 +291,7 @@ identify_rotation <- function (raw_draws, varimax,
       }
     }
   }
+
   id_draws <- raw_draws
   id_draws[, stringr::str_detect(names(id_draws), "^lambda_binary\\[")] <-
     Lb3[, lcols_b]
@@ -301,14 +302,17 @@ identify_rotation <- function (raw_draws, varimax,
   id_draws[, stringr::str_detect(names(id_draws), "^eta\\[")] <- E3[, ecols]
   id_draws[, stringr::str_detect(names(id_draws), "^sigma_eta_evol\\[")] <-
     S3[, 1:D]
+
   result <- list(
     id_draws = id_draws,
     rotmats = list()
   )
+
   result$rotmats$Q <- Q0
   result$rotmats$Q1 <- Q1
   result$rotmats$Q2 <- Q2
   result$rotmats$Q3 <- Q3
+
   for (s in 1:S) {
     for (c_cur in 1:C) {
       result$rotmats$Q[s, c_cur, 1:D, 1:D] <-
@@ -317,6 +321,7 @@ identify_rotation <- function (raw_draws, varimax,
         Q3[s, c_cur, 1:D, 1:D]
     }
   }
+
   return(result)
 }
 
@@ -328,12 +333,14 @@ extract_draws_match <- function(raw_draws, regex_pars) {
 }
 
 
+#' Permute signs
+#'
 #' @param lambda_item lambda object
 #' @param c_cur current row indicator
 #' @param lcols column
 #' @param id_with
 #'
-#' @return sign-permuted object
+#' @return A sign-permuted object
 #'
 sign_permute <- function(lambda_item, c_cur, lcols,
                         id_with = c("binary", "ordinal", "metric"))
@@ -359,7 +366,7 @@ sign_permute <- function(lambda_item, c_cur, lcols,
   } else if (id_with == "metric") {
     replace_original <- "lambda_metric\\[([0-9]+),([0-9]+)\\]$"
   } else {
-    stop("Inavlud `id_with` argument")
+    stop("Invalid `id_with` argument")
   }
 
   colord <- order(var, dim)
@@ -378,15 +385,9 @@ sign_permute <- function(lambda_item, c_cur, lcols,
   )
 
   return(out)
-
 }
 
 
-#'
-#' @param beta_rsp
-#'
-#' @return list of
-#'
 harmonize_varimax <- function (beta_rsp) {
   nChains <- length(beta_rsp)
   cnames <- colnames(beta_rsp[[1]]$lambda_reordered_mcmc)
@@ -396,9 +397,11 @@ harmonize_varimax <- function (beta_rsp) {
   lambda_hat_values <- matrix(nrow = nChains, ncol = d)
   colnames(lambda_hat_values) <-
     colnames(beta_rsp[[1]]$lambda_reordered_mcmc)
+
   for (i in 1:nChains) {
     lambda_hat_values[i, ] <- c(t(beta_rsp[[i]]$lambda_hat))
   }
+
   tankard <- factor.switching::rsp_exact(
     lambda_mcmc = lambda_hat_values,
     maxIter = 100,
@@ -432,19 +435,22 @@ harmonize_varimax <- function (beta_rsp) {
       )
   }
   reorderedChains <- coda::as.mcmc.list(reorderedChains)
+
   return(list(mcmc = reorderedChains,
               sign_vectors = tankard$sign_vectors,
               permute_vectors = tankard$permute_vectors))
 }
 
 
+#' Identify signs
 #'
 #' @param raw_drawas
 #' @param sign
 #'
-#' @return
+#' @return A list
 #'
 #' @import magrittr
+#' @importFrom rlang .data
 #'
 identify_sign <- function (raw_draws, sign) {
   raw_draws_df <- posterior::as_draws_df(raw_draws)
@@ -474,7 +480,7 @@ identify_sign <- function (raw_draws, sign) {
     dplyr::group_by(.data$.chain, .data$dimension) %>%
     dplyr::summarise(flip = (sign * mean.default(.data$est)) < 0,
                     .groups = "drop") %>%
-    dplyr::select(".chain", "dimension", "flip")
+    dplyr::select(.data$.chain, .data$dimension, .data$flip)
 
   identified_draws <- raw_draws_df
 
@@ -499,7 +505,10 @@ identify_sign <- function (raw_draws, sign) {
 #' @param draws
 #' @param regex_pars
 #'
+#' @return A list
+#'
 #' @import magrittr
+#' @importFrom rlang .data
 #'
 #' @export
 label_draws <- function (draws, regex_pars = NULL)
@@ -556,8 +565,8 @@ label_draws <- function (draws, regex_pars = NULL)
           TIME = factor(.data$time, labels = attr(draws, "time_labels")),
           UNIT = factor(.data$unit, labels = attr(draws, "unit_labels"))
         ) %>%
-        dplyr::select("par", "TIME", "UNIT", "dim", "value",
-                      dplyr::everything())
+        dplyr::select(.data$par, .data$TIME, .data$UNIT,
+                      .data$dim, .data$value, dplyr::everything())
     } else if (regex_pars_p == "sigma_eta_evol\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -567,7 +576,7 @@ label_draws <- function (draws, regex_pars = NULL)
                                   "[\\[,\\]]", simplify = TRUE)[, 2],
           dplyr::across(.data$dim, as.integer),
         ) %>%
-        dplyr::select("par", "dim", "value", dplyr::everything())
+        dplyr::select(.data$par, .data$dim, .data$value, dplyr::everything())
     } else if (regex_pars_p == "^lambda_binary\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -583,7 +592,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "binary_item_labels")
           )
         ) %>%
-        dplyr::select("par", "ITEM", "dim", "value", dplyr::everything())
+        dplyr::select(.data$par, .data$ITEM, .data$dim,
+                      .data$value, dplyr::everything())
     } else if (regex_pars_p == "^lambda_metric\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -599,7 +609,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "metric_item_labels")
           )
         ) %>%
-        dplyr::select("par", "ITEM", "dim", "value", dplyr::everything())
+        dplyr::select(.data$par, .data$ITEM, .data$dim,
+                      .data$value, dplyr::everything())
     } else if (regex_pars_p == "^sigma_metric\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -613,7 +624,7 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "metric_item_labels")
           )
         ) %>%
-        dplyr::select("par", "ITEM", "value", dplyr::everything())
+        dplyr::select(.data$par, .data$ITEM, .data$value, dplyr::everything())
     } else if (regex_pars_p == "^alpha_metric\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -630,7 +641,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "metric_item_labels")
           )
         ) %>%
-        dplyr::select("par", "TIME", "ITEM", "value", dplyr::everything())
+        dplyr::select(.data$par, .data$TIME, .data$ITEM,
+                      .data$value, dplyr::everything())
     } else if (regex_pars_p == "^alpha_binary\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -647,7 +659,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "binary_item_labels")
           )
         ) %>%
-        dplyr::select("par", "TIME", "ITEM", "value", dplyr::everything())
+        dplyr::select(.data$par, .data$TIME, .data$ITEM,
+                      .data$value, dplyr::everything())
     } else if (regex_pars_p == "^lambda_ordinal\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -663,7 +676,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "ordinal_item_labels")
           )
         ) %>%
-        dplyr::select("par", "ITEM", "dim", "value", dplyr::everything())
+        dplyr::select(.data$par, .data$ITEM, .data$dim,
+                      .data$value, dplyr::everything())
     } else if (regex_pars_p == "^kappa\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -680,7 +694,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "ordinal_item_labels")
           )
         ) %>%
-        dplyr::select("par", "ITEM", "threshold", "value", dplyr::everything())
+        dplyr::select(.data$par, .data$ITEM, .data$threshold,
+                      .data$value, dplyr::everything())
     } else if (regex_pars_p == "^alpha_ordinal\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -697,11 +712,12 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "ordinal_item_labels")
           )
         ) %>%
-        dplyr::select("par", "TIME", "ITEM", "value", dplyr::everything())
+        dplyr::select(.data$par, .data$TIME, .data$ITEM,
+                      .data$value, dplyr::everything())
     } else if (regex_pars_p == "^sigma_alpha_evol") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::rename(par = "name") %>%
-        dplyr::select("par", "value", dplyr::everything())
+        dplyr::select(.data$par, "value", dplyr::everything())
     } else {
       # pass the element that does not match regex
       next

@@ -26,13 +26,16 @@ Imports:
     factor.switching,
     ggplot2 (>= 3.4.0),
     ggrepel,
-    magrittr  (>= 2.0.0),
+    magrittr (>= 2.0.0),
     methods,
     posterior,
     reshape2,
+    rlang,
     seriation,
+    stats,
     stringr (>= 1.5.0),
     tidyr (>= 1.0.0)
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+LazyData: TRUE
