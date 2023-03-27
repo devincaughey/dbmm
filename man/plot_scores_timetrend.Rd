@@ -4,10 +4,16 @@
 \alias{plot_scores_timetrend}
 \title{plot time series factor scores}
 \usage{
-plot_scores_timetrend(outcomes_labeled)
+plot_scores_timetrend(
+  outcomes_labeled,
+  xdim = "Dimension 1 (Valence)",
+  ydim = "Dimension 2 (Spatial)"
+)
 }
 \arguments{
-\item{outcomes_labeled}{}
+\item{xdim}{(string) x-axis label for the plot}
+
+\item{ydim}{(string) y-axis label for the plot}
 }
 \value{
 plot
