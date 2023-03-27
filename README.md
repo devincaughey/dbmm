@@ -21,5 +21,5 @@ devtools::install_github("tomoya-sasaki/dynIRTtest")
 
 ## TODOs
 
-- \[\] Add descriptions
-- \[\] Figure specifications
+- [ ] Add descriptions
+- [ ] Figure specifications
