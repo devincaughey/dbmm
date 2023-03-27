@@ -48,8 +48,7 @@ shape_data <- function (long_data,
                         make_indicator_for_zeros = TRUE,
                         periods_to_estimate = NULL)
 {
-  # TODO: check the input
-
+  # TODO: check the input?
 
   stdize <- function (x) (x - mean(x, na.rm = TRUE)) / stats::sd(x, na.rm = TRUE)
 
@@ -114,7 +113,6 @@ shape_data <- function (long_data,
   cat("\nCategorizing the following items as metric:\n")
   cat(c("  *", paste(metric_items, collapse = "\n  * "), "\n"))
 
-  # NOTE: use functions?
   binary_data <- long_data %>%
     dplyr::filter(.data$item %in% binary_items) %>%
     dplyr::mutate(ITEM = factor(.data$item, levels = binary_items)) %>%
