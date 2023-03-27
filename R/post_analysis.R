@@ -7,10 +7,11 @@
 #   Please report the issue to the authors.
 
 
-#' Extract object from a stan output
+#' Extract draws from fitted model
 #'
-#' @param fit
-#' @param drop_rex
+#' @param fit (dynIRT object) A fitted model produced by `fit()`.
+#' @param drop_rex (character vector) A vector of regular
+#'     expressions. Parameters that match any of the regular expressions will be dropped
 #' @param format
 #'
 #' @return
@@ -21,8 +22,8 @@
 #' @export
 extract_draws <- function (fit, drop_rex = "^z_", format = "df")
 {
-  draws <- fit$draws(format = format) %>%
-    dplyr::select(-dplyr::matches(drop_rex))
+  draws <- fit$draws(format = format)
+  draws <- dplyr::select(-dplyr::matches(drop_rex))
 
   attr(draws, "unit_labels") <- attr(fit, "unit_labels")
   attr(draws, "time_labels") <- attr(fit, "time_labels")
