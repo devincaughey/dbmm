@@ -23,3 +23,7 @@ devtools::install_github("tomoya-sasaki/dynIRTtest")
 
 - [ ] Add descriptions
 - [ ] Figure specifications
+
+## Explanation
+
+- How to use `dynIRTtest`
