@@ -84,3 +84,9 @@ fitted <- fit(
 )
 ```
 
+### Step 4: Post analysis
+
+```{r,eval=FALSE}
+
+```
+
