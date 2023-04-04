@@ -10,11 +10,14 @@
 #' Extract draws from fitted model
 #'
 #' @param fit (dynIRT object) A fitted model produced by `fit()`.
-#' @param drop_rex (character vector) A vector of regular
-#'     expressions. Parameters that match any of the regular expressions will be dropped
-#' @param format
+#' @param drop_rex (character vector) A vector of regular expressions.
+#'     Parameters that match any of the regular expressions will be dropped.
+#' @param format (string) The format of the returned draws or point
+#'     estimates. Must be a valid format from the ‘posterior’ package. The
+#'     default is `"df"`, which is what other `dynIRTtest` functions will
+#'     expect, but other options include `"array"`, `"matrix"`, and `"list"`.
 #'
-#' @return Draws
+#' @return Draws from the posterior distribution of the selected parameters.
 #'
 #' @import magrittr
 #' @import cmdstanr
