@@ -7,7 +7,7 @@ shaped_data <- shape_data(
     item_var = "outcome",
     value_var = "value",
     standardize = TRUE,
-    periods_to_estimate = 2021
+    periods_to_estimate = 2020:2021
 )
 
 fitted <- fit(
