@@ -1,7 +1,7 @@
-data(social_outcomes_2021)
+data(social_outcomes_2020_2021)
 
 shaped_data <- shape_data(
-    long_data = social_outcomes_2021,
+    long_data = social_outcomes_2020_2021,
     unit_var = "st",
     time_var = "year",
     item_var = "outcome",

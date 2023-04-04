@@ -2,16 +2,21 @@
 % Please edit documentation in R/post_analysis.R
 \name{extract_draws}
 \alias{extract_draws}
-\title{Extract object from a stan output}
+\title{Extract draws from fitted model}
 \usage{
 extract_draws(fit, drop_rex = "^z_", format = "df")
 }
 \arguments{
+\item{fit}{(dynIRT object) A fitted model produced by \code{fit()}.}
+
+\item{drop_rex}{(character vector) A vector of regular
+expressions. Parameters that match any of the regular expressions will be dropped}
+
 \item{format}{}
 }
 \value{
 Draws
 }
 \description{
-Extract object from a stan output
+Extract draws from fitted model
 }

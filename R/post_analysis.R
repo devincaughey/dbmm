@@ -23,7 +23,7 @@
 extract_draws <- function (fit, drop_rex = "^z_", format = "df")
 {
   draws <- fit$draws(format = format)
-  draws <- dplyr::select(-dplyr::matches(drop_rex))
+  draws <- draws %>% dplyr::select(-dplyr::matches(drop_rex))
 
   attr(draws, "unit_labels") <- attr(fit, "unit_labels")
   attr(draws, "time_labels") <- attr(fit, "time_labels")
@@ -479,7 +479,7 @@ identify_sign <- function (raw_draws, sign) {
     dplyr::group_by(.data$.chain, .data$dimension) %>%
     dplyr::summarise(flip = (sign * mean.default(.data$est)) < 0,
                     .groups = "drop") %>%
-    dplyr::select(.data$.chain, .data$dimension, .data$flip)
+    dplyr::select(.chain, dimension, flip)
 
   identified_draws <- raw_draws_df
 
@@ -564,8 +564,8 @@ label_draws <- function (draws, regex_pars = NULL)
           TIME = factor(.data$time, labels = attr(draws, "time_labels")),
           UNIT = factor(.data$unit, labels = attr(draws, "unit_labels"))
         ) %>%
-        dplyr::select(.data$par, .data$TIME, .data$UNIT,
-                      .data$dim, .data$value, dplyr::everything())
+        dplyr::select(par, TIME, UNIT,
+                      dim, value, dplyr::everything())
     } else if (regex_pars_p == "sigma_eta_evol\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -575,7 +575,7 @@ label_draws <- function (draws, regex_pars = NULL)
                                   "[\\[,\\]]", simplify = TRUE)[, 2],
           dplyr::across(.data$dim, as.integer),
         ) %>%
-        dplyr::select(.data$par, .data$dim, .data$value, dplyr::everything())
+        dplyr::select(par, dim, value, dplyr::everything())
     } else if (regex_pars_p == "^lambda_binary\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -591,8 +591,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "binary_item_labels")
           )
         ) %>%
-        dplyr::select(.data$par, .data$ITEM, .data$dim,
-                      .data$value, dplyr::everything())
+        dplyr::select(par, ITEM, dim,
+                      value, dplyr::everything())
     } else if (regex_pars_p == "^lambda_metric\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -608,8 +608,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "metric_item_labels")
           )
         ) %>%
-        dplyr::select(.data$par, .data$ITEM, .data$dim,
-                      .data$value, dplyr::everything())
+        dplyr::select(par, ITEM, dim,
+                      value, dplyr::everything())
     } else if (regex_pars_p == "^sigma_metric\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -623,7 +623,7 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "metric_item_labels")
           )
         ) %>%
-        dplyr::select(.data$par, .data$ITEM, .data$value, dplyr::everything())
+        dplyr::select(par, ITEM, value, dplyr::everything())
     } else if (regex_pars_p == "^alpha_metric\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -640,8 +640,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "metric_item_labels")
           )
         ) %>%
-        dplyr::select(.data$par, .data$TIME, .data$ITEM,
-                      .data$value, dplyr::everything())
+        dplyr::select(par, TIME, ITEM,
+                      value, dplyr::everything())
     } else if (regex_pars_p == "^alpha_binary\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -658,8 +658,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "binary_item_labels")
           )
         ) %>%
-        dplyr::select(.data$par, .data$TIME, .data$ITEM,
-                      .data$value, dplyr::everything())
+        dplyr::select(par, TIME, ITEM,
+                      value, dplyr::everything())
     } else if (regex_pars_p == "^lambda_ordinal\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -675,8 +675,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "ordinal_item_labels")
           )
         ) %>%
-        dplyr::select(.data$par, .data$ITEM, .data$dim,
-                      .data$value, dplyr::everything())
+        dplyr::select(par, ITEM, dim,
+                      value, dplyr::everything())
     } else if (regex_pars_p == "^kappa\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -693,8 +693,8 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "ordinal_item_labels")
           )
         ) %>%
-        dplyr::select(.data$par, .data$ITEM, .data$threshold,
-                      .data$value, dplyr::everything())
+        dplyr::select(par, ITEM, threshold,
+                      value, dplyr::everything())
     } else if (regex_pars_p == "^alpha_ordinal\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
@@ -711,12 +711,12 @@ label_draws <- function (draws, regex_pars = NULL)
             labels = attr(draws, "ordinal_item_labels")
           )
         ) %>%
-        dplyr::select(.data$par, .data$TIME, .data$ITEM,
-                      .data$value, dplyr::everything())
+        dplyr::select(par, TIME, ITEM,
+                      value, dplyr::everything())
     } else if (regex_pars_p == "^sigma_alpha_evol") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::rename(par = "name") %>%
-        dplyr::select(.data$par, "value", dplyr::everything())
+        dplyr::select(par, value, dplyr::everything())
     } else {
       # pass the element that does not match regex
       next
