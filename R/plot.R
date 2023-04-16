@@ -1,4 +1,3 @@
-
 #' @import magrittr
 create_metric_label <- function(outcomes_labeled) {
   metric_labels <- attr(outcomes_labeled, "metric_item_labels") %>%
@@ -12,7 +11,6 @@ create_metric_label <- function(outcomes_labeled) {
 
   return(metric_labels)
 }
-
 
 
 #' plot item intercepts
