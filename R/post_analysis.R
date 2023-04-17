@@ -37,7 +37,7 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df")
 }
 
 
-#' Identify the sign and rotation of the output
+#' Identify the sign and rotation of the parameter draws
 #'
 #' @param raw_draws
 #' @param rotate
