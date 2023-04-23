@@ -4,13 +4,22 @@
 \alias{plot_loadings}
 \title{plot item loadings}
 \usage{
-plot_loadings(outcomes_labeled)
+plot_loadings(
+  outcomes_labeled,
+  xtitle = NULL,
+  ytitle = NULL,
+  maintitle = "Item Loadings"
+)
 }
 \arguments{
-\item{outcomes_labeled}{}
+\item{xtitle}{(string) x-axis label of the plot}
+
+\item{ytitle}{(string) y-axis label of the plot}
+
+\item{maintitle}{(string) Title of the plot. Default is ``Item Loadings''}
 }
 \value{
-plot
+A plot showing item loadings
 }
 \description{
 plot item loadings

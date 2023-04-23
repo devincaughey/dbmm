@@ -2,7 +2,7 @@
 % Please edit documentation in R/post_analysis.R
 \name{identify_draws}
 \alias{identify_draws}
-\title{Identify the sign and rotation of the output}
+\title{Identify the sign and rotation of the parameter draws}
 \usage{
 identify_draws(
   raw_draws,
@@ -20,5 +20,5 @@ identify_draws(
 Identified draws
 }
 \description{
-Identify the sign and rotation of the output
+Identify the sign and rotation of the parameter draws
 }
