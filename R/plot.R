@@ -18,14 +18,20 @@ create_metric_label <- function(outcomes_labeled) {
 #' plot item intercepts
 #'
 #' @param outcomes_labeled
+#' @param xtitle (string) x-axis label of the plot
+#' @param ytitle (string) y-axis label of the plot
+#' @param maintitle (string) Title of the plot
 #'
-#' @return plot
+#' @return A plot showing the estimated intercept
 #'
 #' @import magrittr ggplot2
 #' @importFrom rlang .data
 #'
 #' @export
-plot_intercept <- function(outcomes_labeled) {
+plot_intercept <- function(outcomes_labeled,
+                          xtitle = NULL,
+                          ytitle = "Estimated Intercept",
+                          maintitle = NULL) {
   metric_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
   outcomes_labeled$alpha_metric %>%
     dplyr::group_by(.data$TIME, .data$ITEM) %>%
@@ -53,11 +59,11 @@ plot_intercept <- function(outcomes_labeled) {
       ) +
       # scale_x_continuous(breaks = seq(1960, 2020, 20)) +
       labs(
-        title = "Item Intercepts over Time",
-        y = "Estimated Intercept",
-        x = NULL,
-        color = NULL,
-        fill = NULL
+        title = maintitle,
+        y = ytitle,
+        x = xtitle
+        # color = NULL,
+        # fill = NULL
       ) -> p
 
   p
@@ -67,14 +73,20 @@ plot_intercept <- function(outcomes_labeled) {
 #' plot item loadings
 #'
 #' @param outcomes_labeled
-#'
-#' @return plot
+#' @param xtitle (string) x-axis label of the plot
+#' @param ytitle (string) y-axis label of the plot
+#' @param maintitle (string) Title of the plot. Default is ``Item Loadings''
+
+#' @return A plot showing item loadings
 #'
 #' @import magrittr ggplot2
 #' @importFrom rlang .data
 #'
 #' @export
-plot_loadings <- function(outcomes_labeled) {
+plot_loadings <- function(outcomes_labeled,
+                          xtitle = NULL,
+                          ytitle = NULL,
+                          maintitle = "Item Loadings") {
   metric_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
 
   outcomes_labeled$lambda_metric %>%
@@ -99,11 +111,11 @@ plot_loadings <- function(outcomes_labeled) {
             alpha = 1/4, linewidth = 2
       ) +
       ggrepel::geom_text_repel() +
-      # labs(
-      #     title = "Item Loadings",
-      #     x = "Dimension 1 (Valence)",
-      #     y = "Dimension 2 (Spatial)"
-      # ) +
+      labs(
+          title = maintitle,
+          x = xtitle,
+          y = ytitle
+      ) +
       coord_fixed() -> p
 
   p
@@ -128,18 +140,20 @@ create_factor_scores <- function(outcomes_labeled) {
 #' plot average factor scores
 #'
 #' @param outcomes_labeled
-#' @param xdim (string) x-axis label for the plot
-#' @param ydim (string) y-axis label for the plot
+#' @param xtitle (string) x-axis label of the plot
+#' @param ytitle (string) y-axis label of the plot
+#' @param maintitle (string) Title of the plot
 #'
-#' @return plot
+#' @return A plot showing average factor scores
 #'
 #' @import magrittr ggplot2
 #' @importFrom rlang .data
 #'
 #' @export
 plot_scores_ave <- function(outcomes_labeled,
-                            xdim = "Dimension 1 (Valence)",
-                            ydim = "Dimension 2 (Spatial)")
+                            xtitle = NULL,
+                            ytitle = NULL,
+                            maintitle = NULL)
 {
   eta_ave <- create_factor_scores(outcomes_labeled = outcomes_labeled)
 
@@ -161,9 +175,9 @@ plot_scores_ave <- function(outcomes_labeled,
       geom_point() +
       ggrepel::geom_text_repel()  +
       labs(
-        # title = "Average State Outcome Scores",
-        x = xdim,
-        y = ydim
+        title = maintitle,
+        x = xtitle,
+        y = ytitle
       ) +
       coord_fixed() -> p
 
@@ -174,18 +188,22 @@ plot_scores_ave <- function(outcomes_labeled,
 #' plot time series factor scores
 #'
 #' @param outcomes_labeled
-#' @param xdim (string) x-axis label for the plot
-#' @param ydim (string) y-axis label for the plot
+#' @param xtitle (string) x-axis label of the plot
+#' @param ytitle (string) y-axis label of the plot
+#' @param maintitle (string) Title of the plot
 #'
-#' @return plot
+#' @return A plot plot showing time trend
 #'
 #' @import magrittr ggplot2
 #' @importFrom rlang .data
 #'
 #' @export
 plot_scores_timetrend <- function(outcomes_labeled,
-                                  xdim = "Dimension 1 (Valence)",
-                                  ydim = "Dimension 2 (Spatial)")
+                                  xdim,
+                                  ydim,
+                                  xtitle = "Dimension 1",
+                                  ytitle = "Dimension 2",
+                                  maintitle = NULL)
 {
   outcomes_labeled$eta %>%
     dplyr::group_by(.data$TIME, .data$UNIT, .data$dim) %>%
@@ -193,8 +211,7 @@ plot_scores_timetrend <- function(outcomes_labeled,
                     err = stats::sd(.data$value),
                     .groups = "drop") %>%
     dplyr::mutate(
-      DIMENSION = dplyr::if_else(.data$dim == 1, xdim,
-                                ydim),
+      DIMENSION = dplyr::if_else(.data$dim == 1, xtitle, ytitle),
       UNIT = stats::reorder(.data$UNIT, -.data$est, FUN = mean),
       year = as.integer(as.character(.data$TIME))
     ) %>%
@@ -213,13 +230,13 @@ plot_scores_timetrend <- function(outcomes_labeled,
       scale_color_brewer(type = "qual") +
       scale_fill_brewer(type = "qual") +
       # coord_cartesian(ylim = c(-3.2, 3.2)) +
-      # labs(
-      #   title = "State Outcome Scores over Time",
-      #   y = "Estimated Factor Score",
-      #   x = NULL,
-      #   color = NULL,
-      #   fill = NULL
-      # ) +
+      labs(
+        title = maintitle,
+        y = ytitle,
+        x = xtitle
+        # color = NULL,
+        # fill = NULL
+      ) +
       theme(legend.position = "bottom") -> p
 
   p

@@ -4,13 +4,22 @@
 \alias{plot_intercept}
 \title{plot item intercepts}
 \usage{
-plot_intercept(outcomes_labeled)
+plot_intercept(
+  outcomes_labeled,
+  xtitle = NULL,
+  ytitle = "Estimated Intercept",
+  maintitle = NULL
+)
 }
 \arguments{
-\item{outcomes_labeled}{}
+\item{xtitle}{(string) x-axis label of the plot}
+
+\item{ytitle}{(string) y-axis label of the plot}
+
+\item{maintitle}{(string) Title of the plot}
 }
 \value{
-plot
+A plot showing the estimated intercept
 }
 \description{
 plot item intercepts

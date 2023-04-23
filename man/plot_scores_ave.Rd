@@ -6,17 +6,20 @@
 \usage{
 plot_scores_ave(
   outcomes_labeled,
-  xdim = "Dimension 1 (Valence)",
-  ydim = "Dimension 2 (Spatial)"
+  xtitle = NULL,
+  ytitle = NULL,
+  maintitle = NULL
 )
 }
 \arguments{
-\item{xdim}{(string) x-axis label for the plot}
+\item{xtitle}{(string) x-axis label of the plot}
 
-\item{ydim}{(string) y-axis label for the plot}
+\item{ytitle}{(string) y-axis label of the plot}
+
+\item{maintitle}{(string) Title of the plot}
 }
 \value{
-plot
+A plot showing average factor scores
 }
 \description{
 plot average factor scores
