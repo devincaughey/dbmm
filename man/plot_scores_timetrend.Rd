@@ -6,6 +6,8 @@
 \usage{
 plot_scores_timetrend(
   outcomes_labeled,
+  xdim,
+  ydim,
   xtitle = "Dimension 1",
   ytitle = "Dimension 2",
   maintitle = NULL
