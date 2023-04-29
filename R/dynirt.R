@@ -118,6 +118,8 @@ fit <- function (data,
                 ...)
 {
 
+  check_arg_type(arg = data, typename = "dynIRT_data")
+
   stopifnot(!parallelize_within_chains || threads_per_chain > 0)
 
   ## Add model options to input data
