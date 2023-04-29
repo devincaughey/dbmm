@@ -48,7 +48,7 @@ test_that("Identified rotation", {
 
 labeled <- label_draws(identified)
 
-test_that("Labeld", {
+test_that("Labeled draws", {
   expect_true("dynIRT_labeled" %in% class(labeled))
   }
 )

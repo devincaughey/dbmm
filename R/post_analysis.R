@@ -16,6 +16,7 @@
 #'     estimates. Must be a valid format from the ‘posterior’ package. The
 #'     default is `"df"`, which is what other `dynIRTtest` functions will
 #'     expect, but other options include `"array"`, `"matrix"`, and `"list"`.
+#' @param check (logical)
 #'
 #' @return Draws from the posterior distribution of the selected parameters.
 #'
@@ -23,10 +24,13 @@
 #' @import cmdstanr
 #'
 #' @export
-extract_draws <- function (fit, drop_rex = "^z_", format = "df")
+extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 {
 
-  check_arg_type(arg = fit, typename = "dynIRT_fitted")
+  if (check) {
+    check_arg_type(arg = fit, typename = "dynIRT_fitted")
+  }
+
   draws <- fit$fit$draws(format = format)
 
   # draws <- fit$draws(format = format)
@@ -55,6 +59,7 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df")
 #' @param varimax
 #' @param normalize
 #' @param id_with
+#' @param check (logical)
 #'
 #' @return Identified draws
 #'
@@ -62,9 +67,11 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df")
 #'
 #' @export
 identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
-                          normalize = TRUE, id_with = NULL, sign = NULL)
+                          normalize = TRUE, id_with = NULL, sign = NULL, check = TRUE)
 {
-  check_arg_type(arg = raw_draws, typename = "draws_df")
+  if (check) {
+    check_arg_type(arg = raw_draws, typename = "draws_df")
+  }
 
   if (rotate) {
     if (is.null(sign)) {
@@ -523,6 +530,7 @@ identify_sign <- function (raw_draws, sign) {
 #'
 #' @param draws
 #' @param regex_pars
+#' @param check (logical)
 #'
 #' @return A list
 #'
@@ -530,9 +538,11 @@ identify_sign <- function (raw_draws, sign) {
 #' @importFrom rlang .data
 #'
 #' @export
-label_draws <- function (draws, regex_pars = NULL)
+label_draws <- function (draws, regex_pars = NULL, check = TRUE)
 {
-  check_arg_type(arg = draws, typename = "dynIRT_identified")
+  if (check) {
+    check_arg_type(arg = draws, typename = "dynIRT_identified")
+  }
 
   draws <- draws$id_draws
 
@@ -584,7 +594,7 @@ label_draws <- function (draws, regex_pars = NULL)
                                   "[\\[,\\]]", simplify = TRUE)[, 3],
           dim = stringr::str_split(.data$name,
                                   "[\\[,\\]]", simplify = TRUE)[, 4],
-          dplyr::across(.data$time:.data$dim, as.integer),
+          dplyr::across(time:dim, as.integer),
           TIME = factor(.data$time, labels = attr(draws, "time_labels")),
           UNIT = factor(.data$unit, labels = attr(draws, "unit_labels"))
         ) %>%
@@ -597,7 +607,7 @@ label_draws <- function (draws, regex_pars = NULL)
                                   "[\\[,\\]]", simplify = TRUE)[, 1],
           dim = stringr::str_split(.data$name,
                                   "[\\[,\\]]", simplify = TRUE)[, 2],
-          dplyr::across(.data$dim, as.integer),
+          dplyr::across(dim, as.integer),
         ) %>%
         dplyr::select(par, dim, value, dplyr::everything())
     } else if (regex_pars_p == "^lambda_binary\\[") {
@@ -609,7 +619,7 @@ label_draws <- function (draws, regex_pars = NULL)
                                   "[\\[,\\]]", simplify = TRUE)[, 2],
           dim = stringr::str_split(.data$name,
                                   "[\\[,\\]]", simplify = TRUE)[, 3],
-          dplyr::across(.data$item:.data$dim, as.integer),
+          dplyr::across(item:dim, as.integer),
           ITEM = factor(
             x = .data$item,
             labels = attr(draws, "binary_item_labels")
@@ -626,7 +636,7 @@ label_draws <- function (draws, regex_pars = NULL)
                                   "[\\[,\\]]", simplify = TRUE)[, 2],
           dim = stringr::str_split(.data$name,
                                   "[\\[,\\]]", simplify = TRUE)[, 3],
-          dplyr::across(.data$item:.data$dim, as.integer),
+          dplyr::across(item:dim, as.integer),
           ITEM = factor(
             x = .data$item,
             labels = attr(draws, "metric_item_labels")
@@ -693,7 +703,7 @@ label_draws <- function (draws, regex_pars = NULL)
                                   "[\\[,\\]]", simplify = TRUE)[, 2],
           dim = stringr::str_split(.data$name,
                                   "[\\[,\\]]", simplify = TRUE)[, 3],
-          dplyr::across(.data$item:.data$dim, as.integer),
+          dplyr::across(item:dim, as.integer),
           ITEM = factor(
             x = .data$item,
             labels = attr(draws, "ordinal_item_labels")
