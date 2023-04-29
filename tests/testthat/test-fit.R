@@ -31,7 +31,7 @@ fitted <- fit(
     seed = 123
 )
 
-fitted_draws <- extract_draws(fitted$fit)
+fitted_draws <- extract_draws(fitted)
 
 test_that("Main extracted draws", {
   expect_equal(names(fitted_draws)[1], "lp__")

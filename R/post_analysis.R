@@ -9,7 +9,7 @@
 
 #' Extract draws from fitted model
 #'
-#' @param fit (dynIRT object) A fitted model produced by `fit()`.
+#' @param fit (`dynIRT_fitted` object) A fitted model produced by `fit()`.
 #' @param drop_rex (character vector) A vector of regular expressions.
 #'     Parameters that match any of the regular expressions will be dropped.
 #' @param format (string) The format of the returned draws or point
@@ -25,14 +25,25 @@
 #' @export
 extract_draws <- function (fit, drop_rex = "^z_", format = "df")
 {
-  draws <- fit$draws(format = format)
+
+  check_arg_type(arg = fit, typename = "dynIRT_fitted")
+  draws <- fit$fit$draws(format = format)
+
+  # draws <- fit$draws(format = format)
   draws <- draws %>% dplyr::select(-dplyr::matches(drop_rex))
 
-  attr(draws, "unit_labels") <- attr(fit, "unit_labels")
-  attr(draws, "time_labels") <- attr(fit, "time_labels")
-  attr(draws, "binary_item_labels") <- attr(fit, "binary_item_labels")
-  attr(draws, "ordinal_item_labels") <- attr(fit, "ordinal_item_labels")
-  attr(draws, "metric_item_labels") <- attr(fit, "metric_item_labels")
+  # attr(draws, "unit_labels") <- attr(fit, "unit_labels")
+  # attr(draws, "time_labels") <- attr(fit, "time_labels")
+  # attr(draws, "binary_item_labels") <- attr(fit, "binary_item_labels")
+  # attr(draws, "ordinal_item_labels") <- attr(fit, "ordinal_item_labels")
+  # attr(draws, "metric_item_labels") <- attr(fit, "metric_item_labels")
+
+  attr(draws, "unit_labels") <- attr(fit$fit, "unit_labels")
+  attr(draws, "time_labels") <- attr(fit$fit, "time_labels")
+  attr(draws, "binary_item_labels") <- attr(fit$fit, "binary_item_labels")
+  attr(draws, "ordinal_item_labels") <- attr(fit$fit, "ordinal_item_labels")
+  attr(draws, "metric_item_labels") <- attr(fit$fit, "metric_item_labels")
+
   return(draws)
 }
 
@@ -53,6 +64,8 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df")
 identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
                           normalize = TRUE, id_with = NULL, sign = NULL)
 {
+  check_arg_type(arg = raw_draws, typename = "draws_df")
+
   if (rotate) {
     if (is.null(sign)) {
       sign <- -1
@@ -189,6 +202,10 @@ identify_rotation <- function (raw_draws, varimax,
   Q2 <- Q0
   sp_out <- vector("list", length = C)
   for (c_cur in 1:C) {
+    cat("Now at c_cur", c_cur, "\n")
+    cat("    id", id_with, "\n")
+    cat(lcols_b)
+
     if (id_with == "binary") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lb1,
                                       c_cur = c_cur,
@@ -372,6 +389,7 @@ sign_permute <- function(lambda_item, c_cur, lcols,
   }
 
   colord <- order(var, dim)
+
   colnames(L_c) <- stringr::str_replace(
     colnames(L_c),
     replace_original,
