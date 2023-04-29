@@ -4,10 +4,10 @@
 \alias{extract_draws}
 \title{Extract draws from fitted model}
 \usage{
-extract_draws(fit, drop_rex = "^z_", format = "df")
+extract_draws(fit, drop_rex = "^z_", format = "df", check = TRUE)
 }
 \arguments{
-\item{fit}{(dynIRT object) A fitted model produced by \code{fit()}.}
+\item{fit}{(\code{dynIRT_fitted} object) A fitted model produced by \code{fit()}.}
 
 \item{drop_rex}{(character vector) A vector of regular expressions.
 Parameters that match any of the regular expressions will be dropped.}

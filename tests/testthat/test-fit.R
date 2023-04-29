@@ -31,7 +31,7 @@ fitted <- fit(
     seed = 123
 )
 
-fitted_draws <- extract_draws(fitted$fit)
+fitted_draws <- extract_draws(fitted)
 
 test_that("Main extracted draws", {
   expect_equal(names(fitted_draws)[1], "lp__")
@@ -45,3 +45,11 @@ test_that("Identified rotation", {
   expect_equal(length(identified$rotmats), 4)
   }
 )
+
+labeled <- label_draws(identified)
+
+test_that("Labeled draws", {
+  expect_true("dynIRT_labeled" %in% class(labeled))
+  }
+)
+
