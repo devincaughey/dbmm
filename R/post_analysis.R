@@ -83,6 +83,9 @@ identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
     outcomes_id <- identify_sign(raw_draws, sign = sign)
 
   }
+
+  class(outcomes_id) <- c("dynIRT_identified", class(outcomes_id))
+
   return(outcomes_id)
 }
 
@@ -202,10 +205,6 @@ identify_rotation <- function (raw_draws, varimax,
   Q2 <- Q0
   sp_out <- vector("list", length = C)
   for (c_cur in 1:C) {
-    cat("Now at c_cur", c_cur, "\n")
-    cat("    id", id_with, "\n")
-    cat(lcols_b)
-
     if (id_with == "binary") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lb1,
                                       c_cur = c_cur,
@@ -257,7 +256,7 @@ identify_rotation <- function (raw_draws, varimax,
   S3 <- S0
 
   for (c_cur in 1:C) {
-    cat("\n** Rotating chain", c_cur, "...")
+    cat("** Rotating chain", c_cur, "...\n")
     for (s in 1:S) {
       row <- E0$.chain == c_cur & E0$.iteration == s
       if (Ib > 0) {
@@ -533,6 +532,10 @@ identify_sign <- function (raw_draws, sign) {
 #' @export
 label_draws <- function (draws, regex_pars = NULL)
 {
+  check_arg_type(arg = draws, typename = "dynIRT_identified")
+
+  draws <- draws$id_draws
+
   # TODO: what to do with regex_pars
   if (is.null(regex_pars)) {
     regex_pars <- c(
@@ -749,6 +752,8 @@ label_draws <- function (draws, regex_pars = NULL)
   attr(draws_ls, "binary_item_labels") <- attr(draws, "binary_item_labels")
   attr(draws_ls, "ordinal_item_labels") <- attr(draws, "ordinal_item_labels")
   attr(draws_ls, "metric_item_labels") <- attr(draws, "metric_item_labels")
+
+  class(draws_ls) <- c("dynIRT_labeled", class(draws_ls))
 
   return(draws_ls)
 }

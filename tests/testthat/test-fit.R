@@ -45,3 +45,11 @@ test_that("Identified rotation", {
   expect_equal(length(identified$rotmats), 4)
   }
 )
+
+labeled <- label_draws(identified)
+
+test_that("Labeld", {
+  expect_true("dynIRT_labeled" %in% class(labeled))
+  }
+)
+
