@@ -62,7 +62,7 @@ plot_intercept2 <- function(outcomes_labeled,
   dat %>%
     dplyr::group_by(.data$TIME, .data$ITEM) %>%
     dplyr::summarise(
-      est = mean(.data$value),
+      est = mean.default(.data$value),
       err = stats::sd(.data$value),
       .groups = "drop"
     ) %>%
@@ -120,7 +120,7 @@ plot_intercept3 <- function(outcomes_labeled,
   dat %>%
     dplyr::group_by(.data$TIME, .data$ITEM) %>%
     dplyr::summarise(
-      est = mean(.data$value),
+      est = mean.default(.data$value),
       err = stats::sd(.data$value),
       .groups = "drop"
     ) %>%
@@ -175,7 +175,7 @@ plot_intercept <- function(outcomes_labeled,
   outcomes_labeled$alpha_metric %>%
     dplyr::group_by(.data$TIME, .data$ITEM) %>%
     dplyr::summarise(
-      est = mean(.data$value),
+      est = mean.default(.data$value),
       err = stats::sd(.data$value),
       .groups = "drop"
     ) %>%
@@ -231,7 +231,8 @@ plot_loadings <- function(outcomes_labeled,
   outcomes_labeled$lambda_metric %>%
     dplyr::mutate(ITEM = dplyr::recode(.data$ITEM, !!!metric_labels)) %>%
     dplyr::group_by(.data$ITEM, .data$dim) %>%
-    dplyr::summarise(est = mean(.data$value), err = stats::sd(.data$value)) %>%
+    dplyr::summarise(est = mean.default(.data$value),
+                     err = stats::sd(.data$value)) %>%
     tidyr::pivot_wider(id_cols = "ITEM", names_from = "dim",
                       values_from = c("est", "err")) %>%
     ggplot() +
@@ -266,8 +267,10 @@ plot_loadings <- function(outcomes_labeled,
 create_factor_scores <- function(outcomes_labeled) {
   eta_ave <- outcomes_labeled$eta %>%
     dplyr::group_by(.data$UNIT, .data$dim, .data$.draw) %>%
-    dplyr::summarise(ave = mean(.data$value)) %>%
-    dplyr::summarise(est = mean(.data$ave), err = stats::sd(.data$ave), .groups = "drop") %>%
+    dplyr::summarise(ave = mean.default(.data$value)) %>%
+    dplyr::summarise(est = mean.default(.data$ave),
+                     err = stats::sd(.data$ave),
+                     .groups = "drop") %>%
     dplyr::mutate(DIMENSION = paste("Dimension", .data$dim)) %>%
     tidyr::pivot_wider(id_cols = "UNIT", names_from = "dim",
                       values_from = c("est", "err"))
@@ -346,12 +349,12 @@ plot_scores_timetrend <- function(outcomes_labeled,
 {
   outcomes_labeled$eta %>%
     dplyr::group_by(.data$TIME, .data$UNIT, .data$dim) %>%
-    dplyr::summarise(est = mean(.data$value),
-                    err = stats::sd(.data$value),
-                    .groups = "drop") %>%
+    dplyr::summarise(est = mean.default(.data$value),
+                     err = stats::sd(.data$value),
+                     .groups = "drop") %>%
     dplyr::mutate(
       DIMENSION = dplyr::if_else(.data$dim == 1, xtitle, ytitle),
-      UNIT = stats::reorder(.data$UNIT, -.data$est, FUN = mean),
+      UNIT = stats::reorder(.data$UNIT, -.data$est, FUN = mean.default),
       year = as.integer(as.character(.data$TIME))
     ) %>%
     ggplot() +
