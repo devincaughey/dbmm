@@ -83,8 +83,8 @@ shape_data <- function (long_data,
     }
     if (is.na(ordinal_items)) {
         ordinal_items <- unique_df$item[unique_df$n < max_cats]
-        ordinal_items <-
-            sort(setdiff(ordinal_items, c(drop_items, binary_items)))
+        ordinal_items <- setdiff(ordinal_items, c(drop_items, binary_items))
+        ordinal_items <- sort(ordinal_items)
     }
 
     metric_items <- setdiff(items, c(binary_items, ordinal_items, drop_items))
