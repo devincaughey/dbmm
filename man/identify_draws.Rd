@@ -2,7 +2,7 @@
 % Please edit documentation in R/post_analysis.R
 \name{identify_draws}
 \alias{identify_draws}
-\title{Identify the sign and rotation of the output}
+\title{Identify the sign and rotation of the parameter draws}
 \usage{
 identify_draws(
   raw_draws,
@@ -10,15 +10,18 @@ identify_draws(
   varimax = TRUE,
   normalize = TRUE,
   id_with = NULL,
-  sign = NULL
+  sign = NULL,
+  check = TRUE
 )
 }
 \arguments{
-\item{id_with}{}
+\item{raw_draws}{(\code{draws_df}) A posterior draws}
+
+\item{check}{(logical)}
 }
 \value{
 Identified draws
 }
 \description{
-Identify the sign and rotation of the output
+Identify the sign and rotation of the parameter draws
 }

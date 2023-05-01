@@ -4,10 +4,12 @@
 \alias{label_draws}
 \title{Label the output}
 \usage{
-label_draws(draws, regex_pars = NULL)
+label_draws(draws, regex_pars = NULL, check = TRUE)
 }
 \arguments{
-\item{regex_pars}{}
+\item{draws}{(\code{dynIRT_identified}) A identified dynIRT fitted object}
+
+\item{check}{(logical)}
 }
 \value{
 A list
