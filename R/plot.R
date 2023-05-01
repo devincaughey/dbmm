@@ -40,7 +40,7 @@ create_ordinal_label <- function(outcomes_labeled) {
 }
 
 
-#' test package
+#' test function
 #' @export
 plot_intercept2 <- function(outcomes_labeled,
                           xtitle = NULL,
@@ -68,6 +68,64 @@ plot_intercept2 <- function(outcomes_labeled,
     ) %>%
     dplyr::mutate(
       ITEM = dplyr::recode(.data$ITEM, !!!combined_labels),
+      # ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd),
+      year = as.integer(as.character(.data$TIME))
+    ) %>%
+    dplyr::mutate(
+      ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd)
+    ) %>%
+    ggplot(aes(x = .data$year, y = .data$est)) +
+      # facet_wrap(~.data$ITEM, ncol = 5) +
+      facet_wrap(~.data$ITEM) +
+      geom_line() +
+      geom_ribbon(
+        aes(ymin = .data$est - 1.96 * .data$err,
+            ymax = .data$est + 1.96 * .data$err),
+            color = NA, alpha = 1/4
+      ) +
+      # scale_x_continuous(breaks = seq(1960, 2020, 20)) +
+      labs(
+        title = maintitle,
+        y = ytitle,
+        x = xtitle
+        # color = NULL,
+        # fill = NULL
+      ) -> p
+
+  p
+}
+
+
+#' test function
+#' @export
+plot_intercept3 <- function(outcomes_labeled,
+                          xtitle = NULL,
+                          ytitle = "Estimated Intercept",
+                          id_with = c("metric", "binary", "ordinal"),
+                          maintitle = NULL) {
+
+  if (id_with == "metric") {
+    use_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
+    dat <- outcomes_labeled$alpha_metric |> mutate(type = "metric")
+  } else if (id_with == "binary") {
+    use_labels <- create_binary_label(outcomes_labeled = outcomes_labeled)
+    dat <- outcomes_labeled$alpha_binary |> mutate(type = "binary")
+  } else if (id_with == "ordinal") {
+    use_labels  <- create_ordinal_label(outcomes_labeled = outcomes_labeled)
+    dat <- outcomes_labeled$alpha_ordinal |> mutate(type = "ordinal")
+  } else {
+    stop("Invalid `id_with` argument")
+  }
+
+  dat %>%
+    dplyr::group_by(.data$TIME, .data$ITEM) %>%
+    dplyr::summarise(
+      est = mean(.data$value),
+      err = stats::sd(.data$value),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      ITEM = dplyr::recode(.data$ITEM, !!!use_labels),
       # ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd),
       year = as.integer(as.character(.data$TIME))
     ) %>%

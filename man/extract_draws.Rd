@@ -16,6 +16,8 @@ Parameters that match any of the regular expressions will be dropped.}
 estimates. Must be a valid format from the ‘posterior’ package. The
 default is \code{"df"}, which is what other \code{dynIRTtest} functions will
 expect, but other options include \code{"array"}, \code{"matrix"}, and \code{"list"}.}
+
+\item{check}{(logical)}
 }
 \value{
 Draws from the posterior distribution of the selected parameters.
