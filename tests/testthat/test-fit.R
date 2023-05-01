@@ -52,4 +52,3 @@ test_that("Labeled draws", {
   expect_true("dynIRT_labeled" %in% class(labeled))
   }
 )
-

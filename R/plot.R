@@ -54,9 +54,9 @@ plot_intercept2 <- function(outcomes_labeled,
   combined_labels <- c(binary_labels, ordinal_labels, metric_labels)
 
   dat <- dplyr::bind_rows(
-    outcomes_labeled$alpha_binary |> mutate(type = "binary"),
-    outcomes_labeled$alpha_ordinal |> mutate(type = "ordinal"),
-    outcomes_labeled$alpha_metric |> mutate(type = "metric")
+    outcomes_labeled$alpha_binary |> dplyr::mutate(type = "binary"),
+    outcomes_labeled$alpha_ordinal |> dplyr::mutate(type = "ordinal"),
+    outcomes_labeled$alpha_metric |> dplyr::mutate(type = "metric")
   )
 
   dat %>%
@@ -106,13 +106,13 @@ plot_intercept3 <- function(outcomes_labeled,
 
   if (id_with == "metric") {
     use_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
-    dat <- outcomes_labeled$alpha_metric |> mutate(type = "metric")
+    dat <- outcomes_labeled$alpha_metric |> dplyr::mutate(type = "metric")
   } else if (id_with == "binary") {
     use_labels <- create_binary_label(outcomes_labeled = outcomes_labeled)
-    dat <- outcomes_labeled$alpha_binary |> mutate(type = "binary")
+    dat <- outcomes_labeled$alpha_binary |> dplyr::mutate(type = "binary")
   } else if (id_with == "ordinal") {
     use_labels  <- create_ordinal_label(outcomes_labeled = outcomes_labeled)
-    dat <- outcomes_labeled$alpha_ordinal |> mutate(type = "ordinal")
+    dat <- outcomes_labeled$alpha_ordinal |> dplyr::mutate(type = "ordinal")
   } else {
     stop("Invalid `id_with` argument")
   }
