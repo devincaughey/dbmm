@@ -15,7 +15,9 @@ identify_draws(
 )
 }
 \arguments{
-\item{id_with}{}
+\item{raw_draws}{(\code{draws_df}) A posterior draws}
+
+\item{check}{(logical)}
 }
 \value{
 Identified draws

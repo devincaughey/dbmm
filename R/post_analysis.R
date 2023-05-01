@@ -54,7 +54,7 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 
 #' Identify the sign and rotation of the parameter draws
 #'
-#' @param raw_draws
+#' @param raw_draws (`draws_df`) A posterior draws
 #' @param rotate
 #' @param varimax
 #' @param normalize
@@ -528,7 +528,7 @@ identify_sign <- function (raw_draws, sign) {
 
 #' Label the output
 #'
-#' @param draws
+#' @param draws (`dynIRT_identified`) A identified dynIRT fitted object
 #' @param regex_pars
 #' @param check (logical)
 #'
