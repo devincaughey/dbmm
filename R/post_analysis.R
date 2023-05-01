@@ -53,24 +53,24 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df")
 identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
                           normalize = TRUE, id_with = NULL, sign = NULL)
 {
-  if (rotate) {
     if (is.null(sign)) {
-      sign <- -1
-      cat("Using `sign`=", sign, "\n")
+        sign <- 1
+        cat("Using `sign`=", sign, "\n")
     }
-    outcomes_id <- identify_rotation(raw_draws, varimax = varimax,
-                                     normalize = normalize, id_with = id_with)
-    outcomes_id$id_draws <- identify_sign(outcomes_id$id_draws,
-                                          sign = sign)$id_draws
-  } else {
-    if (is.null(sign)) {
-      sign <- c(-1, -1)
-      cat("Using `sign`=", sign, "\n")
-    }
-    outcomes_id <- identify_sign(raw_draws, sign = sign)
+    if (rotate) {
+        outcomes_id <- identify_rotation(
+            raw_draws,
+            varimax = varimax,
+            normalize = normalize,
+            id_with = id_with
+        )
+        outcomes_id$id_draws <-
+            identify_sign(outcomes_id$id_draws, sign = sign)$id_draws
+    } else {
+        outcomes_id <- identify_sign(raw_draws, sign = sign)
 
-  }
-  return(outcomes_id)
+    }
+    return(outcomes_id)
 }
 
 
