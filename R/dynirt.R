@@ -1,3 +1,4 @@
+
 #' dynIRT main function
 #'
 #' Fit a dynIRT model using stan
@@ -109,11 +110,11 @@ fit <- function (data,
                 df_sigma_alpha_evol = 4,
                 df_sigma_eta_evol = 4,
                 mu_sigma_metric = 0.5,
-                mu_sigma_alpha_evol = 0.1,
-                mu_sigma_eta_evol = 0.1,
+                mu_sigma_alpha_evol = 0.5,
+                mu_sigma_eta_evol = 0.5,
                 sd_sigma_metric = 0.5,
-                sd_sigma_alpha_evol = 0.1,
-                sd_sigma_eta_evol = 0.1,
+                sd_sigma_alpha_evol = 0.5,
+                sd_sigma_eta_evol = 0.5,
                 seed = 123,
                 ...)
 {
