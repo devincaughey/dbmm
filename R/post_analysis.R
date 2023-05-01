@@ -53,20 +53,29 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 
 
 #' Identify the sign and rotation of the parameter draws
-#'
+
 #' @param raw_draws (`draws_df`) A posterior draws
-#' @param rotate
-#' @param varimax
-#' @param normalize
-#' @param id_with
-#' @param check (logical)
+#' @param rotate (logical) Should the factor draws be rotated? If `NULL` (the
+#' default), `rotate` will be set to `TRUE` if and only if the number of factors
+#' is greater than 1.
+#' @param varimax (logical) Should a varimax rotation be applied within each
+#' draw? Defaults to `TRUE`.
+#' @param normalize (logical) Should Kaiser normalization be performed before
+#' varimax rotation? Defaults to `TRUE`.
+#' @param id_with (string) Should "binary", "ordinal", or "metric" loadings be
+#' used to identify the model. If `NULL` (the default), the largest set of items
+#' will be chosen.
+#' @param sign (integer) Should the sign of the average identified loading be
+#' negative (`-1`) or positive (`+1`, the default).
+#' @param check (logical) Should the class of `raw_draws` be checked? Defaults
+#' to `TRUE`.
 #'
 #' @return Identified draws
 #'
 #' @import magrittr
 #'
 #' @export
-identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
+identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
                            normalize = TRUE, id_with = NULL, sign = NULL,
                            check = TRUE)
 {
@@ -75,7 +84,11 @@ identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
     }
     if (is.null(sign)) {
         sign <- 1
-        cat("Using `sign`=", sign, "\n")
+        cat("Using `sign = ", sign, "`\n")
+    }
+    if (is.null(rotate)) {
+        n_dim <- sum(grepl("sigma_eta_evol", colnames(raw_draws)))
+        rotate <- n_dim > 1
     }
     if (rotate) {
         outcomes_id <- identify_rotation(
