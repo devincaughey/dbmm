@@ -67,13 +67,12 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 #'
 #' @export
 identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
-                          normalize = TRUE, id_with = NULL, sign = NULL, check = TRUE)
+                           normalize = TRUE, id_with = NULL, sign = NULL,
+                           check = TRUE)
 {
-  if (check) {
-    check_arg_type(arg = raw_draws, typename = "draws_df")
-  }
-
-  if (rotate) {
+    if (check) {
+        check_arg_type(arg = raw_draws, typename = "draws_df")
+    }
     if (is.null(sign)) {
         sign <- 1
         cat("Using `sign`=", sign, "\n")
@@ -90,11 +89,11 @@ identify_draws <- function(raw_draws, rotate = FALSE, varimax = TRUE,
     } else {
         outcomes_id <- identify_sign(raw_draws, sign = sign)
 
-  }
+    }
 
-  class(outcomes_id) <- c("dynIRT_identified", class(outcomes_id))
+    class(outcomes_id) <- c("dynIRT_identified", class(outcomes_id))
 
-  return(outcomes_id)
+    return(outcomes_id)
 }
 
 
