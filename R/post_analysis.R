@@ -1,12 +1,3 @@
-# when using dynIRTtest::identify
-# Warning message:
-# Returning more (or less) than 1 row per `summarise()` group was deprecated in dplyr 1.1.0.
-# ℹ Please use `reframe()` instead.
-# ℹ When switching from `summarise()` to `reframe()`, remember that `reframe()` always returns an ungrouped data frame and adjust accordingly.
-# ℹ The deprecated feature was likely used in the dynIRTtest package.
-#   Please report the issue to the authors.
-
-
 #' Extract draws from fitted model
 #'
 #' @param fit (`dynIRT_fitted` object) A fitted model produced by `fit()`.
