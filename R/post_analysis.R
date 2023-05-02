@@ -494,19 +494,22 @@ harmonize_varimax <- function (beta_rsp) {
 identify_sign <- function (raw_draws, sign) {
   raw_draws_df <- posterior::as_draws_df(raw_draws)
 
-  long_draws <- suppressWarnings(
-    raw_draws_df %>%
+  long_draws <- 
+      raw_draws_df %>%
+      as.data.frame() %>%
       dplyr::select(dplyr::matches("^\\.|^lambda")) %>%
-      tidyr::pivot_longer(cols = -dplyr::matches("^\\."),
-                          names_to = "variable") %>%
+      tidyr::pivot_longer(
+                 cols = -dplyr::matches("^\\."),
+                 names_to = "variable"
+             ) %>%
       dplyr::group_by(.data$.chain, .data$variable) %>% # nolint
       dplyr::summarise(est = mean.default(.data$value), .groups = "drop") %>%
       tidyr::separate(
-        col = .data$variable,
-        into = c("parameter", "type", "item", "dimension", "extra"),
-        convert = TRUE
-      )
-  )
+                 col = .data$variable,
+                 into = c("parameter", "type", "item", "dimension", "extra"),
+                 convert = TRUE
+             )
+
 
   sign_df <- data.frame(
     dimension = 1:max(long_draws$dimension),
