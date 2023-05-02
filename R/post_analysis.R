@@ -510,7 +510,6 @@ identify_sign <- function (raw_draws, sign) {
                  convert = TRUE
              )
 
-
   sign_df <- data.frame(
     dimension = 1:max(long_draws$dimension),
     sign = rep(sign, length.out = max(long_draws$dimension))
@@ -520,7 +519,7 @@ identify_sign <- function (raw_draws, sign) {
 
   chain_flips <- long_draws %>%
     dplyr::group_by(.data$.chain, .data$dimension) %>%
-    dplyr::summarise(flip = (sign * mean.default(.data$est)) < 0,
+    dplyr::summarise(flip = (mean.default(sign) * mean.default(.data$est)) < 0,
                     .groups = "drop") %>%
     dplyr::select(.chain, dimension, flip)
 
