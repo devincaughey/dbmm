@@ -6,7 +6,7 @@
 \usage{
 identify_draws(
   raw_draws,
-  rotate = FALSE,
+  rotate = NULL,
   varimax = TRUE,
   normalize = TRUE,
   id_with = NULL,
@@ -17,7 +17,25 @@ identify_draws(
 \arguments{
 \item{raw_draws}{(\code{draws_df}) A posterior draws}
 
-\item{check}{(logical)}
+\item{rotate}{(logical) Should the factor draws be rotated? If \code{NULL} (the
+default), \code{rotate} will be set to \code{TRUE} if and only if the number of factors
+is greater than 1.}
+
+\item{varimax}{(logical) Should a varimax rotation be applied within each
+draw? Defaults to \code{TRUE}.}
+
+\item{normalize}{(logical) Should Kaiser normalization be performed before
+varimax rotation? Defaults to \code{TRUE}.}
+
+\item{id_with}{(string) Should "binary", "ordinal", or "metric" loadings be
+used to identify the model. If \code{NULL} (the default), the largest set of items
+will be chosen.}
+
+\item{sign}{(integer) Should the sign of the average identified loading be
+negative (\code{-1}) or positive (\code{+1}, the default).}
+
+\item{check}{(logical) Should the class of \code{raw_draws} be checked? Defaults
+to \code{TRUE}.}
 }
 \value{
 Identified draws
