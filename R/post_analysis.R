@@ -84,7 +84,7 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
     }
     if (is.null(sign)) {
         sign <- 1
-        cat("Using `sign = ", sign, "`\n")
+        cat("Using `sign = ", sign, "`\n", sep = "")
     }
     if (is.null(rotate)) {
         n_dim <- sum(grepl("sigma_eta_evol", colnames(raw_draws)))
@@ -543,9 +543,13 @@ identify_sign <- function (raw_draws, sign) {
 
 #' Label the output
 #'
-#' @param draws (`dynIRT_identified`) A identified dynIRT fitted object
-#' @param regex_pars
-#' @param check (logical)
+#' @param draws (`dynIRT_identified`) An identified dynIRT fitted object
+#' @param regex_pars (named character vector) Vector of regular expressions, to
+#'     be used to pick out columns of `draws`. The names of this vector will be
+#'     used to name the resulting list of data frames. If `NULL` (the default),
+#'     all parameters will be returned.
+#' @param check (logical) Should the class of `draws` be checked? Defaults to
+#'     `TRUE`.
 #'
 #' @return A list
 #'
@@ -615,7 +619,7 @@ label_draws <- function (draws, regex_pars = NULL, check = TRUE)
         ) %>%
         dplyr::select(par, TIME, UNIT,
                       dim, value, dplyr::everything())
-    } else if (regex_pars_p == "sigma_eta_evol\\[") {
+    } else if (regex_pars_p == "^sigma_eta_evol\\[") {
       draws_ls[[p]] <- draws_ls_p %>%
         dplyr::mutate(
           par = stringr::str_split(.data$name,
