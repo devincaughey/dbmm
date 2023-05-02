@@ -7,9 +7,15 @@
 label_draws(draws, regex_pars = NULL, check = TRUE)
 }
 \arguments{
-\item{draws}{(\code{dynIRT_identified}) A identified dynIRT fitted object}
+\item{draws}{(\code{dynIRT_identified}) An identified dynIRT fitted object}
 
-\item{check}{(logical)}
+\item{regex_pars}{(named character vector) Vector of regular expressions, to
+be used to pick out columns of \code{draws}. The names of this vector will be
+used to name the resulting list of data frames. If \code{NULL} (the default),
+all parameters will be returned.}
+
+\item{check}{(logical) Should the class of \code{draws} be checked? Defaults to
+\code{TRUE}.}
 }
 \value{
 A list
