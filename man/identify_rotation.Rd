@@ -4,10 +4,18 @@
 \alias{identify_rotation}
 \title{Identify the rotation of the output}
 \usage{
-identify_rotation(raw_draws, varimax, normalize, id_with)
+identify_rotation(raw_draws, varimax, normalize, item_type)
 }
 \arguments{
-\item{id_with}{}
+\item{raw_draws}{(\code{draws_df}) A posterior draws}
+
+\item{varimax}{(logical) Should a varimax rotation be applied within each
+draw? Defaults to \code{TRUE}.}
+
+\item{normalize}{(logical) Should Kaiser normalization be performed before
+varimax rotation?}
+
+\item{item_type}{(string) The item type. Default is "binary".}
 }
 \value{
 Rotated object

@@ -7,10 +7,13 @@
 identify_sign(raw_draws, sign)
 }
 \arguments{
-\item{sign}{}
+\item{raw_draws}{(\code{draws_df}) A posterior draws}
+
+\item{sign}{(integer) Should the sign of the average identified loading be
+negative (\code{-1}) or positive (\code{+1}).}
 }
 \value{
-A list
+A \code{dynIRT_labeled} object.
 }
 \description{
 Identify signs

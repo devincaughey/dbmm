@@ -8,8 +8,23 @@ plot_intercept2(
   outcomes_labeled,
   xtitle = NULL,
   ytitle = "Estimated Intercept",
-  maintitle = NULL
+  maintitle = NULL,
+  recode = NULL
 )
+}
+\arguments{
+\item{outcomes_labeled}{A \code{dynIRT_labeled} object}
+
+\item{xtitle}{(string) x-axis label of the plot}
+
+\item{ytitle}{(string) y-axis label of the plot}
+
+\item{maintitle}{(string) Title of the plot}
+
+\item{recode}{(string)}
+}
+\value{
+A plot showing the estimated intercept
 }
 \description{
 test function

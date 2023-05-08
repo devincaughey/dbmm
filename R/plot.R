@@ -1,57 +1,20 @@
-create_metric_label <- function(outcomes_labeled) {
-  metric_labels <- attr(outcomes_labeled, "metric_item_labels") |>
-    stringr::str_remove("^[xz]_") |>
-    stringr::str_remove("cps_") |>
-    stringr::str_remove("spm_") |>
-    stringr::str_remove("_guttmacher_occurence") |>
-    stringr::str_replace_all("per_capita", "pc") |>
-    stringr::str_replace_all("_", " ")
-  names(metric_labels) <- attr(outcomes_labeled, "metric_item_labels")
-
-  return(metric_labels)
-}
-
-
-create_binary_label <- function(outcomes_labeled) {
-  binary_labels <- attr(outcomes_labeled, "binary_item_labels") |>
-    stringr::str_remove("^[xz]_") |>
-    stringr::str_remove("cps_") |>
-    stringr::str_remove("spm_") |>
-    stringr::str_remove("_guttmacher_occurence") |>
-    stringr::str_replace_all("per_capita", "pc") |>
-    stringr::str_replace_all("_", " ")
-  names(binary_labels) <- attr(outcomes_labeled, "binary_item_labels")
-
-  return(binary_labels)
-}
-
-
-create_ordinal_label <- function(outcomes_labeled) {
-  ordinal_labels <- attr(outcomes_labeled, "ordinal_item_labels") |>
-    stringr::str_remove("^[xz]_") |>
-    stringr::str_remove("cps_") |>
-    stringr::str_remove("spm_") |>
-    stringr::str_remove("_guttmacher_occurence") |>
-    stringr::str_replace_all("per_capita", "pc") |>
-    stringr::str_replace_all("_", " ")
-  names(ordinal_labels) <- attr(outcomes_labeled, "ordinal_item_labels")
-
-  return(ordinal_labels)
-}
-
-
 #' test function
+#' @param outcomes_labeled  A `dynIRT_labeled` object
+#' @param xtitle (string) x-axis label of the plot
+#' @param ytitle (string) y-axis label of the plot
+#' @param maintitle (string) Title of the plot
+#'
+#' @return A plot showing the estimated intercept
+#'
+#' @import magrittr ggplot2
+#' @importFrom rlang .data
+
 #' @export
 plot_intercept2 <- function(outcomes_labeled,
                           xtitle = NULL,
                           ytitle = "Estimated Intercept",
                           maintitle = NULL) {
 
-  metric_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
-  ordinal_labels <- create_ordinal_label(outcomes_labeled = outcomes_labeled)
-  binary_labels <- create_binary_label(outcomes_labeled = outcomes_labeled)
-
-  combined_labels <- c(binary_labels, ordinal_labels, metric_labels)
 
   dat <- dplyr::bind_rows(
     outcomes_labeled$alpha_binary |> dplyr::mutate(type = "binary"),
@@ -67,8 +30,6 @@ plot_intercept2 <- function(outcomes_labeled,
       .groups = "drop"
     ) %>%
     dplyr::mutate(
-      ITEM = dplyr::recode(.data$ITEM, !!!combined_labels),
-      # ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd),
       year = as.integer(as.character(.data$TIME))
     ) %>%
     dplyr::mutate(
@@ -83,7 +44,6 @@ plot_intercept2 <- function(outcomes_labeled,
             ymax = .data$est + 1.96 * .data$err),
             color = NA, alpha = 1/4
       ) +
-      # scale_x_continuous(breaks = seq(1960, 2020, 20)) +
       labs(
         title = maintitle,
         y = ytitle,
@@ -92,29 +52,38 @@ plot_intercept2 <- function(outcomes_labeled,
         # fill = NULL
       ) -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
   p
 }
 
 
 #' test function
+#' @param outcomes_labeled  A `dynIRT_labeled` object
+#' @param xtitle (string) x-axis label of the plot
+#' @param ytitle (string) y-axis label of the plot
+#' @param item_type (string) Should "binary", "ordinal", or "metric" loadings be
+#' used to visualize? Default is "metric".
+#' @param maintitle (string) Title of the plot
+#'
+#' @return A plot showing the estimated intercept
+#'
+#' @import magrittr ggplot2
+#' @importFrom rlang .data
 #' @export
 plot_intercept3 <- function(outcomes_labeled,
                           xtitle = NULL,
                           ytitle = "Estimated Intercept",
-                          id_with = c("metric", "binary", "ordinal"),
+                          item_type = c("metric", "binary", "ordinal"),
                           maintitle = NULL) {
 
-  if (id_with == "metric") {
-    use_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
+  if (item_type == "metric") {
     dat <- outcomes_labeled$alpha_metric |> dplyr::mutate(type = "metric")
-  } else if (id_with == "binary") {
-    use_labels <- create_binary_label(outcomes_labeled = outcomes_labeled)
+  } else if (item_type == "binary") {
     dat <- outcomes_labeled$alpha_binary |> dplyr::mutate(type = "binary")
-  } else if (id_with == "ordinal") {
-    use_labels  <- create_ordinal_label(outcomes_labeled = outcomes_labeled)
+  } else if (item_type == "ordinal") {
     dat <- outcomes_labeled$alpha_ordinal |> dplyr::mutate(type = "ordinal")
   } else {
-    stop("Invalid `id_with` argument")
+    stop("Invalid `item_type` argument")
   }
 
   dat %>%
@@ -125,8 +94,6 @@ plot_intercept3 <- function(outcomes_labeled,
       .groups = "drop"
     ) %>%
     dplyr::mutate(
-      ITEM = dplyr::recode(.data$ITEM, !!!use_labels),
-      # ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd),
       year = as.integer(as.character(.data$TIME))
     ) %>%
     dplyr::mutate(
@@ -141,7 +108,6 @@ plot_intercept3 <- function(outcomes_labeled,
             ymax = .data$est + 1.96 * .data$err),
             color = NA, alpha = 1/4
       ) +
-      # scale_x_continuous(breaks = seq(1960, 2020, 20)) +
       labs(
         title = maintitle,
         y = ytitle,
@@ -150,16 +116,18 @@ plot_intercept3 <- function(outcomes_labeled,
         # fill = NULL
       ) -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
   p
 }
 
 
 #' plot item intercepts
 #'
-#' @param outcomes_labeled
+#' @param outcomes_labeled  A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot
+#' @param item_labels (string) Named string vector where each element represents the new labels and the names of the elements correspond to the original label in `outcomes_labeled`. Default is NULL.
 #'
 #' @return A plot showing the estimated intercept
 #'
@@ -170,8 +138,11 @@ plot_intercept3 <- function(outcomes_labeled,
 plot_intercept <- function(outcomes_labeled,
                           xtitle = NULL,
                           ytitle = "Estimated Intercept",
-                          maintitle = NULL) {
-  metric_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
+                          maintitle = NULL,
+                          item_labels = NULL) {
+
+  ## function to check if item_labels is properly
+
   outcomes_labeled$alpha_metric %>%
     dplyr::group_by(.data$TIME, .data$ITEM) %>%
     dplyr::summarise(
@@ -180,10 +151,9 @@ plot_intercept <- function(outcomes_labeled,
       .groups = "drop"
     ) %>%
     dplyr::mutate(
-      ITEM = dplyr::recode(.data$ITEM, !!!metric_labels),
-      # ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd),
       year = as.integer(as.character(.data$TIME))
     ) %>%
+    {if (!is.null(item_labels)) dplyr::mutate(., ITEM = dplyr::recode(.data$ITEM, !!!item_labels)) else . } %>%
     dplyr::mutate(
       ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd)
     ) %>%
@@ -196,7 +166,6 @@ plot_intercept <- function(outcomes_labeled,
             ymax = .data$est + 1.96 * .data$err),
             color = NA, alpha = 1/4
       ) +
-      # scale_x_continuous(breaks = seq(1960, 2020, 20)) +
       labs(
         title = maintitle,
         y = ytitle,
@@ -205,13 +174,15 @@ plot_intercept <- function(outcomes_labeled,
         # fill = NULL
       ) -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
+
   p
 }
 
 
 #' plot item loadings
 #'
-#' @param outcomes_labeled
+#' @param outcomes_labeled A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot. Default is ``Item Loadings''
@@ -226,10 +197,9 @@ plot_loadings <- function(outcomes_labeled,
                           xtitle = NULL,
                           ytitle = NULL,
                           maintitle = "Item Loadings") {
-  metric_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
 
   outcomes_labeled$lambda_metric %>%
-    dplyr::mutate(ITEM = dplyr::recode(.data$ITEM, !!!metric_labels)) %>%
+    # dplyr::mutate(ITEM = dplyr::recode(.data$ITEM, !!!metric_labels)) %>%
     dplyr::group_by(.data$ITEM, .data$dim) %>%
     dplyr::summarise(est = mean.default(.data$value),
                      err = stats::sd(.data$value)) %>%
@@ -258,6 +228,7 @@ plot_loadings <- function(outcomes_labeled,
       ) +
       coord_fixed() -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
   p
 }
 
@@ -281,7 +252,7 @@ create_factor_scores <- function(outcomes_labeled) {
 
 #' plot average factor scores
 #'
-#' @param outcomes_labeled
+#' @param outcomes_labeled  A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot
@@ -323,13 +294,14 @@ plot_scores_ave <- function(outcomes_labeled,
       ) +
       coord_fixed() -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
   p
 }
 
 
 #' plot time series factor scores
 #'
-#' @param outcomes_labeled
+#' @param outcomes_labeled  A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot
@@ -341,8 +313,6 @@ plot_scores_ave <- function(outcomes_labeled,
 #'
 #' @export
 plot_scores_timetrend <- function(outcomes_labeled,
-                                  xdim,
-                                  ydim,
                                   xtitle = "Dimension 1",
                                   ytitle = "Dimension 2",
                                   maintitle = NULL)
@@ -381,5 +351,6 @@ plot_scores_timetrend <- function(outcomes_labeled,
       ) +
       theme(legend.position = "bottom") -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
   p
 }

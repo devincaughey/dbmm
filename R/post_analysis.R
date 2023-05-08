@@ -53,7 +53,7 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 #' draw? Defaults to `TRUE`.
 #' @param normalize (logical) Should Kaiser normalization be performed before
 #' varimax rotation? Defaults to `TRUE`.
-#' @param id_with (string) Should "binary", "ordinal", or "metric" loadings be
+#' @param item_type (string) Should "binary", "ordinal", or "metric" loadings be
 #' used to identify the model. If `NULL` (the default), the largest set of items
 #' will be chosen.
 #' @param sign (integer) Should the sign of the average identified loading be
@@ -61,13 +61,13 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 #' @param check (logical) Should the class of `raw_draws` be checked? Defaults
 #' to `TRUE`.
 #'
-#' @return Identified draws
+#' @return A `dynIRT_identified` object. Identified draws from posterior draws.
 #'
 #' @import magrittr
 #'
 #' @export
 identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
-                           normalize = TRUE, id_with = NULL, sign = NULL,
+                           normalize = TRUE, item_type = NULL, sign = NULL,
                            check = TRUE)
 {
     if (check) {
@@ -86,7 +86,7 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
             raw_draws,
             varimax = varimax,
             normalize = normalize,
-            id_with = id_with
+            item_type = item_type
         )
         outcomes_id$id_draws <-
             identify_sign(outcomes_id$id_draws, sign = sign)$id_draws
@@ -103,17 +103,19 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
 
 #' Identify the rotation of the output
 #'
-#' @param raw_draws
-#' @param varimax
-#' @param normalize
-#' @param id_with
+#' @param raw_draws (`draws_df`) A posterior draws
+#' @param varimax (logical) Should a varimax rotation be applied within each
+#' draw? Defaults to `TRUE`.
+#' @param normalize (logical) Should Kaiser normalization be performed before
+#' varimax rotation?
+#' @param item_type (string) The item type. Default is "binary".
 #'
 #' @return Rotated object
 #'
 #' @import magrittr
 #'
 identify_rotation <- function (raw_draws, varimax,
-                               normalize, id_with)
+                               normalize, item_type)
 {
 
   Lb0 <- extract_draws_match(raw_draws = raw_draws,
@@ -170,32 +172,32 @@ identify_rotation <- function (raw_draws, varimax,
   ecols_t <- stringr::str_split(names(E0)[ecols], "[\\[,\\]]",
                                 simplify = TRUE)[, 2]
 
-  if (is.null(id_with)) {
-    id_with <- c("binary", "ordinal", "metric")[which.max(c(Ib, Io, Im))]
+  if (is.null(item_type)) {
+    item_type <- c("binary", "ordinal", "metric")[which.max(c(Ib, Io, Im))]
   }
-  stopifnot(id_with %in% c("binary", "ordinal", "metric"))
-  cat("\nUsing", id_with, "items to identify the model.\n")
+  stopifnot(item_type %in% c("binary", "ordinal", "metric"))
+  cat("\nUsing", item_type, "items to identify the model.\n")
 
   if (varimax & D > 1) {
     ## 1. Apply varimax rotation
     cat("\n**** Applying varimax rotations...")
     for (s in 1:S) {
       for (c_cur in 1:C) {
-        if (id_with == "binary") {
+        if (item_type == "binary") {
           row <- Lb0$.chain == c_cur & Lb0$.iteration == s
           Lb0_cs <- matrix(
             as.numeric(Lb0[row, lcols_b]), nrow = Ib, ncol = D
           )
           vm <- stats::varimax(Lb0_cs, normalize = normalize)
           Lb1[row, lcols_b] <- t(as.numeric(vm$loadings))
-        } else if (id_with == "ordinal") {
+        } else if (item_type == "ordinal") {
           row <- Lo0$.chain == c_cur & Lo0$.iteration == s
           Lo0_cs <- matrix(
             as.numeric(Lo0[row, lcols_o]), nrow = Io, ncol = D
           )
           vm <- varimax(Lo0_cs, normalize = normalize)
           Lo1[row, lcols_o] <- t(as.numeric(vm$loadings))
-        } else if (id_with == "metric") {
+        } else if (item_type == "metric") {
           row <- Lm0$.chain == c_cur & Lm0$.iteration == s
           Lm0_cs <- matrix(
             as.numeric(Lm0[row, lcols_m]), nrow = Im, ncol = D
@@ -203,7 +205,7 @@ identify_rotation <- function (raw_draws, varimax,
           vm <- varimax(Lm0_cs, normalize = normalize)
           Lm1[row, lcols_m] <- t(as.numeric(vm$loadings))
         } else {
-          stop("Invalid `id_with` argument")
+          stop("Invalid `item_type` argument")
         }
         Q1[s, c_cur, 1:D, 1:D] <- vm$rotmat
       }
@@ -216,23 +218,23 @@ identify_rotation <- function (raw_draws, varimax,
   Q2 <- Q0
   sp_out <- vector("list", length = C)
   for (c_cur in 1:C) {
-    if (id_with == "binary") {
+    if (item_type == "binary") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lb1,
                                       c_cur = c_cur,
                                       lcols = lcols_b,
-                                      id_with = "binary")
-    } else if (id_with == "ordinal") {
+                                      item_type = "binary")
+    } else if (item_type == "ordinal") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lo1,
                                       c_cur = c_cur,
                                       lcols = lcols_o,
-                                      id_with = "ordinal")
-    } else if (id_with == "metric") {
+                                      item_type = "ordinal")
+    } else if (item_type == "metric") {
       sp_out[[c_cur]] <- sign_permute(lambda_item = Lm1,
                                       c_cur = c_cur,
                                       lcols = lcols_m,
-                                      id_with = "metric")
+                                      item_type = "metric")
     } else {
-      stop("Invalid `id_with` argument")
+      stop("Invalid `item_type` argument")
     }
     sv <- sp_out[[c_cur]]$sign_vectors
     pv <- sp_out[[c_cur]]$permute_vectors
@@ -367,12 +369,12 @@ extract_draws_match <- function(raw_draws, regex_pars) {
 #' @param lambda_item lambda object
 #' @param c_cur current row indicator
 #' @param lcols column
-#' @param id_with
+#' @param item_type (string) The item type. Default is "binary".
 #'
 #' @return A sign-permuted object
 #'
 sign_permute <- function(lambda_item, c_cur, lcols,
-                        id_with = c("binary", "ordinal", "metric"))
+                        item_type = c("binary", "ordinal", "metric"))
 {
   rows <- lambda_item$.chain == c_cur
 
@@ -388,14 +390,14 @@ sign_permute <- function(lambda_item, c_cur, lcols,
                         ".+\\[([0-9]+),([0-9]+)\\]$", "\\2")
     )
 
-  if (id_with == "binary") {
+  if (item_type == "binary") {
     replace_original <- "lambda_binary\\[([0-9]+),([0-9]+)\\]$"
-  } else if (id_with == "ordinal") {
+  } else if (item_type == "ordinal") {
     replace_original <- "lambda_ordinal\\[([0-9]+),([0-9]+)\\]$"
-  } else if (id_with == "metric") {
+  } else if (item_type == "metric") {
     replace_original <- "lambda_metric\\[([0-9]+),([0-9]+)\\]$"
   } else {
-    stop("Invalid `id_with` argument")
+    stop("Invalid `item_type` argument")
   }
 
   colord <- order(var, dim)
@@ -474,10 +476,11 @@ harmonize_varimax <- function (beta_rsp) {
 
 #' Identify signs
 #'
-#' @param raw_drawas
-#' @param sign
+#' @param raw_draws (`draws_df`) A posterior draws
+#' @param sign (integer) Should the sign of the average identified loading be
+#' negative (`-1`) or positive (`+1`).
 #'
-#' @return A list
+#' @return A `dynIRT_labeled` object.
 #'
 #' @import magrittr
 #' @importFrom rlang .data
@@ -485,7 +488,7 @@ harmonize_varimax <- function (beta_rsp) {
 identify_sign <- function (raw_draws, sign) {
   raw_draws_df <- posterior::as_draws_df(raw_draws)
 
-  long_draws <- 
+  long_draws <-
       raw_draws_df %>%
       as.data.frame() %>%
       dplyr::select(dplyr::matches("^\\.|^lambda")) %>%
