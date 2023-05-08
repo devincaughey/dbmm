@@ -61,7 +61,7 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 #' @param check (logical) Should the class of `raw_draws` be checked? Defaults
 #' to `TRUE`.
 #'
-#' @return Identified draws
+#' @return A `dynIRT_identified` object. Identified draws from posterior draws.
 #'
 #' @import magrittr
 #'
@@ -103,10 +103,12 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
 
 #' Identify the rotation of the output
 #'
-#' @param raw_draws
-#' @param varimax
-#' @param normalize
-#' @param item_type
+#' @param raw_draws (`draws_df`) A posterior draws
+#' @param varimax (logical) Should a varimax rotation be applied within each
+#' draw? Defaults to `TRUE`.
+#' @param normalize (logical) Should Kaiser normalization be performed before
+#' varimax rotation?
+#' @param item_type (string) The item type. Default is "binary".
 #'
 #' @return Rotated object
 #'
@@ -367,7 +369,7 @@ extract_draws_match <- function(raw_draws, regex_pars) {
 #' @param lambda_item lambda object
 #' @param c_cur current row indicator
 #' @param lcols column
-#' @param item_type
+#' @param item_type (string) The item type. Default is "binary".
 #'
 #' @return A sign-permuted object
 #'
@@ -474,10 +476,11 @@ harmonize_varimax <- function (beta_rsp) {
 
 #' Identify signs
 #'
-#' @param raw_drawas
-#' @param sign
+#' @param raw_draws (`draws_df`) A posterior draws
+#' @param sign (integer) Should the sign of the average identified loading be
+#' negative (`-1`) or positive (`+1`).
 #'
-#' @return A list
+#' @return A `dynIRT_labeled` object.
 #'
 #' @import magrittr
 #' @importFrom rlang .data

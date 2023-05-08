@@ -1,4 +1,14 @@
 #' test function
+#' @param outcomes_labeled  A `dynIRT_labeled` object
+#' @param xtitle (string) x-axis label of the plot
+#' @param ytitle (string) y-axis label of the plot
+#' @param maintitle (string) Title of the plot
+#'
+#' @return A plot showing the estimated intercept
+#'
+#' @import magrittr ggplot2
+#' @importFrom rlang .data
+
 #' @export
 plot_intercept2 <- function(outcomes_labeled,
                           xtitle = NULL,
@@ -42,11 +52,21 @@ plot_intercept2 <- function(outcomes_labeled,
         # fill = NULL
       ) -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
   p
 }
 
 
 #' test function
+#' @param outcomes_labeled  A `dynIRT_labeled` object
+#' @param xtitle (string) x-axis label of the plot
+#' @param ytitle (string) y-axis label of the plot
+#' @param maintitle (string) Title of the plot
+#'
+#' @return A plot showing the estimated intercept
+#'
+#' @import magrittr ggplot2
+#' @importFrom rlang .data
 #' @export
 plot_intercept3 <- function(outcomes_labeled,
                           xtitle = NULL,
@@ -94,13 +114,14 @@ plot_intercept3 <- function(outcomes_labeled,
         # fill = NULL
       ) -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
   p
 }
 
 
 #' plot item intercepts
 #'
-#' @param outcomes_labeled
+#' @param outcomes_labeled  A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot
@@ -146,13 +167,15 @@ plot_intercept <- function(outcomes_labeled,
         # fill = NULL
       ) -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
+
   p
 }
 
 
 #' plot item loadings
 #'
-#' @param outcomes_labeled
+#' @param outcomes_labeled A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot. Default is ``Item Loadings''
@@ -199,6 +222,7 @@ plot_loadings <- function(outcomes_labeled,
       ) +
       coord_fixed() -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
   p
 }
 
@@ -222,7 +246,7 @@ create_factor_scores <- function(outcomes_labeled) {
 
 #' plot average factor scores
 #'
-#' @param outcomes_labeled
+#' @param outcomes_labeled  A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot
@@ -264,13 +288,14 @@ plot_scores_ave <- function(outcomes_labeled,
       ) +
       coord_fixed() -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
   p
 }
 
 
 #' plot time series factor scores
 #'
-#' @param outcomes_labeled
+#' @param outcomes_labeled  A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot
@@ -322,5 +347,6 @@ plot_scores_timetrend <- function(outcomes_labeled,
       ) +
       theme(legend.position = "bottom") -> p
 
+  class(p) <- c("dynIRTtest_viz", class(p))
   p
 }

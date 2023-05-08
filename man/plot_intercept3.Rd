@@ -8,7 +8,7 @@ plot_intercept3(
   outcomes_labeled,
   xtitle = NULL,
   ytitle = "Estimated Intercept",
-  id_with = c("metric", "binary", "ordinal"),
+  item_type = c("metric", "binary", "ordinal"),
   maintitle = NULL
 )
 }

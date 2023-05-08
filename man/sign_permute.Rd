@@ -8,7 +8,7 @@ sign_permute(
   lambda_item,
   c_cur,
   lcols,
-  id_with = c("binary", "ordinal", "metric")
+  item_type = c("binary", "ordinal", "metric")
 )
 }
 \arguments{
@@ -18,7 +18,7 @@ sign_permute(
 
 \item{lcols}{column}
 
-\item{id_with}{}
+\item{item_type}{(string) The item type. Default is "binary".}
 }
 \value{
 A sign-permuted object

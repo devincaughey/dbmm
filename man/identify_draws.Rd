@@ -9,7 +9,7 @@ identify_draws(
   rotate = NULL,
   varimax = TRUE,
   normalize = TRUE,
-  id_with = NULL,
+  item_type = NULL,
   sign = NULL,
   check = TRUE
 )
@@ -27,7 +27,7 @@ draw? Defaults to \code{TRUE}.}
 \item{normalize}{(logical) Should Kaiser normalization be performed before
 varimax rotation? Defaults to \code{TRUE}.}
 
-\item{id_with}{(string) Should "binary", "ordinal", or "metric" loadings be
+\item{item_type}{(string) Should "binary", "ordinal", or "metric" loadings be
 used to identify the model. If \code{NULL} (the default), the largest set of items
 will be chosen.}
 
@@ -38,7 +38,7 @@ negative (\code{-1}) or positive (\code{+1}, the default).}
 to \code{TRUE}.}
 }
 \value{
-Identified draws
+A \code{dynIRT_identified} object. Identified draws from posterior draws.
 }
 \description{
 Identify the sign and rotation of the parameter draws
