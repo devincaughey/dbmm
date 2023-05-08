@@ -43,12 +43,19 @@ identified <- identify_draws(fitted_draws, rotate = TRUE)
 
 test_that("Identified rotation", {
   expect_equal(length(identified$rotmats), 4)
+  expect_s3_class(identified, "dynIRT_identified")
   }
 )
 
 labeled <- label_draws(identified)
 
 test_that("Labeled draws", {
-  expect_true("dynIRT_labeled" %in% class(labeled))
+  expect_s3_class(labeled, "dynIRT_labeled")
+  }
+)
+
+test_that("Figures", {
+  p <- plot_intercept(labeled)
+  expect_s3_class(p, "dynIRTtest_viz")
   }
 )

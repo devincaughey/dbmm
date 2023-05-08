@@ -61,6 +61,8 @@ plot_intercept2 <- function(outcomes_labeled,
 #' @param outcomes_labeled  A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
+#' @param item_type (string) Should "binary", "ordinal", or "metric" loadings be
+#' used to visualize? Default is "metric".
 #' @param maintitle (string) Title of the plot
 #'
 #' @return A plot showing the estimated intercept
@@ -125,6 +127,7 @@ plot_intercept3 <- function(outcomes_labeled,
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot
+#' @param item_labels (string) Named string vector where each element represents the new labels and the names of the elements correspond to the original label in `outcomes_labeled`. Default is NULL.
 #'
 #' @return A plot showing the estimated intercept
 #'
@@ -135,7 +138,10 @@ plot_intercept3 <- function(outcomes_labeled,
 plot_intercept <- function(outcomes_labeled,
                           xtitle = NULL,
                           ytitle = "Estimated Intercept",
-                          maintitle = NULL) {
+                          maintitle = NULL,
+                          item_labels = NULL) {
+
+  ## function to check if item_labels is properly
 
   outcomes_labeled$alpha_metric %>%
     dplyr::group_by(.data$TIME, .data$ITEM) %>%
@@ -147,6 +153,7 @@ plot_intercept <- function(outcomes_labeled,
     dplyr::mutate(
       year = as.integer(as.character(.data$TIME))
     ) %>%
+    {if (!is.null(item_labels)) dplyr::mutate(., ITEM = dplyr::recode(.data$ITEM, !!!item_labels)) else . } %>%
     dplyr::mutate(
       ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd)
     ) %>%
@@ -190,10 +197,9 @@ plot_loadings <- function(outcomes_labeled,
                           xtitle = NULL,
                           ytitle = NULL,
                           maintitle = "Item Loadings") {
-  metric_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
 
   outcomes_labeled$lambda_metric %>%
-    dplyr::mutate(ITEM = dplyr::recode(.data$ITEM, !!!metric_labels)) %>%
+    # dplyr::mutate(ITEM = dplyr::recode(.data$ITEM, !!!metric_labels)) %>%
     dplyr::group_by(.data$ITEM, .data$dim) %>%
     dplyr::summarise(est = mean.default(.data$value),
                      err = stats::sd(.data$value)) %>%
@@ -307,8 +313,6 @@ plot_scores_ave <- function(outcomes_labeled,
 #'
 #' @export
 plot_scores_timetrend <- function(outcomes_labeled,
-                                  xdim,
-                                  ydim,
                                   xtitle = "Dimension 1",
                                   ytitle = "Dimension 2",
                                   maintitle = NULL)

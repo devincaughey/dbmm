@@ -12,6 +12,21 @@ plot_intercept3(
   maintitle = NULL
 )
 }
+\arguments{
+\item{outcomes_labeled}{A \code{dynIRT_labeled} object}
+
+\item{xtitle}{(string) x-axis label of the plot}
+
+\item{ytitle}{(string) y-axis label of the plot}
+
+\item{item_type}{(string) Should "binary", "ordinal", or "metric" loadings be
+used to visualize? Default is "metric".}
+
+\item{maintitle}{(string) Title of the plot}
+}
+\value{
+A plot showing the estimated intercept
+}
 \description{
 test function
 }
