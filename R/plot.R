@@ -1,45 +1,3 @@
-create_metric_label <- function(outcomes_labeled) {
-  metric_labels <- attr(outcomes_labeled, "metric_item_labels") |>
-    stringr::str_remove("^[xz]_") |>
-    stringr::str_remove("cps_") |>
-    stringr::str_remove("spm_") |>
-    stringr::str_remove("_guttmacher_occurence") |>
-    stringr::str_replace_all("per_capita", "pc") |>
-    stringr::str_replace_all("_", " ")
-  names(metric_labels) <- attr(outcomes_labeled, "metric_item_labels")
-
-  return(metric_labels)
-}
-
-
-create_binary_label <- function(outcomes_labeled) {
-  binary_labels <- attr(outcomes_labeled, "binary_item_labels") |>
-    stringr::str_remove("^[xz]_") |>
-    stringr::str_remove("cps_") |>
-    stringr::str_remove("spm_") |>
-    stringr::str_remove("_guttmacher_occurence") |>
-    stringr::str_replace_all("per_capita", "pc") |>
-    stringr::str_replace_all("_", " ")
-  names(binary_labels) <- attr(outcomes_labeled, "binary_item_labels")
-
-  return(binary_labels)
-}
-
-
-create_ordinal_label <- function(outcomes_labeled) {
-  ordinal_labels <- attr(outcomes_labeled, "ordinal_item_labels") |>
-    stringr::str_remove("^[xz]_") |>
-    stringr::str_remove("cps_") |>
-    stringr::str_remove("spm_") |>
-    stringr::str_remove("_guttmacher_occurence") |>
-    stringr::str_replace_all("per_capita", "pc") |>
-    stringr::str_replace_all("_", " ")
-  names(ordinal_labels) <- attr(outcomes_labeled, "ordinal_item_labels")
-
-  return(ordinal_labels)
-}
-
-
 #' test function
 #' @export
 plot_intercept2 <- function(outcomes_labeled,
@@ -47,11 +5,6 @@ plot_intercept2 <- function(outcomes_labeled,
                           ytitle = "Estimated Intercept",
                           maintitle = NULL) {
 
-  metric_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
-  ordinal_labels <- create_ordinal_label(outcomes_labeled = outcomes_labeled)
-  binary_labels <- create_binary_label(outcomes_labeled = outcomes_labeled)
-
-  combined_labels <- c(binary_labels, ordinal_labels, metric_labels)
 
   dat <- dplyr::bind_rows(
     outcomes_labeled$alpha_binary |> dplyr::mutate(type = "binary"),
@@ -67,8 +20,6 @@ plot_intercept2 <- function(outcomes_labeled,
       .groups = "drop"
     ) %>%
     dplyr::mutate(
-      ITEM = dplyr::recode(.data$ITEM, !!!combined_labels),
-      # ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd),
       year = as.integer(as.character(.data$TIME))
     ) %>%
     dplyr::mutate(
@@ -83,7 +34,6 @@ plot_intercept2 <- function(outcomes_labeled,
             ymax = .data$est + 1.96 * .data$err),
             color = NA, alpha = 1/4
       ) +
-      # scale_x_continuous(breaks = seq(1960, 2020, 20)) +
       labs(
         title = maintitle,
         y = ytitle,
@@ -101,20 +51,17 @@ plot_intercept2 <- function(outcomes_labeled,
 plot_intercept3 <- function(outcomes_labeled,
                           xtitle = NULL,
                           ytitle = "Estimated Intercept",
-                          id_with = c("metric", "binary", "ordinal"),
+                          item_type = c("metric", "binary", "ordinal"),
                           maintitle = NULL) {
 
-  if (id_with == "metric") {
-    use_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
+  if (item_type == "metric") {
     dat <- outcomes_labeled$alpha_metric |> dplyr::mutate(type = "metric")
-  } else if (id_with == "binary") {
-    use_labels <- create_binary_label(outcomes_labeled = outcomes_labeled)
+  } else if (item_type == "binary") {
     dat <- outcomes_labeled$alpha_binary |> dplyr::mutate(type = "binary")
-  } else if (id_with == "ordinal") {
-    use_labels  <- create_ordinal_label(outcomes_labeled = outcomes_labeled)
+  } else if (item_type == "ordinal") {
     dat <- outcomes_labeled$alpha_ordinal |> dplyr::mutate(type = "ordinal")
   } else {
-    stop("Invalid `id_with` argument")
+    stop("Invalid `item_type` argument")
   }
 
   dat %>%
@@ -125,8 +72,6 @@ plot_intercept3 <- function(outcomes_labeled,
       .groups = "drop"
     ) %>%
     dplyr::mutate(
-      ITEM = dplyr::recode(.data$ITEM, !!!use_labels),
-      # ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd),
       year = as.integer(as.character(.data$TIME))
     ) %>%
     dplyr::mutate(
@@ -141,7 +86,6 @@ plot_intercept3 <- function(outcomes_labeled,
             ymax = .data$est + 1.96 * .data$err),
             color = NA, alpha = 1/4
       ) +
-      # scale_x_continuous(breaks = seq(1960, 2020, 20)) +
       labs(
         title = maintitle,
         y = ytitle,
@@ -171,7 +115,7 @@ plot_intercept <- function(outcomes_labeled,
                           xtitle = NULL,
                           ytitle = "Estimated Intercept",
                           maintitle = NULL) {
-  metric_labels <- create_metric_label(outcomes_labeled = outcomes_labeled)
+
   outcomes_labeled$alpha_metric %>%
     dplyr::group_by(.data$TIME, .data$ITEM) %>%
     dplyr::summarise(
@@ -180,8 +124,6 @@ plot_intercept <- function(outcomes_labeled,
       .groups = "drop"
     ) %>%
     dplyr::mutate(
-      ITEM = dplyr::recode(.data$ITEM, !!!metric_labels),
-      # ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd),
       year = as.integer(as.character(.data$TIME))
     ) %>%
     dplyr::mutate(
@@ -196,7 +138,6 @@ plot_intercept <- function(outcomes_labeled,
             ymax = .data$est + 1.96 * .data$err),
             color = NA, alpha = 1/4
       ) +
-      # scale_x_continuous(breaks = seq(1960, 2020, 20)) +
       labs(
         title = maintitle,
         y = ytitle,
