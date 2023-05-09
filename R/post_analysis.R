@@ -52,17 +52,10 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 #' @param varimax (logical) Should a varimax rotation be applied within each
 #'     draw? Defaults to `TRUE`.
 #' @param normalize (logical) Should Kaiser normalization be performed before
-<<<<<<< Updated upstream
 #' varimax rotation? Defaults to `TRUE`.
 #' @param item_type (string) Should "binary", "ordinal", or "metric" loadings be
 #' used to identify the model. If `NULL` (the default), the largest set of items
 #' will be chosen.
-=======
-#'     varimax rotation? Defaults to `TRUE`.
-#' @param id_with (string) Should "binary", "ordinal", or "metric" loadings be
-#'     used to identify the model. If `NULL` (the default), the largest set of
-#'     items will be chosen.
->>>>>>> Stashed changes
 #' @param sign (integer) Should the sign of the average identified loading be
 #'     negative (`-1`) or positive (`+1`, the default).
 #' @param check (logical) Should the class of `raw_draws` be checked? Defaults
