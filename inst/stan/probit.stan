@@ -2,8 +2,15 @@
 
 functions {
   /* De-mean and 'whiten' (cov = I) XX */
-  real p2l_array (array[] real x) {	// coverts scalar from probit to logit scale
-    array[dims(x)[1]] real y;
+  vector p2l_vector (vector x) { // coverts vector from probit to logit scale
+    vector[num_elements(x)] y;
+    for (i in 1:num_elements(x)) {
+      y[i] = 0.07056 * pow(x[i], 3) + 1.5976 * x[i];
+    }
+    return y;
+  }
+  array[] real p2l_array (array[] real x) { // coverts array from probit to logit scale
+    array[num_elements(x)] real y;
     for (i in 1:num_elements(x)) {
       y[i] = 0.07056 * pow(x[i], 3) + 1.5976 * x[i];
     }
@@ -38,14 +45,14 @@ functions {
     array[N_slice] int tt_slice = tt_b[start:end];
     array[N_slice] int jj_slice = jj_b[start:end];
     array[N_slice] int ii_slice = ii_b[start:end];
-    array[N_slice] real nu_slice;
+    vector[N_slice] nu_slice;
     for (n in 1:N_slice) {
       real a_n = alpha_b[tt_slice[n], ii_slice[n]];
       row_vector[D] l_n = to_row_vector(lambda_b[ii_slice[n], 1:D]);
       vector[D] e_n = to_vector(eta[tt_slice[n], jj_slice[n], 1:D]);
       nu_slice[n] = a_n + l_n * e_n;
     }
-    return bernoulli_logit_lupmf(yy_b_slice | p2l_array(nu_slice));
+    return bernoulli_logit_lupmf(yy_b_slice | p2l_vector(nu_slice));
   }
   real oprobit_partial_sum_lpmf(array[] int yy_o_slice,
                                int start,
@@ -73,7 +80,7 @@ functions {
       vector[D] e_n = to_vector(eta[tt_slice[n], jj_slice[n], 1:D]);
       nu_slice[n] = a_n + l_n * e_n;
     }
-    return ordered_logistic_lupmf(yy_o_slice | p2l_array(nu_slice), kappa_slice);
+    return ordered_logistic_lupmf(yy_o_slice | p2l_vector(nu_slice), kappa_slice);
   }
   real normal_partial_sum_lpdf(array[] real yy_m_slice,
                                int start,
@@ -260,8 +267,8 @@ model {
       }
     }
     profile("likelihood") {
-      target += bernoulli_logit_lupmf(yy_binary | p2l_array(nu_binary));
-      target += ordered_logistic_lupmf(yy_ordinal | p2l_array(nu_ordinal),
+      target += bernoulli_logit_lupmf(yy_binary | p2l_vector(nu_binary));
+      target += ordered_logistic_lupmf(yy_ordinal | p2l_vector(nu_ordinal),
 				       kappa[ii_ordinal]);
       target += normal_lupdf(yy_metric | nu_metric,
 			     sigma_metric[ii_metric]);
