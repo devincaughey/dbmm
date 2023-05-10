@@ -3,7 +3,7 @@
 functions {
   /* De-mean and 'whiten' (cov = I) XX */
   real p2l_array (array[] real x) {	// coverts scalar from probit to logit scale
-    array[dims(x)] real y;
+    array[dims(x)[1]] real y;
     y = 0.07056 * pow(x, 3) + 1.5976 * x;
     return y;
   }
