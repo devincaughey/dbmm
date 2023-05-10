@@ -1,3 +1,25 @@
+#' Check convergence
+#'
+#' @param raw_draws (`dynIRT_draws`) A posterior draws
+#'
+#' @export
+check_convergence <- function(raw_draws) {
+  check_arg_type(arg = raw_draws, typename = "dynIRT_draws")
+
+  raw_draws |>
+    posterior::summarize_draws() |>
+    dplyr::filter(rhat > 1.1) |>
+    dplyr::pull(variable) -> non_converged_params
+
+  if (length(non_converged_params) == 0) {
+    cli::cli_alert_success("Rhat is smaller than 1.1 for all parameters.")
+  } else {
+    cli::cli_alert_warning("The following variables have not converged. Consider running more iterations.")
+    cli::cli_text("{non_converged_params}")
+  }
+}
+
+
 #' Extract draws from fitted model
 #'
 #' @param fit (`dynIRT_fitted` object) A fitted model produced by `fit()`.
@@ -39,13 +61,15 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
   attr(draws, "ordinal_item_labels") <- attr(fit$fit, "ordinal_item_labels")
   attr(draws, "metric_item_labels") <- attr(fit$fit, "metric_item_labels")
 
+  class(draws) <- c("dynIRT_draws", class(draws))
+
   return(draws)
 }
 
 
 #' Identify the sign and rotation of the parameter draws
 
-#' @param raw_draws (`draws_df`) A posterior draws
+#' @param raw_draws (`dynIRT_draws`) A posterior draws
 #' @param rotate (logical) Should the factor draws be rotated? If `NULL` (the
 #'     default), `rotate` will be set to `TRUE` if and only if the number of
 #'     factors is greater than 1.
@@ -58,7 +82,7 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 #' will be chosen.
 #' @param sign (integer) Should the sign of the average identified loading be
 #'     negative (`-1`) or positive (`+1`, the default).
-#' @param check (logical) Should the class of `raw_draws` be checked? Defaults
+#' @param check (logical) Should the class of `dynIRT_draws` be checked? Defaults
 #'     to `TRUE`.
 #'
 #' @return A `dynIRT_identified` object. Identified draws from posterior draws.
@@ -71,17 +95,22 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
                            check = TRUE)
 {
     if (check) {
-        check_arg_type(arg = raw_draws, typename = "draws_df")
+        check_arg_type(arg = raw_draws, typename = "dynIRT_draws")
     }
+
     if (is.null(sign)) {
         sign <- 1
         cat("Using `sign = ", sign, "`\n", sep = "")
+    } else {
+        check_arg_type(arg = sign, typename = "numeric")
     }
+
     if (is.null(rotate)) {
         n_dim <- sum(grepl("sigma_eta_evol", colnames(raw_draws)))
         rotate <- n_dim > 1
     }
-    if (rotate) {
+
+    if (!is.null(rotate)) {
         outcomes_id <- identify_rotation(
             raw_draws,
             varimax = varimax,

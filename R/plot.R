@@ -3,11 +3,16 @@ check_item_labels <- function(outcomes_labeled_item, item_labels) {
   original_labels <- sort(as.character(unique(outcomes_labeled_item)))
 
   if (length(original_labels) != length(item_labels)) {
-    stop("The length of original labels and `item_labels` are different.")
-  } else if (sum(is.na(item_labels))) {
-    stop("New labels should not contain `NA`.")
-  } else if (sum(original_labels != sort(names(item_labels))) > 0) {
-    stop("Element names of `item_labels` must match original labels")
+    cli::cli_abort("The length of original labels and `item_labels` are different.")
+  }
+  if (sum(is.na(item_labels)) > 0 | sum(is.null(item_labels)) > 0) {
+    cli::cli_abort("`item_labels` should not contain `NA` or `NULL`.")
+  }
+  if (sum(is.na(names(item_labels))) > 0 | sum(is.null(names(item_labels))) > 0) {
+    cli::cli_abort("Element names of `item_labels` should not contain `NA` or `NULL`.")
+  }
+  if (sum(original_labels != sort(names(item_labels))) > 0) {
+    cli::cli_abort("Element names of `item_labels` must match original labels")
   }
 }
 
@@ -41,7 +46,7 @@ plot_intercept_test <- function(outcomes_labeled,
   } else if (item_type == "ordinal") {
     dat <- outcomes_labeled$alpha_ordinal |> dplyr::mutate(type = "ordinal")
   } else {
-    stop("Invalid `item_type` argument")
+    cli::cli_abort("Invalid `item_type` argument")
   }
 
   if (!is.null(item_labels)) {
