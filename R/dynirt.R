@@ -118,7 +118,7 @@ fit <- function (data,
                 sd_sigma_alpha_evol = 0.5,
                 sd_sigma_eta_evol = 0.5,
                 seed = 123,
-                link = "probit"
+                link = "probit",
                 ...)
 {
 
