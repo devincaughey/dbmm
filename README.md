@@ -34,13 +34,17 @@ with binary, ordinal, and/or metric indicators. To do so, it uses the
 Bayesian programming language [Stan](https://mc-stan.org), as linked to
 R by the package [**CmdStanR**](https://mc-stan.org/cmdstanr/).
 
-The basic workflow involves the following steps: 1. Shape the data into
-the list format required by **CmdStanR** (`shape_data()`). 2. Fit a
-dynamic factor model to the data. 3. Extract parameter draws from the
-fitted model. 4. If needed, identify the model by rotating (or
-sign-flipping) the draws. 5. Convert the draws into a list of
-parameter-specific data frames with informative labels. 6. Summarize and
-visualize the draws.
+The basic workflow involves the following steps:
+
+1.  Shape the data into the list format required by **CmdStanR**
+    (`shape_data()`).
+2.  Fit a dynamic factor model to the data.
+3.  Extract parameter draws from the fitted model.
+4.  If needed, identify the model by rotating (or sign-flipping) the
+    draws.
+5.  Convert the draws into a list of parameter-specific data frames with
+    informative labels.
+6.  Summarize and visualize the draws.
 
 ``` r
 library(dynIRTtest)
@@ -119,7 +123,7 @@ labeled <- label_draws(identified)
 
 ### Step 5: Visualization
 
-- There are curretly four plotting functions.
+- There are currently four plotting functions.
 - You can use `item_labels` argument in `plot_intercept` and
   `plot_loadings` to rename item labels to show in plots. Similarly,
   `unit_labels` argument is available for `plot_scores_ave` and
@@ -138,6 +142,7 @@ p <- plot_scores_ave(labeled)
 # plot time series factor scores
 p <- plot_scores_timetrend(labeled)
 
+# Change unit labels to show in plot
 # each element is the new label
 new_unit_names <- state.name
 # names assigned to each element are the original labels
