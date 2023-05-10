@@ -33,11 +33,18 @@ fitted <- fit(
 
 fitted_draws <- extract_draws(fitted)
 
-test_that("Main extracted draws", {
+test_that("Extracted draws", {
   expect_equal(names(fitted_draws)[1], "lp__")
   expect_equal(nrow(fitted_draws), 100)
   }
 )
+
+test_that("Check convergence", {
+  expect_message(check_convergence(fitted_draws),
+                "The following variables have not converged")
+  }
+)
+
 
 identified <- identify_draws(fitted_draws, rotate = TRUE)
 

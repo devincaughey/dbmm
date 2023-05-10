@@ -121,6 +121,18 @@ fit <- function (data,
 
   check_arg_type(arg = data, typename = "dynIRT_data")
 
+  # According to the explanation of cmdstanr,
+  # "The actual number of CPU cores used is parallel_chains*threads_per_chain"
+  if (parallelize_within_chains & !is.null(threads_per_chain)) {
+    check_arg_type(arg = threads_per_chain, typename = "numeric")
+    check_arg_type(arg = chains, typename = "numeric")
+
+    specified_cores <- threads_per_chain * chains
+    if (parallel::detectCores() <= specified_cores) {
+      cli::cli_alert_warning("The number of specified cores exceeds the number of cores in your computer.")
+    }
+  }
+
   stopifnot(!parallelize_within_chains || threads_per_chain > 0)
 
   ## Add model options to input data

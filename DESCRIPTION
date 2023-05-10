@@ -29,6 +29,7 @@ Imports:
     ggrepel,
     magrittr (>= 2.0.0),
     methods,
+    parallel,
     posterior,
     reshape2,
     rlang,

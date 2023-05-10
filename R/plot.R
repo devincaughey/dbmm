@@ -17,7 +17,7 @@ check_item_labels <- function(outcomes_labeled_item, item_labels) {
 }
 
 
-#' test function
+#' test function: plotting intercept for either metric, binary, or ordinal item
 #' @param outcomes_labeled  A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot

@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{plot_intercept_test}
 \alias{plot_intercept_test}
-\title{test function}
+\title{test function: plotting intercept for either metric, binary, or ordinal item}
 \usage{
 plot_intercept_test(
   outcomes_labeled,
@@ -31,5 +31,5 @@ used to visualize? Default is "metric".}
 A plot showing the estimated intercept
 }
 \description{
-test function
+test function: plotting intercept for either metric, binary, or ordinal item
 }
