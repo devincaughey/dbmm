@@ -9,6 +9,13 @@ functions {
     }
     return y;
   }
+  array[] real p2l_array (array[] real x) { // coverts array from probit to logit scale
+    array[num_elements(x)] real y;
+    for (i in 1:num_elements(x)) {
+      y[i] = 0.07056 * pow(x[i], 3) + 1.5976 * x[i];
+    }
+    return y;
+  }
   matrix whiten(matrix XX) {
     matrix[rows(XX), cols(XX)] DM;
     matrix[cols(XX), cols(XX)] SS;
@@ -38,7 +45,7 @@ functions {
     array[N_slice] int tt_slice = tt_b[start:end];
     array[N_slice] int jj_slice = jj_b[start:end];
     array[N_slice] int ii_slice = ii_b[start:end];
-    array[N_slice] real nu_slice;
+    vector[N_slice] nu_slice;
     for (n in 1:N_slice) {
       real a_n = alpha_b[tt_slice[n], ii_slice[n]];
       row_vector[D] l_n = to_row_vector(lambda_b[ii_slice[n], 1:D]);
