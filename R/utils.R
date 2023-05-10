@@ -5,9 +5,9 @@ check_arg_type <- function(arg, typename, message = NULL) {
   argname <- deparse(match.call()[['arg']])
   if (!inherits(arg, typename)) {
     if (is.null(message)) {
-      stop(paste0('`', argname, '` is not a ', typename, ' object.'))
+      cli::cli_abort(paste0('`', argname, '` is not a ', typename, ' object.'))
     } else {
-      stop(message)
+      cli::cli_abort(message)
     }
   }
 }

@@ -20,6 +20,7 @@ RoxygenNote: 7.2.3
 Depends:
     R (>= 3.6)
 Imports:
+    cli,
     cmdstanr,
     coda,
     dplyr (>= 1.0.0),

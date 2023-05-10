@@ -15,7 +15,7 @@ identify_draws(
 )
 }
 \arguments{
-\item{raw_draws}{(\code{draws_df}) A posterior draws}
+\item{raw_draws}{(\code{dynIRT_draws}) A posterior draws}
 
 \item{rotate}{(logical) Should the factor draws be rotated? If \code{NULL} (the
 default), \code{rotate} will be set to \code{TRUE} if and only if the number of
@@ -34,7 +34,7 @@ will be chosen.}
 \item{sign}{(integer) Should the sign of the average identified loading be
 negative (\code{-1}) or positive (\code{+1}, the default).}
 
-\item{check}{(logical) Should the class of \code{raw_draws} be checked? Defaults
+\item{check}{(logical) Should the class of \code{dynIRT_draws} be checked? Defaults
 to \code{TRUE}.}
 }
 \value{
