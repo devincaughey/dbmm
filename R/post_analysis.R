@@ -115,6 +115,7 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
             normalize = normalize,
             item_type = item_type
         )
+        outcomes_id <- identify_sign(outcomes_id$id_draws, sign = sign) 
     } else {
         outcomes_id <- identify_sign(raw_draws, sign = sign) 
     }
