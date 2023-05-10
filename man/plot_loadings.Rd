@@ -8,7 +8,8 @@ plot_loadings(
   outcomes_labeled,
   xtitle = NULL,
   ytitle = NULL,
-  maintitle = "Item Loadings"
+  maintitle = "Item Loadings",
+  item_labels = NULL
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ plot_loadings(
 \item{ytitle}{(string) y-axis label of the plot}
 
 \item{maintitle}{(string) Title of the plot. Default is ``Item Loadings''}
+
+\item{item_labels}{(string) Named string vector where each element represents the new labels and the names of the elements correspond to the original label in \code{outcomes_labeled}. Default is NULL.}
 }
 \value{
 A plot showing item loadings

@@ -9,7 +9,7 @@ plot_intercept(
   xtitle = NULL,
   ytitle = "Estimated Intercept",
   maintitle = NULL,
-  recode = NULL
+  item_labels = NULL
 )
 }
 \arguments{
@@ -21,7 +21,7 @@ plot_intercept(
 
 \item{maintitle}{(string) Title of the plot}
 
-\item{recode}{(string) Named string vector where each element represents the new labels and the names of the elements correspond to the original label in \code{outcomes_labeled}. Default is NULL.}
+\item{item_labels}{(string) Named string vector where each element represents the new labels and the names of the elements correspond to the original label in \code{outcomes_labeled}. Default is NULL.}
 }
 \value{
 A plot showing the estimated intercept

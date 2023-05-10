@@ -57,5 +57,43 @@ test_that("Labeled draws", {
 test_that("Figures", {
   p <- plot_intercept(labeled)
   expect_s3_class(p, "dynIRTtest_viz")
+
+  create_metric_label <- function(outcomes_labeled) {
+    metric_labels <- attr(outcomes_labeled, "metric_item_labels") |>
+      stringr::str_remove("^[xz]_") |>
+      stringr::str_remove("cps_") |>
+      stringr::str_remove("spm_") |>
+      stringr::str_remove("_guttmacher_occurence") |>
+      stringr::str_replace_all("per_capita", "pc") |>
+      stringr::str_replace_all("_", " ")
+    names(metric_labels) <- attr(outcomes_labeled, "metric_item_labels")
+
+    return(metric_labels)
+  }
+
+  p <- plot_intercept(labeled, item_labels = create_metric_label(labeled))
+  expect_s3_class(p, "dynIRTtest_viz")
+
+  p <- plot_loadings(labeled)
+  expect_s3_class(p, "dynIRTtest_viz")
+
+  p <- plot_loadings(labeled, item_labels = create_metric_label(labeled))
+  expect_s3_class(p, "dynIRTtest_viz")
+
+  p <- plot_scores_ave(labeled)
+  expect_s3_class(p, "dynIRTtest_viz")
+
+  p <- plot_scores_timetrend(labeled)
+  expect_s3_class(p, "dynIRTtest_viz")
+
+  new_unit_names <- state.name
+  names(new_unit_names) <- state.abb
+
+  p <- plot_scores_ave(labeled, unit_labels = new_unit_names)
+  expect_s3_class(p, "dynIRTtest_viz")
+
+  p <- plot_scores_timetrend(labeled, unit_labels = new_unit_names)
+  expect_s3_class(p, "dynIRTtest_viz")
+
   }
 )

@@ -18,8 +18,8 @@ identify_draws(
 \item{raw_draws}{(\code{draws_df}) A posterior draws}
 
 \item{rotate}{(logical) Should the factor draws be rotated? If \code{NULL} (the
-default), \code{rotate} will be set to \code{TRUE} if and only if the number of factors
-is greater than 1.}
+default), \code{rotate} will be set to \code{TRUE} if and only if the number of
+factors is greater than 1.}
 
 \item{varimax}{(logical) Should a varimax rotation be applied within each
 draw? Defaults to \code{TRUE}.}

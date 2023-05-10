@@ -2,13 +2,14 @@
 % Please edit documentation in R/plot.R
 \name{plot_scores_timetrend}
 \alias{plot_scores_timetrend}
-\title{plot time series factor scores}
+\title{Plot time series factor scores. Currently only support 2-dimensional plot.}
 \usage{
 plot_scores_timetrend(
   outcomes_labeled,
   xtitle = "Dimension 1",
   ytitle = "Dimension 2",
-  maintitle = NULL
+  maintitle = NULL,
+  unit_labels = NULL
 )
 }
 \arguments{
@@ -19,10 +20,12 @@ plot_scores_timetrend(
 \item{ytitle}{(string) y-axis label of the plot}
 
 \item{maintitle}{(string) Title of the plot}
+
+\item{unit_labels}{(string) Named string vector where each element represents the new unit labels and the names of the elements correspond to the original unit labels in \code{outcomes_labeled}. Default is NULL.}
 }
 \value{
 A plot plot showing time trend
 }
 \description{
-plot time series factor scores
+Plot time series factor scores. Currently only support 2-dimensional plot.
 }
