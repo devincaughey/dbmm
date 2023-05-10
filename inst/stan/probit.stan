@@ -2,6 +2,11 @@
 
 functions {
   /* De-mean and 'whiten' (cov = I) XX */
+  real p2l_real (real x) {	// coverts scalar from probit to logit scale
+    real y;
+    y = 0.07056 * pow(x, 3) + 1.5976 * x;
+    return y;
+  }
   matrix whiten(matrix XX) {
     matrix[rows(XX), cols(XX)] DM;
     matrix[cols(XX), cols(XX)] SS;
@@ -15,7 +20,7 @@ functions {
     WW = cholesky_decompose(PP);            // Cholesky decomposition
     return DM * WW;                         // de-meaned and whitened XX
   }
-  real blogit_partial_sum_lpmf(array[] int yy_b_slice,
+  real bprobit_partial_sum_lpmf(array[] int yy_b_slice,
                                int start,
                                int end,
                                array[,] real alpha_b,
@@ -38,9 +43,9 @@ functions {
       vector[D] e_n = to_vector(eta[tt_slice[n], jj_slice[n], 1:D]);
       nu_slice[n] = a_n + l_n * e_n;
     }
-    return bernoulli_logit_lupmf(yy_b_slice | nu_slice);
+    return bernoulli_logit_lupmf(yy_b_slice | p2l_real(nu_slice));
   }
-  real ologit_partial_sum_lpmf(array[] int yy_o_slice,
+  real oprobit_partial_sum_lpmf(array[] int yy_o_slice,
                                int start,
                                int end,
                                array[,] real alpha_o,
@@ -66,7 +71,7 @@ functions {
       vector[D] e_n = to_vector(eta[tt_slice[n], jj_slice[n], 1:D]);
       nu_slice[n] = a_n + l_n * e_n;
     }
-    return ordered_logistic_lupmf(yy_o_slice | nu_slice, kappa_slice);
+    return ordered_logistic_lupmf(yy_o_slice | p2l_real(nu_slice), kappa_slice);
   }
   real normal_partial_sum_lpdf(array[] real yy_m_slice,
                                int start,
@@ -253,8 +258,8 @@ model {
       }
     }
     profile("likelihood") {
-      target += bernoulli_logit_lupmf(yy_binary | nu_binary);
-      target += ordered_logistic_lupmf(yy_ordinal | nu_ordinal,
+      target += bernoulli_logit_lupmf(yy_binary | p2l_real(nu_binary));
+      target += ordered_logistic_lupmf(yy_ordinal | p2l_real(nu_ordinal),
 				       kappa[ii_ordinal]);
       target += normal_lupdf(yy_metric | nu_metric,
 			     sigma_metric[ii_metric]);
@@ -263,7 +268,7 @@ model {
   if (parallelize == 1) {
     profile("parallel") {
       int grainsize = 1;
-      target += reduce_sum(blogit_partial_sum_lupmf,
+      target += reduce_sum(bprobit_partial_sum_lupmf,
                            to_array_1d(yy_binary),
                            grainsize,
                            alpha_binary,
@@ -272,7 +277,7 @@ model {
                            tt_binary,
                            ii_binary,
                            jj_binary);
-      target += reduce_sum(ologit_partial_sum_lupmf,
+      target += reduce_sum(oprobit_partial_sum_lupmf,
                            to_array_1d(yy_ordinal),
                            grainsize,
                            alpha_ordinal,
