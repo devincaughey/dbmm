@@ -101,6 +101,7 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
 }
 
 
+
 #' Identify the rotation of the output
 #'
 #' @param raw_draws (`draws_df`) A posterior draws
@@ -128,22 +129,6 @@ identify_rotation <- function (raw_draws, varimax,
                             regex_pars = "(^eta\\[)|(^\\.)")
   S0 <- extract_draws_match(raw_draws = raw_draws,
                             regex_pars = "(^sigma_eta_evol\\[)|(^\\.)")
-
-  # Lb0 <- dplyr::select(raw_draws,
-  #                     dplyr::matches("(^lambda_binary\\[)|(^\\.)")) %>%
-  #   as.data.frame()
-  # Lo0 <- dplyr::select(raw_draws,
-  #                     dplyr::matches("(^lambda_ordinal\\[)|(^\\.)")) %>%
-  #   as.data.frame()
-  # Lm0 <- dplyr::select(raw_draws,
-  #                     dplyr::matches("(^lambda_metric\\[)|(^\\.)")) %>%
-  #   as.data.frame()
-  # E0 <- dplyr::select(raw_draws,
-  #                     dplyr::matches("(^eta\\[)|(^\\.)")) %>%
-  #   as.data.frame()
-  # S0 <- dplyr::select(raw_draws,
-  #                     dplyr::matches("(^sigma_eta_evol\\[)|(^\\.)")) %>%
-  #   as.data.frame()
 
   S <- max(raw_draws$.iteration)
   C <- max(raw_draws$.chain)
@@ -354,123 +339,6 @@ identify_rotation <- function (raw_draws, varimax,
   }
 
   return(result)
-}
-
-
-#' @import magrittr
-extract_draws_match <- function(raw_draws, regex_pars) {
-  dplyr::select(raw_draws, dplyr::matches(regex_pars)) %>%
-    as.data.frame()
-}
-
-
-#' Permute signs
-#'
-#' @param lambda_item lambda object
-#' @param c_cur current row indicator
-#' @param lcols column
-#' @param item_type (string) The item type. Default is "binary".
-#'
-#' @return A sign-permuted object
-#'
-sign_permute <- function(lambda_item, c_cur, lcols,
-                        item_type = c("binary", "ordinal", "metric"))
-{
-  rows <- lambda_item$.chain == c_cur
-
-  L_c <- as.matrix(lambda_item[rows, lcols])
-
-  var <- as.integer(
-    stringr::str_replace(colnames(L_c),
-                        ".+\\[([0-9]+),([0-9]+)\\]$", "\\1")
-    )
-
-  dim <- as.integer(
-    stringr::str_replace(colnames(L_c),
-                        ".+\\[([0-9]+),([0-9]+)\\]$", "\\2")
-    )
-
-  if (item_type == "binary") {
-    replace_original <- "lambda_binary\\[([0-9]+),([0-9]+)\\]$"
-  } else if (item_type == "ordinal") {
-    replace_original <- "lambda_ordinal\\[([0-9]+),([0-9]+)\\]$"
-  } else if (item_type == "metric") {
-    replace_original <- "lambda_metric\\[([0-9]+),([0-9]+)\\]$"
-  } else {
-    stop("Invalid `item_type` argument")
-  }
-
-  colord <- order(var, dim)
-
-  colnames(L_c) <- stringr::str_replace(
-    colnames(L_c),
-    replace_original,
-    "LambdaV\\1_\\2"
-  )
-
-  out <- factor.switching::rsp_exact(
-    lambda_mcmc = L_c[, colord],
-    rotate = FALSE,
-    maxIter = 100,
-    threshold = 1e-6,
-    verbose = FALSE
-  )
-
-  return(out)
-}
-
-
-harmonize_varimax <- function (beta_rsp) {
-  nChains <- length(beta_rsp)
-  cnames <- colnames(beta_rsp[[1]]$lambda_reordered_mcmc)
-  d <- dim(beta_rsp[[1]]$lambda_reordered_mcmc)[2]
-  q <- as.numeric(strsplit(cnames[d], split = "_")[[1]][2])
-  p <- d / q
-  lambda_hat_values <- matrix(nrow = nChains, ncol = d)
-  colnames(lambda_hat_values) <-
-    colnames(beta_rsp[[1]]$lambda_reordered_mcmc)
-
-  for (i in 1:nChains) {
-    lambda_hat_values[i, ] <- c(t(beta_rsp[[i]]$lambda_hat))
-  }
-
-  tankard <- factor.switching::rsp_exact(
-    lambda_mcmc = lambda_hat_values,
-    maxIter = 100,
-    threshold = 1e-06,
-    verbose = TRUE,
-    rotate = FALSE)
-
-  reorderedChains <- vector("list", length = nChains)
-  for (i in 1:nChains) {
-    mcmcIterations <- dim(beta_rsp[[i]]$lambda_reordered_mcmc)[1]
-    v_vectors <- matrix(
-      tankard$permute_vectors[i, ],
-      nrow = mcmcIterations,
-      ncol = q,
-      byrow = TRUE
-    )
-    c_vectors <- matrix(
-      tankard$sign_vectors[i, ],
-      nrow = mcmcIterations,
-      ncol = q,
-      byrow = TRUE
-    )
-    lrm <- beta_rsp[[i]]$lambda_reordered_mcmc
-    reorderedChains[[i]] <-
-      coda::as.mcmc(
-        factor.switching::switch_and_permute(
-          lambda_mcmc = lrm,
-          switch_vectors = c_vectors,
-          permute_vectors = v_vectors
-        )
-      )
-  }
-  reorderedChains <- coda::as.mcmc.list(reorderedChains)
-
-  return(list(mcmc = reorderedChains,
-              sign_vectors = tankard$sign_vectors,
-              permute_vectors = tankard$permute_vectors))
 }
 
 
@@ -779,4 +647,121 @@ label_draws <- function (draws, regex_pars = NULL, check = TRUE)
   class(draws_ls) <- c("dynIRT_labeled", class(draws_ls))
 
   return(draws_ls)
+}
+
+
+
+#' @import magrittr
+extract_draws_match <- function(raw_draws, regex_pars) {
+  dplyr::select(raw_draws, dplyr::matches(regex_pars)) %>%
+    as.data.frame()
+}
+
+#' Permute signs
+#'
+#' @param lambda_item lambda object
+#' @param c_cur current row indicator
+#' @param lcols column
+#' @param item_type (string) The item type. Default is "binary".
+#'
+#' @return A sign-permuted object
+#'
+sign_permute <- function(lambda_item, c_cur, lcols,
+                        item_type = c("binary", "ordinal", "metric"))
+{
+  rows <- lambda_item$.chain == c_cur
+
+  L_c <- as.matrix(lambda_item[rows, lcols])
+
+  var <- as.integer(
+    stringr::str_replace(colnames(L_c),
+                        ".+\\[([0-9]+),([0-9]+)\\]$", "\\1")
+    )
+
+  dim <- as.integer(
+    stringr::str_replace(colnames(L_c),
+                        ".+\\[([0-9]+),([0-9]+)\\]$", "\\2")
+    )
+
+  if (item_type == "binary") {
+    replace_original <- "lambda_binary\\[([0-9]+),([0-9]+)\\]$"
+  } else if (item_type == "ordinal") {
+    replace_original <- "lambda_ordinal\\[([0-9]+),([0-9]+)\\]$"
+  } else if (item_type == "metric") {
+    replace_original <- "lambda_metric\\[([0-9]+),([0-9]+)\\]$"
+  } else {
+    stop("Invalid `item_type` argument")
+  }
+
+  colord <- order(var, dim)
+
+  colnames(L_c) <- stringr::str_replace(
+    colnames(L_c),
+    replace_original,
+    "LambdaV\\1_\\2"
+  )
+
+  out <- factor.switching::rsp_exact(
+    lambda_mcmc = L_c[, colord],
+    rotate = FALSE,
+    maxIter = 100,
+    threshold = 1e-6,
+    verbose = FALSE
+  )
+
+  return(out)
+}
+
+
+harmonize_varimax <- function (beta_rsp) {
+  nChains <- length(beta_rsp)
+  cnames <- colnames(beta_rsp[[1]]$lambda_reordered_mcmc)
+  d <- dim(beta_rsp[[1]]$lambda_reordered_mcmc)[2]
+  q <- as.numeric(strsplit(cnames[d], split = "_")[[1]][2])
+  p <- d / q
+  lambda_hat_values <- matrix(nrow = nChains, ncol = d)
+  colnames(lambda_hat_values) <-
+    colnames(beta_rsp[[1]]$lambda_reordered_mcmc)
+
+  for (i in 1:nChains) {
+    lambda_hat_values[i, ] <- c(t(beta_rsp[[i]]$lambda_hat))
+  }
+
+  tankard <- factor.switching::rsp_exact(
+    lambda_mcmc = lambda_hat_values,
+    maxIter = 100,
+    threshold = 1e-06,
+    verbose = TRUE,
+    rotate = FALSE)
+
+  reorderedChains <- vector("list", length = nChains)
+  for (i in 1:nChains) {
+    mcmcIterations <- dim(beta_rsp[[i]]$lambda_reordered_mcmc)[1]
+    v_vectors <- matrix(
+      tankard$permute_vectors[i, ],
+      nrow = mcmcIterations,
+      ncol = q,
+      byrow = TRUE
+    )
+    c_vectors <- matrix(
+      tankard$sign_vectors[i, ],
+      nrow = mcmcIterations,
+      ncol = q,
+      byrow = TRUE
+    )
+    lrm <- beta_rsp[[i]]$lambda_reordered_mcmc
+    reorderedChains[[i]] <-
+      coda::as.mcmc(
+        factor.switching::switch_and_permute(
+          lambda_mcmc = lrm,
+          switch_vectors = c_vectors,
+          permute_vectors = v_vectors
+        )
+      )
+  }
+  reorderedChains <- coda::as.mcmc.list(reorderedChains)
+
+  return(list(mcmc = reorderedChains,
+              sign_vectors = tankard$sign_vectors,
+              permute_vectors = tankard$permute_vectors))
 }
