@@ -68,6 +68,11 @@ shape_data <- function (long_data,
     long_data <- dplyr::select(long_data,
                                unit, UNIT, time,
                                TIME, item, value)
+    stopifnot(!anyNA(long_data$unit))
+    stopifnot(!anyNA(long_data$time))
+    stopifnot(!anyNA(long_data$item))
+    stopifnot(!anyNA(long_data$value))
+
     items <- sort(unique(long_data$item))
 
     unique_df <- long_data %>%
