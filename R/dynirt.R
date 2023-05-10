@@ -79,6 +79,8 @@
 #'     deviations of the metric items. Defaults to `0.1`.
 #' @param seed (positive integer) An integer vector of length one indicating the
 #'     state of Stan’s pseudo-random number generator. Defaults to `123`.
+#' @param link (string) Which link function should be used for binary and
+#'     ordinal outcomes. One of `"probit"` (the default) and `"logit"`.
 #' @param ... Additional arguments to `cmdstanr::sample()`.
 #'
 #' @return A dynIRT object containing
@@ -116,6 +118,7 @@ fit <- function (data,
                 sd_sigma_alpha_evol = 0.5,
                 sd_sigma_eta_evol = 0.5,
                 seed = 123,
+                link = "probit",
                 ...)
 {
 
@@ -200,7 +203,7 @@ fit <- function (data,
 
   ## Compile model
   ## NOTE: make sure to change the package name
-  file <- system.file(paste0("stan/model.stan"), package = "dynIRTtest")
+  file <- system.file(paste0("stan/", link, ".stan"), package = "dynIRTtest")
 
   m0 <- cmdstan_model(stan_file = file)
 
