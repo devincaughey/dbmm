@@ -80,6 +80,13 @@ test_that("Figures", {
   p <- plot_loadings(labeled, item_labels = create_metric_label(labeled))
   expect_s3_class(p, "dynIRTtest_viz")
 
+  # check `check_item_labels` works
+  wrong_labels <- create_metric_label(labeled)
+  names(wrong_labels)[1] <- "a"
+
+  expect_error(plot_intercept(labeled, item_labels = wrong_labels),
+              regexp = "Element names of `item_labels")
+
   p <- plot_scores_ave(labeled)
   expect_s3_class(p, "dynIRTtest_viz")
 
