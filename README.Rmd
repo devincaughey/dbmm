@@ -39,35 +39,39 @@ devtools::install_github("tomoya-sasaki/dynIRTtest")
 
 The R package **dynIRTtest** fits dynamic multidimensional factor models with
 binary, ordinal, and/or metric indicators. To do so, it uses the Bayesian
-programming language Stan, as linked to R by the package **CmdStanR**.
+programming language [Stan](https://mc-stan.org), as linked to R by the package
+[**CmdStanR**](https://mc-stan.org/cmdstanr/).
 
 The basic workflow involves the following steps:
-  1. Shape the data into the list format required by **CmdStanR**.
+  1. Shape the data into the list format required by **CmdStanR**
+     (`shape_data()`).
   2. Fit a dynamic factor model to the data.
-  3. Extract draws from the fitted model.
-  4. 
+  3. Extract parameter draws from the fitted model.
+  4. If needed, identify the model by rotating (or sign-flipping) the draws.
+  5. Convert the draws into a list of parameter-specific data frames with
+     informative labels.
+  6. Summarize and visualize the draws.
 
-### Step 1: load data
-
-Load data on state societal outcomes from 2020 and 2021.
+### Step 1: Shape the data
 
 ```{r, eval=FALSE}
+library(dynIRTtest)
+## Load data on societal attributes of U.S. states in 2020 and 2021
 data("social_outcomes_2020_2021")
-```
-
-### Step 2: Reshape data
-
-```{r, eval=FALSE}
+## Shape the data into list form
 shaped_data <- shape_data(
     long_data = social_outcomes_2020_2021,
     unit_var = "st",
     time_var = "year",
     item_var = "outcome",
-    value_var = "value",
+    value_var = "value"
+    periods_to_estimate = 2020:2021,
+    ordinal_items = NA,
+    binary_items = NA,
+    max_cats = 10,
     standardize = TRUE,
-    periods_to_estimate = 2020:2021
+    make_indicator_for_zeros = TRUE
 )
-
 ```
 
 ### Step 3: Fit the model
