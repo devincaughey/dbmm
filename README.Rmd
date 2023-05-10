@@ -64,7 +64,7 @@ shaped_data <- shape_data(
     unit_var = "st",
     time_var = "year",
     item_var = "outcome",
-    value_var = "value"
+    value_var = "value",
     periods_to_estimate = 2020:2021,
     ordinal_items = NA,
     binary_items = NA,
