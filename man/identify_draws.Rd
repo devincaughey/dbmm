@@ -28,14 +28,14 @@ draw? Defaults to \code{TRUE}.}
 varimax rotation? Defaults to \code{TRUE}.}
 
 \item{item_type}{(string) Should "binary", "ordinal", or "metric" loadings be
-used to identify the model. If \code{NULL} (the default), the largest set of items
-will be chosen.}
+used to identify the model. If \code{NULL} (the default), the largest set of
+items will be chosen.}
 
 \item{sign}{(integer) Should the sign of the average identified loading be
 negative (\code{-1}) or positive (\code{+1}, the default).}
 
-\item{check}{(logical) Should the class of \code{dynIRT_draws} be checked? Defaults
-to \code{TRUE}.}
+\item{check}{(logical) Should the class of \code{dynIRT_draws} be checked?
+Defaults to \code{TRUE}.}
 }
 \value{
 A \code{dynIRT_identified} object. Identified draws from posterior draws.
