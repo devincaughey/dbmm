@@ -2,8 +2,8 @@
 
 functions {
   /* De-mean and 'whiten' (cov = I) XX */
-  real p2l_real (real x) {	// coverts scalar from probit to logit scale
-    real y;
+  real p2l_array (array[] real x) {	// coverts scalar from probit to logit scale
+    array[] real y;
     y = 0.07056 * pow(x, 3) + 1.5976 * x;
     return y;
   }
