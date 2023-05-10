@@ -6,10 +6,16 @@
 <!-- badges: start -->
 <!-- badges: end -->
 
+## TODOs
+
+- [x] Add descriptions
+- [ ] Figure specifications
+
 ## Misc
 
-We will change the package name later. Please edit the `README.Rmd` file
-and do not directly edit the `README.md` file.
+- We will change the package name later.
+- Please edit the `README.Rmd` file and do not directly edit the
+  `README.md` file.
 
 ## Installation
 
@@ -40,7 +46,7 @@ visualize the draws.
 library(dynIRTtest)
 ```
 
-### Step 1: Reshape data
+### Step 1: Shape data
 
 ``` r
 ## Load data on societal attributes of U.S. states in 2020 and 2021
