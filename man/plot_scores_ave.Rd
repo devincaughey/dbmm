@@ -2,13 +2,14 @@
 % Please edit documentation in R/plot.R
 \name{plot_scores_ave}
 \alias{plot_scores_ave}
-\title{plot average factor scores}
+\title{plot average factor scores across different units}
 \usage{
 plot_scores_ave(
   outcomes_labeled,
   xtitle = NULL,
   ytitle = NULL,
-  maintitle = NULL
+  maintitle = "Average Factor Scores",
+  unit_labels = NULL
 )
 }
 \arguments{
@@ -18,11 +19,13 @@ plot_scores_ave(
 
 \item{ytitle}{(string) y-axis label of the plot}
 
-\item{maintitle}{(string) Title of the plot}
+\item{maintitle}{(string) Title of the plot. Default is "Agerage Factor Scores".}
+
+\item{unit_labels}{(string) Named string vector where each element represents the new unit labels and the names of the elements correspond to the original unit labels in \code{outcomes_labeled}. Default is NULL.}
 }
 \value{
 A plot showing average factor scores
 }
 \description{
-plot average factor scores
+plot average factor scores across different units
 }

@@ -1,59 +1,14 @@
-#' test function
-#' @param outcomes_labeled  A `dynIRT_labeled` object
-#' @param xtitle (string) x-axis label of the plot
-#' @param ytitle (string) y-axis label of the plot
-#' @param maintitle (string) Title of the plot
-#'
-#' @return A plot showing the estimated intercept
-#'
-#' @import magrittr ggplot2
-#' @importFrom rlang .data
+#' internal function to check `item_labels` argument
+check_item_labels <- function(outcomes_labeled_item, item_labels) {
+  original_labels <- sort(as.character(unique(outcomes_labeled_item)))
 
-#' @export
-plot_intercept2 <- function(outcomes_labeled,
-                          xtitle = NULL,
-                          ytitle = "Estimated Intercept",
-                          maintitle = NULL) {
-
-
-  dat <- dplyr::bind_rows(
-    outcomes_labeled$alpha_binary |> dplyr::mutate(type = "binary"),
-    outcomes_labeled$alpha_ordinal |> dplyr::mutate(type = "ordinal"),
-    outcomes_labeled$alpha_metric |> dplyr::mutate(type = "metric")
-  )
-
-  dat %>%
-    dplyr::group_by(.data$TIME, .data$ITEM) %>%
-    dplyr::summarise(
-      est = mean.default(.data$value),
-      err = stats::sd(.data$value),
-      .groups = "drop"
-    ) %>%
-    dplyr::mutate(
-      year = as.integer(as.character(.data$TIME))
-    ) %>%
-    dplyr::mutate(
-      ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd)
-    ) %>%
-    ggplot(aes(x = .data$year, y = .data$est)) +
-      # facet_wrap(~.data$ITEM, ncol = 5) +
-      facet_wrap(~.data$ITEM) +
-      geom_line() +
-      geom_ribbon(
-        aes(ymin = .data$est - 1.96 * .data$err,
-            ymax = .data$est + 1.96 * .data$err),
-            color = NA, alpha = 1/4
-      ) +
-      labs(
-        title = maintitle,
-        y = ytitle,
-        x = xtitle
-        # color = NULL,
-        # fill = NULL
-      ) -> p
-
-  class(p) <- c("dynIRTtest_viz", class(p))
-  p
+  if (length(original_labels) != length(item_labels)) {
+    stop("The length of original labels and `item_labels` are different.")
+  } else if (sum(is.na(item_labels))) {
+    stop("New labels should not contain `NA`.")
+  } else if (sum(original_labels != sort(names(item_labels))) > 0) {
+    stop("Element names of `item_labels` must match original labels")
+  }
 }
 
 
@@ -63,6 +18,7 @@ plot_intercept2 <- function(outcomes_labeled,
 #' @param ytitle (string) y-axis label of the plot
 #' @param item_type (string) Should "binary", "ordinal", or "metric" loadings be
 #' used to visualize? Default is "metric".
+#' @param item_labels (string) Named string vector where each element represents the new labels and the names of the elements correspond to the original label in `outcomes_labeled`. Default is NULL.
 #' @param maintitle (string) Title of the plot
 #'
 #' @return A plot showing the estimated intercept
@@ -70,11 +26,13 @@ plot_intercept2 <- function(outcomes_labeled,
 #' @import magrittr ggplot2
 #' @importFrom rlang .data
 #' @export
-plot_intercept3 <- function(outcomes_labeled,
+plot_intercept_test <- function(outcomes_labeled,
                           xtitle = NULL,
                           ytitle = "Estimated Intercept",
+                          maintitle = NULL,
                           item_type = c("metric", "binary", "ordinal"),
-                          maintitle = NULL) {
+                          item_labels = NULL) {
+
 
   if (item_type == "metric") {
     dat <- outcomes_labeled$alpha_metric |> dplyr::mutate(type = "metric")
@@ -84,6 +42,11 @@ plot_intercept3 <- function(outcomes_labeled,
     dat <- outcomes_labeled$alpha_ordinal |> dplyr::mutate(type = "ordinal")
   } else {
     stop("Invalid `item_type` argument")
+  }
+
+  if (!is.null(item_labels)) {
+    check_arg_type(item_labels, "character")
+    check_item_labels(dat$ITEM, item_labels)
   }
 
   dat %>%
@@ -96,6 +59,7 @@ plot_intercept3 <- function(outcomes_labeled,
     dplyr::mutate(
       year = as.integer(as.character(.data$TIME))
     ) %>%
+    {if (!is.null(item_labels)) dplyr::mutate(., ITEM = dplyr::recode(.data$ITEM, !!!item_labels)) else . } %>%
     dplyr::mutate(
       ITEM = stats::reorder(.data$ITEM, .data$est, FUN = stats::sd)
     ) %>%
@@ -143,6 +107,11 @@ plot_intercept <- function(outcomes_labeled,
 
   ## function to check if item_labels is properly
 
+  if (!is.null(item_labels)) {
+    check_arg_type(item_labels, "character")
+    check_item_labels(outcomes_labeled$alpha_metric$ITEM, item_labels)
+  }
+
   outcomes_labeled$alpha_metric %>%
     dplyr::group_by(.data$TIME, .data$ITEM) %>%
     dplyr::summarise(
@@ -186,7 +155,8 @@ plot_intercept <- function(outcomes_labeled,
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot. Default is ``Item Loadings''
-
+#' @param item_labels (string) Named string vector where each element represents the new labels and the names of the elements correspond to the original label in `outcomes_labeled`. Default is NULL.
+#'
 #' @return A plot showing item loadings
 #'
 #' @import magrittr ggplot2
@@ -196,10 +166,16 @@ plot_intercept <- function(outcomes_labeled,
 plot_loadings <- function(outcomes_labeled,
                           xtitle = NULL,
                           ytitle = NULL,
-                          maintitle = "Item Loadings") {
+                          maintitle = "Item Loadings",
+                          item_labels = NULL) {
+
+  if (!is.null(item_labels)) {
+    check_arg_type(item_labels, "character")
+    check_item_labels(outcomes_labeled$lambda_metric$ITEM, item_labels)
+  }
 
   outcomes_labeled$lambda_metric %>%
-    # dplyr::mutate(ITEM = dplyr::recode(.data$ITEM, !!!metric_labels)) %>%
+    {if (!is.null(item_labels)) dplyr::mutate(., ITEM = dplyr::recode(.data$ITEM, !!!item_labels)) else . } %>%
     dplyr::group_by(.data$ITEM, .data$dim) %>%
     dplyr::summarise(est = mean.default(.data$value),
                      err = stats::sd(.data$value)) %>%
@@ -250,12 +226,13 @@ create_factor_scores <- function(outcomes_labeled) {
 }
 
 
-#' plot average factor scores
+#' plot average factor scores across different units
 #'
 #' @param outcomes_labeled  A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
-#' @param maintitle (string) Title of the plot
+#' @param maintitle (string) Title of the plot. Default is "Agerage Factor Scores".
+#' @param unit_labels (string) Named string vector where each element represents the new unit labels and the names of the elements correspond to the original unit labels in `outcomes_labeled`. Default is NULL.
 #'
 #' @return A plot showing average factor scores
 #'
@@ -266,11 +243,18 @@ create_factor_scores <- function(outcomes_labeled) {
 plot_scores_ave <- function(outcomes_labeled,
                             xtitle = NULL,
                             ytitle = NULL,
-                            maintitle = NULL)
+                            maintitle = "Average Factor Scores",
+                            unit_labels = NULL)
 {
   eta_ave <- create_factor_scores(outcomes_labeled = outcomes_labeled)
 
+  if (!is.null(unit_labels)) {
+    check_arg_type(unit_labels, "character")
+    check_item_labels(eta_ave$UNIT, unit_labels)
+  }
+
   eta_ave %>%
+    {if (!is.null(unit_labels)) dplyr::mutate(., UNIT = dplyr::recode(.data$UNIT, !!!unit_labels)) else . } %>%
     ggplot() +
       aes(x = .data$est_1, y = .data$est_2, label = .data$UNIT) +
       geom_hline(yintercept = 0, linetype = "dotted") +
@@ -299,12 +283,13 @@ plot_scores_ave <- function(outcomes_labeled,
 }
 
 
-#' plot time series factor scores
+#' Plot time series factor scores. Currently only support 2-dimensional plot.
 #'
 #' @param outcomes_labeled  A `dynIRT_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot
+#' @param unit_labels (string) Named string vector where each element represents the new unit labels and the names of the elements correspond to the original unit labels in `outcomes_labeled`. Default is NULL.
 #'
 #' @return A plot plot showing time trend
 #'
@@ -315,13 +300,21 @@ plot_scores_ave <- function(outcomes_labeled,
 plot_scores_timetrend <- function(outcomes_labeled,
                                   xtitle = "Dimension 1",
                                   ytitle = "Dimension 2",
-                                  maintitle = NULL)
+                                  maintitle = NULL,
+                                  unit_labels = NULL)
 {
+
+  if (!is.null(unit_labels)) {
+    check_arg_type(unit_labels, "character")
+    check_item_labels(outcomes_labeled$eta$UNIT, unit_labels)
+  }
+
   outcomes_labeled$eta %>%
     dplyr::group_by(.data$TIME, .data$UNIT, .data$dim) %>%
     dplyr::summarise(est = mean.default(.data$value),
                      err = stats::sd(.data$value),
                      .groups = "drop") %>%
+    {if (!is.null(unit_labels)) dplyr::mutate(., UNIT = dplyr::recode(.data$UNIT, !!!unit_labels)) else . } %>%
     dplyr::mutate(
       DIMENSION = dplyr::if_else(.data$dim == 1, xtitle, ytitle),
       UNIT = stats::reorder(.data$UNIT, -.data$est, FUN = mean.default),
@@ -329,7 +322,7 @@ plot_scores_timetrend <- function(outcomes_labeled,
     ) %>%
     ggplot() +
       # facet_wrap(~ .data$faUNIT, ncol = 5) +
-      facet_wrap(~ .data$faUNIT) +
+      facet_wrap(~ .data$UNIT) +
       aes(x = .data$year, y = .data$est,
           color = .data$DIMENSION, fill = .data$DIMENSION) +
       geom_ribbon(
