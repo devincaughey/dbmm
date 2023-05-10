@@ -2,7 +2,7 @@
 
 functions {
   /* De-mean and 'whiten' (cov = I) XX */
-  vector _vector (vector x) { // coverts vector from probit to logit scale
+  vector (vector x) { // coverts vector from probit to logit scale
     vector[num_elements(x)] y;
     for (i in 1:num_elements(x)) {
       y[i] = 0.07056 * pow(x[i], 3) + 1.5976 * x[i];
