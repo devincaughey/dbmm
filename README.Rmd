@@ -32,19 +32,20 @@ devtools::install_github("tomoya-sasaki/dynIRTtest")
 
 ## TODOs
 
-- [ ] Add descriptions
+- [x] Add descriptions
 - [ ] Figure specifications
 
 ## Explanation
 
-The R package **dynIRTtest** fits dynamic multidimensional factor models with binary, ordinal,
-and/or metric indicators. To do so, it uses the Bayesian programming language
-Stan, as linked to R by the package **CmdStanR**. 
+The R package **dynIRTtest** fits dynamic multidimensional factor models with
+binary, ordinal, and/or metric indicators. To do so, it uses the Bayesian
+programming language Stan, as linked to R by the package **CmdStanR**.
 
 The basic workflow involves the following steps:
   1. Shape the data into the list format required by **CmdStanR**.
   2. Fit a dynamic factor model to the data.
-  3. Extract draws from the 
+  3. Extract draws from the fitted model.
+  4. 
 
 ### Step 1: load data
 
