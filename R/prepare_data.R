@@ -71,8 +71,7 @@ shape_data <- function (long_data,
     items <- sort(unique(long_data$item))
 
     unique_df <- long_data %>%
-        dplyr::group_by(.data$item) %>%
-        dplyr::summarise(n = length(unique(.data$value)), .groups = "drop")
+        dplyr::summarise(n = length(unique(.data$value)), .by = .data$item)
 
     drop_items <- dplyr::filter(unique_df, .data$n < 2)$item
     cat("\nDropping the following items due to lack of variation:\n")
