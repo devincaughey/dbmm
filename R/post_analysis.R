@@ -76,14 +76,14 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 #' @param varimax (logical) Should a varimax rotation be applied within each
 #'     draw? Defaults to `TRUE`.
 #' @param normalize (logical) Should Kaiser normalization be performed before
-#' varimax rotation? Defaults to `TRUE`.
+#'     varimax rotation? Defaults to `TRUE`.
 #' @param item_type (string) Should "binary", "ordinal", or "metric" loadings be
-#' used to identify the model. If `NULL` (the default), the largest set of items
-#' will be chosen.
+#'     used to identify the model. If `NULL` (the default), the largest set of
+#'     items will be chosen.
 #' @param sign (integer) Should the sign of the average identified loading be
 #'     negative (`-1`) or positive (`+1`, the default).
-#' @param check (logical) Should the class of `dynIRT_draws` be checked? Defaults
-#'     to `TRUE`.
+#' @param check (logical) Should the class of `dynIRT_draws` be checked?
+#'     Defaults to `TRUE`.
 #'
 #' @return A `dynIRT_identified` object. Identified draws from posterior draws.
 #'
@@ -97,7 +97,6 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
     if (check) {
         check_arg_type(arg = raw_draws, typename = "dynIRT_draws")
     }
-
     if (is.null(sign)) {
         sign <- 1
         cat("Using `sign = ", sign, "`\n", sep = "")
@@ -109,23 +108,17 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
         n_dim <- sum(grepl("sigma_eta_evol", colnames(raw_draws)))
         rotate <- n_dim > 1
     }
-
-    if (!is.null(rotate)) {
+    if (isTRUE(rotate)) {
         outcomes_id <- identify_rotation(
             raw_draws,
             varimax = varimax,
             normalize = normalize,
             item_type = item_type
         )
-        outcomes_id$id_draws <-
-            identify_sign(outcomes_id$id_draws, sign = sign)$id_draws
     } else {
-        outcomes_id <- identify_sign(raw_draws, sign = sign)
-
+        outcomes_id <- identify_sign(raw_draws, sign = sign) 
     }
-
     class(outcomes_id) <- c("dynIRT_identified", class(outcomes_id))
-
     return(outcomes_id)
 }
 
