@@ -1,18 +1,22 @@
+---
+output: github_document
+---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
+
+
 
 # (temporary name) dynIRTtest
 
 <!-- badges: start -->
 <!-- badges: end -->
 
-We will change the package name later. Please edit the `README.Rmd` file
-and do not directly edit the `README.md` file.
+We will change the package name later. 
+Please edit the `README.Rmd` file and do not directly edit the `README.md` file.
 
 ## Installation
 
-You can install the development version of dynIRTtest from
-[GitHub](https://github.com/) with:
+You can install the development version of **dynIRTtest** from [GitHub](https://github.com/) with:
 
 ``` r
 # install.packages("devtools")
@@ -21,24 +25,34 @@ devtools::install_github("tomoya-sasaki/dynIRTtest")
 
 ## TODOs
 
-- [ ] Add descriptions
+- [x] Add descriptions
 - [ ] Figure specifications
 
 ## Explanation
 
-- How to use `dynIRTtest`
+The R package **dynIRTtest** fits dynamic multidimensional factor models with
+binary, ordinal, and/or metric indicators. To do so, it uses the Bayesian
+programming language Stan, as linked to R by the package **CmdStanR**.
+
+The basic workflow involves the following steps:
+  1. Shape the data into the list format required by **CmdStanR**.
+  2. Fit a dynamic factor model to the data.
+  3. Extract draws from the fitted model.
+  4. 
 
 ### Step 1: load data
 
-- Load state-level public opinion data from 2020 and 2021
+Load data on state societal outcomes from 2020 and 2021.
 
-``` r
+
+```r
 data("social_outcomes_2020_2021")
 ```
 
 ### Step 2: Reshape data
 
-``` r
+
+```r
 shaped_data <- shape_data(
     long_data = social_outcomes_2020_2021,
     unit_var = "st",
@@ -48,11 +62,13 @@ shaped_data <- shape_data(
     standardize = TRUE,
     periods_to_estimate = 2020:2021
 )
+
 ```
 
 ### Step 3: Fit the model
 
-``` r
+
+```r
 fitted <- fit(
     data = shaped_data,
     lambda_zeros = data.frame(
@@ -76,3 +92,6 @@ fitted <- fit(
 ```
 
 ### Step 4: Post analysis
+
+
+
