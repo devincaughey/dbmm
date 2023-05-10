@@ -4,7 +4,9 @@ functions {
   /* De-mean and 'whiten' (cov = I) XX */
   real p2l_array (array[] real x) {	// coverts scalar from probit to logit scale
     array[dims(x)[1]] real y;
-    y = 0.07056 * pow(x, 3) + 1.5976 * x;
+    for (i in 1:num_elements(x)) {
+      y[i] = 0.07056 * pow(x[i], 3) + 1.5976 * x[i];
+    }
     return y;
   }
   matrix whiten(matrix XX) {
