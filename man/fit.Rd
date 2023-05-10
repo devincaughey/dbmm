@@ -27,6 +27,7 @@ fit(
   sd_sigma_alpha_evol = 0.5,
   sd_sigma_eta_evol = 0.5,
   seed = 123,
+  link = "probit",
   ...
 )
 }
@@ -127,6 +128,9 @@ deviations of the metric items. Defaults to \code{0.1}.}
 
 \item{seed}{(positive integer) An integer vector of length one indicating the
 state of Stan’s pseudo-random number generator. Defaults to \code{123}.}
+
+\item{link}{(string) Which link function should be used for binary and
+ordinal outcomes. One of \code{"probit"} (the default) and \code{"logit"}.}
 
 \item{...}{Additional arguments to \code{cmdstanr::sample()}.}
 }
