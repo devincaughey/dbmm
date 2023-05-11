@@ -55,6 +55,11 @@ library(dynIRTtest)
 ``` r
 ## Load data on societal attributes of U.S. states in 2020 and 2021
 data("social_outcomes_2020_2021")
+
+## Remove any rows that contain NA's in `unit_var`, `time_var`, `item_var`, or `value_var`
+social_outcomes_2020_2021 |>
+    drop_na(st, year, outcome, value) -> social_outcomes_2020_2021
+
 ## Shape the data into list form
 shaped_data <- shape_data(
     long_data = social_outcomes_2020_2021,
@@ -73,7 +78,8 @@ shaped_data <- shape_data(
 
 ### Step 2: Fit the model
 
-- You can specify additional arguments for `cmdstanr::sample()`
+- You can specify additional arguments for `cmdstanr::sample()`. Check
+  [here](https://mc-stan.org/cmdstanr/reference/model-method-sample.html).
 
 ``` r
 fitted <- fit(
@@ -81,7 +87,7 @@ fitted <- fit(
     lambda_zeros = data.frame(
         item = c("x_cps_spm_poverty"),
         dim = c(2)
-    ),
+    ), # fix `x_cps_spm_poverty` to zero
     n_dim = 2,
     chains = 2,
     parallelize_within_chains = TRUE,
@@ -103,21 +109,21 @@ fitted <- fit(
 ### Step 3: Extract Draws
 
 ``` r
-# extract posterior draws
+## Extract posterior draws
 fitted_draws <- extract_draws(fitted)
 
-# convergence diagnostics
+## Convergence diagnostics
 checked <- check_convergence(fitted_draws)
 ```
 
 ### Step 4: Post analysis
 
 ``` r
-# identify the sign and rotation of the parameter draws
-# set rotate = FALSE to skip rotation
+## Identify the sign and rotation of the parameter draws
+## Set rotate = FALSE to skip rotation
 identified <- identify_draws(fitted_draws, rotate = TRUE)
 
-# label the posterior draws
+## Label the posterior draws
 labeled <- label_draws(identified)
 ```
 
@@ -130,22 +136,22 @@ labeled <- label_draws(identified)
   `plot_scores_timetrend` to change unit labels.
 
 ``` r
-# plot intercept
+## Plot intercept
 p <- plot_intercept(labeled)
 
-# plot item loadings
+## Plot item loadings
 p <- plot_loadings(labeled)
 
-# plot average scores across different units
+## Plot average scores across different units
 p <- plot_scores_ave(labeled)
 
-# plot time series factor scores
+## Plot time series factor scores
 p <- plot_scores_timetrend(labeled)
 
-# Change unit labels to show in plot
-# each element is the new label
+## Change unit labels to show in plot
+## Each element is the new label
 new_unit_names <- state.name
-# names assigned to each element are the original labels
+## Names assigned to each element are the original labels
 names(new_unit_names) <- state.abb
 
 p <- plot_scores_ave(labeled, unit_labels = new_unit_names)
