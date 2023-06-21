@@ -7,7 +7,7 @@
 label_draws(draws, regex_pars = NULL, check = TRUE)
 }
 \arguments{
-\item{draws}{(\code{dynIRT_identified}) An identified dynIRT fitted object}
+\item{draws}{(\code{dbmm_identified}) An identified dbmm fitted object}
 
 \item{regex_pars}{(named character vector) Vector of regular expressions, to
 be used to pick out columns of \code{draws}. The names of this vector will be

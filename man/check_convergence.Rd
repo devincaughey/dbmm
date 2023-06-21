@@ -7,7 +7,7 @@
 check_convergence(raw_draws)
 }
 \arguments{
-\item{raw_draws}{(\code{dynIRT_draws}) A posterior draws}
+\item{raw_draws}{(\code{dbmm_draws}) A posterior draws}
 }
 \description{
 Check convergence

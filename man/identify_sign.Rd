@@ -13,7 +13,7 @@ identify_sign(raw_draws, sign)
 negative (\code{-1}) or positive (\code{+1}).}
 }
 \value{
-A \code{dynIRT_labeled} object.
+A \code{dbmm_labeled} object.
 }
 \description{
 Identify signs

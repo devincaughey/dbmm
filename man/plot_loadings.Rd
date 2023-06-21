@@ -13,7 +13,7 @@ plot_loadings(
 )
 }
 \arguments{
-\item{outcomes_labeled}{A \code{dynIRT_labeled} object}
+\item{outcomes_labeled}{A \code{dbmm_labeled} object}
 
 \item{xtitle}{(string) x-axis label of the plot}
 

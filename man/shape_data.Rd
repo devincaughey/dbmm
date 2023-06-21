@@ -2,7 +2,7 @@
 % Please edit documentation in R/prepare_data.R
 \name{shape_data}
 \alias{shape_data}
-\title{Prepare data for dynIRT}
+\title{Prepare data for dbmm}
 \usage{
 shape_data(
   long_data,
@@ -63,5 +63,5 @@ parameter values for that year will be imputed by the dynamic model.}
 A list formatted for Stan
 }
 \description{
-Prepare data for dynIRT
+Prepare data for dbmm
 }
