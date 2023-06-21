@@ -1,18 +1,12 @@
-Package: dynIRTtest
-Title: Dynamic Estimation of Group-Level Opinion
-Description: Fit dynamic group-level item response theory (IRT) and multilevel
-    regression and poststratification (MRP) models from item response data. dynIRT
-    models latent traits at the level of demographic and geographic groups,
-    rather than individuals, in a Bayesian group-level IRT approach developed by
-    Caughey and Warshaw (2015) <doi:10.1093/pan/mpu021>. The package also
-    estimates subpopulations' average responses to single survey items with a
-    dynamic MRP model proposed by Park, Gelman, and Bafumi (2004)
-    <doi:10.11126/stanford/9780804753005.003.0011>.
+Package: dbmm
+Title: Dynamic Bayesian Measurement models
+Description: Use cmdstan to fit dynamic measurement models, including dynamic group-level item response theory (DGIRT) and dynamic mixed factor analysis (DMFA) models
 Version: 0.0.1
 Authors@R:
-  c(person("Tomoya", "Sasaki", email = "tomo1990sasaki@gmail.com", role = c("aut", "cre"),
-          comment = c(ORCID = "0009-0001-9243-2243")),
-    person("Devin", "Caughey", email = "caughey@mit.edu", role = c("aut")))
+  c(person("Devin", "Caughey", email = "devin.caughey@gmail.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0001-6419-6805")),
+    person("Tomoya", "Sasaki", email = "tomo1990sasaki@gmail.com", role = c("aut", "cre"),
+            comment = c(ORCID = "0009-0001-9243-2243")))
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
