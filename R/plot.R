@@ -85,7 +85,7 @@ plot_intercept_test <- function(outcomes_labeled,
         # fill = NULL
       ) -> p
 
-  class(p) <- c("dynIRTtest_viz", class(p))
+  class(p) <- c("dbmm_viz", class(p))
   p
 }
 
@@ -148,7 +148,7 @@ plot_intercept <- function(outcomes_labeled,
         # fill = NULL
       ) -> p
 
-  class(p) <- c("dynIRTtest_viz", class(p))
+  class(p) <- c("dbmm_viz", class(p))
 
   p
 }
@@ -209,7 +209,7 @@ plot_loadings <- function(outcomes_labeled,
       ) +
       coord_fixed() -> p
 
-  class(p) <- c("dynIRTtest_viz", class(p))
+  class(p) <- c("dbmm_viz", class(p))
   p
 }
 
@@ -283,7 +283,7 @@ plot_scores_ave <- function(outcomes_labeled,
       ) +
       coord_fixed() -> p
 
-  class(p) <- c("dynIRTtest_viz", class(p))
+  class(p) <- c("dbmm_viz", class(p))
   p
 }
 
@@ -349,6 +349,6 @@ plot_scores_timetrend <- function(outcomes_labeled,
       ) +
       theme(legend.position = "bottom") -> p
 
-  class(p) <- c("dynIRTtest_viz", class(p))
+  class(p) <- c("dbmm_viz", class(p))
   p
 }
