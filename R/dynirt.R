@@ -185,7 +185,7 @@ fit <- function (data,
   }
 
   if (data$D > 1 && !isTRUE(lambda_zeros) && !is.null(lambda_zeros)) {
-    for (i in seq_along(lambda_zeros)) {
+    for (i in 1:nrow(lambda_zeros)) {
       if (lambda_zeros[i, 1] %in% attr(data, "binary_item_labels")) {
         nonzero_binary[lambda_zeros[i, 1], lambda_zeros[i, 2]] <- 0
       }
