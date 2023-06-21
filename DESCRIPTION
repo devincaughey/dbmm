@@ -5,7 +5,7 @@ Version: 0.0.1
 Authors@R:
   c(person("Devin", "Caughey", email = "devin.caughey@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-6419-6805")),
-    person("Tomoya", "Sasaki", email = "tomo1990sasaki@gmail.com", role = c("aut", "cre"),
+    person("Tomoya", "Sasaki", email = "tomo1990sasaki@gmail.com", role = c("aut"),
             comment = c(ORCID = "0009-0001-9243-2243")))
 License: GPL (>= 3)
 Encoding: UTF-8
