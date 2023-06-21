@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# (temporary name) dynIRTtest
+# dbmm: R package for dynamic Bayesian measurement models
 
 <!-- badges: start -->
 <!-- badges: end -->
@@ -19,17 +19,17 @@
 
 ## Installation
 
-You can install the development version of **dynIRTtest** from
+You can install the development version of **dbmm** from
 [GitHub](https://github.com/) with:
 
 ``` r
 # install.packages("devtools")
-devtools::install_github("tomoya-sasaki/dynIRTtest")
+devtools::install_github("devincaughey/dbmm")
 ```
 
 ## Explanation
 
-The R package **dynIRTtest** fits dynamic multidimensional factor models
+The R package **dbmm** fits dynamic multidimensional factor models
 with binary, ordinal, and/or metric indicators. To do so, it uses the
 Bayesian programming language [Stan](https://mc-stan.org), as linked to
 R by the package [**CmdStanR**](https://mc-stan.org/cmdstanr/).
@@ -47,7 +47,7 @@ The basic workflow involves the following steps:
 6.  Summarize and visualize the draws.
 
 ``` r
-library(dynIRTtest)
+library(dbmm)
 ```
 
 ### Step 1: Shape data
