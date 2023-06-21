@@ -27,7 +27,7 @@ check_convergence <- function(raw_draws) {
 #'     Parameters that match any of the regular expressions will be dropped.
 #' @param format (string) The format of the returned draws or point
 #'     estimates. Must be a valid format from the ‘posterior’ package. The
-#'     default is `"df"`, which is what other `dynIRTtest` functions will
+#'     default is `"df"`, which is what other `dbmm` functions will
 #'     expect, but other options include `"array"`, `"matrix"`, and `"list"`.
 #' @param check (logical)
 #'
