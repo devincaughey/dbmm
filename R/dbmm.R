@@ -1,7 +1,7 @@
 
-#' dynIRT main function
+#' dbmm main function
 #'
-#' Fit a dynIRT model using stan
+#' Fit a dbmm model using stan
 #'
 #' @param data (list) Data formatted for Stan, typically created by `shape()`.
 #' @param chains (positive integer) The number of Markov chains to run. The
@@ -83,7 +83,7 @@
 #'     ordinal outcomes. One of `"probit"` (the default) and `"logit"`.
 #' @param ... Additional arguments to `cmdstanr::sample()`.
 #'
-#' @return A dynIRT object containing
+#' @return A dbmm object containing
 #'  \describe{
 #'    \item{unit_labels}{}
 #'    \item{time_labels}{}
@@ -122,7 +122,7 @@ fit <- function (data,
                 ...)
 {
 
-  check_arg_type(arg = data, typename = "dynIRT_data")
+  check_arg_type(arg = data, typename = "dbmm_data")
 
   # According to the explanation of cmdstanr,
   # "The actual number of CPU cores used is parallel_chains*threads_per_chain"
@@ -243,7 +243,7 @@ fit <- function (data,
     out$data <- data
   }
 
-  class(out) <- c("dynIRT_fitted", class(out))
+  class(out) <- c("dbmm_fitted", class(out))
 
   return(out)
 }

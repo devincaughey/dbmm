@@ -1,5 +1,5 @@
 .onAttach <- function(...) {
-    pkgname <- "dynIRTtest"
+    pkgname <- "dbmm"
     packageStartupMessage("Package version: ",
                           as.character(utils::packageVersion(pkgname)))
 }

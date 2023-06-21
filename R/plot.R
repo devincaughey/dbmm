@@ -18,7 +18,7 @@ check_item_labels <- function(outcomes_labeled_item, item_labels) {
 
 
 #' test function: plotting intercept for either metric, binary, or ordinal item
-#' @param outcomes_labeled  A `dynIRT_labeled` object
+#' @param outcomes_labeled  A `dbmm_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param item_type (string) Should "binary", "ordinal", or "metric" loadings be
@@ -92,7 +92,7 @@ plot_intercept_test <- function(outcomes_labeled,
 
 #' plot item intercepts
 #'
-#' @param outcomes_labeled  A `dynIRT_labeled` object
+#' @param outcomes_labeled  A `dbmm_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot
@@ -156,7 +156,7 @@ plot_intercept <- function(outcomes_labeled,
 
 #' plot item loadings
 #'
-#' @param outcomes_labeled A `dynIRT_labeled` object
+#' @param outcomes_labeled A `dbmm_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot. Default is ``Item Loadings''
@@ -233,7 +233,7 @@ create_factor_scores <- function(outcomes_labeled) {
 
 #' plot average factor scores across different units
 #'
-#' @param outcomes_labeled  A `dynIRT_labeled` object
+#' @param outcomes_labeled  A `dbmm_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot. Default is "Agerage Factor Scores".
@@ -290,7 +290,7 @@ plot_scores_ave <- function(outcomes_labeled,
 
 #' Plot time series factor scores. Currently only support 2-dimensional plot.
 #'
-#' @param outcomes_labeled  A `dynIRT_labeled` object
+#' @param outcomes_labeled  A `dbmm_labeled` object
 #' @param xtitle (string) x-axis label of the plot
 #' @param ytitle (string) y-axis label of the plot
 #' @param maintitle (string) Title of the plot

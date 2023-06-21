@@ -1,4 +1,4 @@
-#' Prepare data for dynIRT
+#' Prepare data for dbmm
 #'
 #' @param long_data (data frame) Data in long (unit-period-item) form
 #' @param unit_var (string) Name of variable identifying units
@@ -197,7 +197,7 @@ shape_data <- function (long_data,
     attr(stan_data, "ordinal_item_labels") <- levels(ordinal_data$ITEM)
     attr(stan_data, "metric_item_labels") <- levels(metric_data$ITEM)
 
-    class(stan_data) <- c("dynIRT_data", class(stan_data))
+    class(stan_data) <- c("dbmm_data", class(stan_data))
 
     return(stan_data)
 }

@@ -1,10 +1,10 @@
 #' Check convergence
 #'
-#' @param raw_draws (`dynIRT_draws`) A posterior draws
+#' @param raw_draws (`dbmm_draws`) A posterior draws
 #'
 #' @export
 check_convergence <- function(raw_draws) {
-  check_arg_type(arg = raw_draws, typename = "dynIRT_draws")
+  check_arg_type(arg = raw_draws, typename = "dbmm_draws")
 
   raw_draws |>
     posterior::summarize_draws() |>
@@ -22,7 +22,7 @@ check_convergence <- function(raw_draws) {
 
 #' Extract draws from fitted model
 #'
-#' @param fit (`dynIRT_fitted` object) A fitted model produced by `fit()`.
+#' @param fit (`dbmm_fitted` object) A fitted model produced by `fit()`.
 #' @param drop_rex (character vector) A vector of regular expressions.
 #'     Parameters that match any of the regular expressions will be dropped.
 #' @param format (string) The format of the returned draws or point
@@ -41,7 +41,7 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 {
 
   if (check) {
-    check_arg_type(arg = fit, typename = "dynIRT_fitted")
+    check_arg_type(arg = fit, typename = "dbmm_fitted")
   }
 
   draws <- fit$fit$draws(format = format)
@@ -61,7 +61,7 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
   attr(draws, "ordinal_item_labels") <- attr(fit$fit, "ordinal_item_labels")
   attr(draws, "metric_item_labels") <- attr(fit$fit, "metric_item_labels")
 
-  class(draws) <- c("dynIRT_draws", class(draws))
+  class(draws) <- c("dbmm_draws", class(draws))
 
   return(draws)
 }
@@ -69,7 +69,7 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 
 #' Identify the sign and rotation of the parameter draws
 
-#' @param raw_draws (`dynIRT_draws`) A posterior draws
+#' @param raw_draws (`dbmm_draws`) A posterior draws
 #' @param rotate (logical) Should the factor draws be rotated? If `NULL` (the
 #'     default), `rotate` will be set to `TRUE` if and only if the number of
 #'     factors is greater than 1.
@@ -82,10 +82,10 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 #'     items will be chosen.
 #' @param sign (integer) Should the sign of the average identified loading be
 #'     negative (`-1`) or positive (`+1`, the default).
-#' @param check (logical) Should the class of `dynIRT_draws` be checked?
+#' @param check (logical) Should the class of `dbmm_draws` be checked?
 #'     Defaults to `TRUE`.
 #'
-#' @return A `dynIRT_identified` object. Identified draws from posterior draws.
+#' @return A `dbmm_identified` object. Identified draws from posterior draws.
 #'
 #' @import magrittr
 #'
@@ -95,7 +95,7 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
                            check = TRUE)
 {
     if (check) {
-        check_arg_type(arg = raw_draws, typename = "dynIRT_draws")
+        check_arg_type(arg = raw_draws, typename = "dbmm_draws")
     }
     if (is.null(sign)) {
         sign <- 1
@@ -119,7 +119,7 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
     } else {
         outcomes_id <- identify_sign(raw_draws, sign = sign) 
     }
-    class(outcomes_id) <- c("dynIRT_identified", class(outcomes_id))
+    class(outcomes_id) <- c("dbmm_identified", class(outcomes_id))
     return(outcomes_id)
 }
 
@@ -371,7 +371,7 @@ identify_rotation <- function (raw_draws, varimax,
 #' @param sign (integer) Should the sign of the average identified loading be
 #' negative (`-1`) or positive (`+1`).
 #'
-#' @return A `dynIRT_labeled` object.
+#' @return A `dbmm_labeled` object.
 #'
 #' @import magrittr
 #' @importFrom rlang .data
@@ -428,7 +428,7 @@ identify_sign <- function (raw_draws, sign) {
 
 #' Label the output
 #'
-#' @param draws (`dynIRT_identified`) An identified dynIRT fitted object
+#' @param draws (`dbmm_identified`) An identified dbmm fitted object
 #' @param regex_pars (named character vector) Vector of regular expressions, to
 #'     be used to pick out columns of `draws`. The names of this vector will be
 #'     used to name the resulting list of data frames. If `NULL` (the default),
@@ -445,7 +445,7 @@ identify_sign <- function (raw_draws, sign) {
 label_draws <- function (draws, regex_pars = NULL, check = TRUE)
 {
   if (check) {
-    check_arg_type(arg = draws, typename = "dynIRT_identified")
+    check_arg_type(arg = draws, typename = "dbmm_identified")
   }
 
   draws <- draws$id_draws
@@ -667,7 +667,7 @@ label_draws <- function (draws, regex_pars = NULL, check = TRUE)
   attr(draws_ls, "ordinal_item_labels") <- attr(draws, "ordinal_item_labels")
   attr(draws_ls, "metric_item_labels") <- attr(draws, "metric_item_labels")
 
-  class(draws_ls) <- c("dynIRT_labeled", class(draws_ls))
+  class(draws_ls) <- c("dbmm_labeled", class(draws_ls))
 
   return(draws_ls)
 }
