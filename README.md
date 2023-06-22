@@ -100,9 +100,7 @@ fitted <- fit(
     iter_sampling = 50,
     adapt_delta = .9,
     refresh = 10, # how often to update printed screen updates
-    seed = 123,
-    iter_warmup = 1000, # burn in
-    iter_sampling = 1000 # samples for posterior inference
+    seed = 123
 )
 ```
 
