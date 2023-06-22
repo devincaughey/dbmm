@@ -471,7 +471,8 @@ label_draws <- function (draws, regex_pars = NULL, check = TRUE)
   names(draws_ls) <- names(regex_pars)
 
   for (p in seq_along(regex_pars)) {
-    regex_pars_p <- regex_pars[p]
+      regex_pars_p <- regex_pars[p]
+      cat("\nLabeling ", regex_pars_p, "...\n")
 
     if (!any(stringr::str_detect(names(draws_df), regex_pars_p))) next
 
