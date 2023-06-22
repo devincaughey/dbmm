@@ -5,8 +5,12 @@ Version: 0.0.1
 Authors@R:
   c(person("Devin", "Caughey", email = "devin.caughey@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-6419-6805")),
+    person("Elissa", "Berwick", email = "elissa.berwick@gmail.com", role = c("aut")),
+    person("James", "Dunham", email = "james@jdunham.io", role = c("aut")),
     person("Tomoya", "Sasaki", email = "tomo1990sasaki@gmail.com", role = c("aut"),
-            comment = c(ORCID = "0009-0001-9243-2243")))
+            comment = c(ORCID = "0009-0001-9243-2243")),
+    person("Christopher", "Warshaw", email = "cwarshaw@gmail.com", role = c("aut"))
+    )
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
