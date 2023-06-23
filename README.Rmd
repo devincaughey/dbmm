@@ -13,20 +13,10 @@ knitr::opts_chunk$set(
 )
 ```
 
-# (temporary name) dbmm
+# dbmm: Dynamic Bayesian Measurement Models #
 
 <!-- badges: start -->
 <!-- badges: end -->
-
-## TODOs
-
-- [x] Add descriptions
-- [ ] Figure specifications
-
-## Misc
-
-* We will change the package name later. 
-* Please edit the `README.Rmd` file and do not directly edit the `README.md` file.
 
 ## Installation
 
