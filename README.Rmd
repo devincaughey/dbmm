@@ -27,11 +27,10 @@ You can install the development version of **dbmm** from [GitHub](https://github
 devtools::install_github("devincaughey/dbmm")
 ```
 
-## Explanation
+## Explanation ##
 
-The R package **dbmm** fits dynamic multidimensional factor models with
-binary, ordinal, and/or metric indicators. To do so, it uses the Bayesian
-programming language [Stan](https://mc-stan.org), as linked to R by the package
+The R package **dbmm** fits dynamic Bayesian measurement models using the
+programming language [Stan](https://mc-stan.org) via the R package
 [**CmdStanR**](https://mc-stan.org/cmdstanr/).
 
 The basic workflow involves the following steps:
