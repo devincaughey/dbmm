@@ -27,28 +27,25 @@ You can install the development version of **dbmm** from [GitHub](https://github
 devtools::install_github("devincaughey/dbmm")
 ```
 
+You will also need to install **cmdstanr** (for instructions, see [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
+
 ## Overview ##
 
 The R package **dbmm** fits dynamic Bayesian measurement models using the
-programming language [Stan](https://mc-stan.org) via the R package
-[**cmdstanr**](https://mc-stan.org/cmdstanr/). Currently, the only supported model is a dynamic factor (DF) model for indicators of mixed type (binary, ordinal, or continuous). In the future, however, the package will incorporate other models, including the dynamic group-level item response theory (DGIRT) model currently implemented by the R package [**dgo**](https://github.com/jamesdunham/dgo).
+programming language [Stan](https://mc-stan.org) via the R package [**cmdstanr**](https://mc-stan.org/cmdstanr/). Currently, the only supported model is a dynamic factor (DF) model for indicators of mixed type (binary, ordinal, or metric). In the future, however, the package will incorporate other models, including the dynamic group-level item response theory (DGIRT) model currently implemented by the R package [**dgo**](https://github.com/jamesdunham/dgo).
 
-## Workflow ##****
+## Workflow ##
 
-The basic workflow involves the following steps:
+Using **dbmm** involves the following steps:
 
-  1. Shape the data into the list format required by **cmdstanr**
-     (`shape_data()`).
-  2. Fit a dynamic factor model to the data.
-  3. Extract parameter draws from the fitted model.
-  4. If needed, identify the model by rotating (or sign-flipping) the draws.
-  5. Convert the draws into a list of parameter-specific data frames with
-     informative labels.
-  6. Summarize and visualize the draws.
+  1. *Shape* the data into the list format required by **cmdstanr**.
+  2. *Fit* the required model in Stan using.
+  3. *Extract* parameter draws from the fitted model.
+  4. If needed, *identify* the model the model by rotating and/or sign-flipping the draws.
+  5. *Check* the convergence diagnostics of the fitted model.
+  5. *Label* the draws with informative parameter names.
+  6. *Summarize* and *plot* the posterior distributions.
 
-```{r, eval=FALSE}
-library(dbmm)
-```
 
 ### Step 1: Shape data
 
@@ -56,18 +53,17 @@ library(dbmm)
 ## Load data on societal attributes of U.S. states in 2020 and 2021
 data("social_outcomes_2020_2021")
 
-## Remove any rows that contain NA's in `unit_var`, `time_var`, `item_var`, or `value_var`
-social_outcomes_2020_2021 |>
-    drop_na(st, year, outcome, value) -> social_outcomes_2020_2021
+## Drop observations with missing values
+social_outcomes_2020_2021 <- na.omit(social_outcomes_2020_2021)
 
 ## Shape the data into list form
 shaped_data <- shape_data(
     long_data = social_outcomes_2020_2021,
-    unit_var = "st",
-    time_var = "year",
-    item_var = "outcome",
-    value_var = "value",
-    periods_to_estimate = 2020:2021,
+    unit_var = "st",                      
+    time_var = "year",                    
+    item_var = "outcome",                 
+    value_var = "value",                  
+    periods_to_estimate = 2020:2021,      
     ordinal_items = NA,
     binary_items = NA,
     max_cats = 10,
@@ -78,82 +74,104 @@ shaped_data <- shape_data(
 
 ### Step 2: Fit the model
 
-* You can specify additional arguments for `cmdstanr::sample()`. Check [here](https://mc-stan.org/cmdstanr/reference/model-method-sample.html).
+You can specify additional arguments for `cmdstanr::sample()`. For details, see [here](https://mc-stan.org/cmdstanr/reference/model-method-sample.html).
 
 ```{r,eval=FALSE}
+options(mc.cores = parallel::detectCores()) # for parallizing across chains
 fitted <- fit(
     data = shaped_data,
-    lambda_zeros = data.frame(
-        item = c("x_cps_spm_poverty"),
-        dim = c(2)
-    ), # fix `x_cps_spm_poverty` to zero
     n_dim = 2,
     chains = 2,
-    parallelize_within_chains = TRUE,
-    threads_per_chain = 2,
+    parallelize_within_chains = FALSE,
     constant_alpha = FALSE,
     separate_eta = TRUE,
     init_kappa = FALSE,
     force_recompile = FALSE,
-    iter_warmup = 50,
-    iter_sampling = 50,
+    iter_warmup = 500, 
+    iter_sampling = 500,
     adapt_delta = .9,
-    refresh = 10, # how often to update printed screen updates
-    seed = 123,
-    iter_warmup = 1000, # burn in
-    iter_sampling = 1000 # samples for posterior inference
+    refresh = 10,
+    seed = 123
 )
 ```
 
-### Step 3: Extract Draws
+### Step 3: Extract draws ###
 
 ```{r,eval=FALSE}
-## Extract posterior draws
 fitted_draws <- extract_draws(fitted)
-
-## Convergence diagnostics
-checked <- check_convergence(fitted_draws)
+head(fitted_draws)
 ```
 
-### Step 4: Post analysis
+### Step 4: Identify the model ###
 
 ```{r,eval=FALSE}
-## Identify the sign and rotation of the parameter draws
-## Set rotate = FALSE to skip rotation
-identified <- identify_draws(fitted_draws, rotate = TRUE)
-
-## Label the posterior draws
-labeled <- label_draws(identified)
-
+identified_draws <- identify_draws(fitted_draws, rotate = TRUE)
+## (To apply varimax rotation, set `rotate = TRUE`.)
 ```
 
-### Step 5: Visualization
+### Step 5: Check convergence of the identified model ###
 
-* There are currently four plotting functions.
-* You can use `item_labels` argument in `plot_intercept` and `plot_loadings` to rename item labels to show in plots. Similarly, `unit_labels` argument is available for `plot_scores_ave` and `plot_scores_timetrend` to change unit labels.
+```{r,eval=FALSE}
+## Basic check
+check_convergence(identified_draws$id_draws)
+## Traceplot of selected parameters
+bayesplot::mcmc_trace(identified_draws$id_draws, pars = "lambda_metric[23,2]")
+## More details 
+summarized_draws <- summary(identified_draws$id_draws)
+summary(summarized_draws)
+```
 
+### Step 6: Label parameters ###
 
-```{r, eval = FALSE}
-## Plot intercept
-p <- plot_intercept(labeled)
+```{r,eval=FALSE}
+labeled_draws <- label_draws(identified_draws)
+head(labeled_draws$eta)
+head(labeled_draws$lambda_metric)
+```
+
+### Step 7: Summarizing and plotting the posterior draws
+
+```{r,eval=FALSE}
+library(tidyverse)
+
+## Posterior mean and standard deviation of the factor scores and item loadings
+eta_summ <- labeled_draws$eta %>%
+    summarise(
+        est = mean(value),
+        err = sd(value),
+        .by = c(TIME, UNIT, dim)
+    )
+head(eta_summ)
+lambda_metric_summ <- labeled_draws$lambda_metric %>%
+    summarise(
+        est = mean(value),
+        err = sd(value),
+        .by = c(ITEM, dim)
+    )
+head(lambda_metric_summ)
 
 ## Plot item loadings
-p <- plot_loadings(labeled)
-
-## Plot average scores across different units
-p <- plot_scores_ave(labeled)
-
-## Plot time series factor scores
-p <- plot_scores_timetrend(labeled)
-
-## Change unit labels to show in plot
-## Each element is the new label
-new_unit_names <- state.name
-## Names assigned to each element are the original labels
-names(new_unit_names) <- state.abb
-
-p <- plot_scores_ave(labeled, unit_labels = new_unit_names)
-
-
+lambda_metric_summ %>%
+    pivot_wider(
+        id_cols = "ITEM",
+        names_from = "dim",
+        values_from = c("est", "err")
+    ) %>%
+    ggplot() +
+    aes(x = est_1, y = est_2, label = ITEM) +
+    geom_vline(xintercept = 0, linetype = "dotted") +
+    geom_hline(yintercept = 0, linetype = "dotted") +
+    geom_point() +
+    geom_linerange(
+        aes(xmin = est_1 - 1.96*err_1, xmax = est_1 + 1.96*err_1),
+        alpha = 1/4, linewidth = 2
+    ) +
+    geom_linerange(
+        aes(ymin = est_2 - 1.96*err_2, ymax = est_2 + 1.96*err_2),
+        alpha = 1/4, linewidth = 2
+    ) +
+    ggrepel::geom_text_repel() +
+    labs(title = "Item Loadings") +
+    coord_fixed()
 ```
 
