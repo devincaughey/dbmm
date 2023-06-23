@@ -20,15 +20,17 @@ You can install the development version of **dbmm** from [GitHub](https://github
 devtools::install_github("devincaughey/dbmm")
 ```
 
-## Explanation ##
+## Overview ##
 
 The R package **dbmm** fits dynamic Bayesian measurement models using the
 programming language [Stan](https://mc-stan.org) via the R package
-[**CmdStanR**](https://mc-stan.org/cmdstanr/).
+[**cmdstanr**](https://mc-stan.org/cmdstanr/). Currently, the only supported model is a dynamic factor (DF) model for indicators of mixed type (binary, ordinal, or continuous). In the future, however, the package will incorporate other models, including the dynamic group-level item response theory (DGIRT) model currently implemented by the R package [**dgo**](https://github.com/jamesdunham/dgo).
+
+## Workflow ##
 
 The basic workflow involves the following steps:
 
-  1. Shape the data into the list format required by **CmdStanR**
+  1. Shape the data into the list format required by **cmdstanr**
      (`shape_data()`).
   2. Fit a dynamic factor model to the data.
   3. Extract parameter draws from the fitted model.
