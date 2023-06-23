@@ -1,5 +1,3 @@
-/* This version produced workable results with 2 dimensions. */
-
 functions {
   /* De-mean and 'whiten' (cov = I) XX */
   vector p2l_vector (vector x) { // coverts vector from probit to logit scale
