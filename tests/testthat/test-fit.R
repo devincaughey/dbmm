@@ -53,20 +53,20 @@ identified <- identify_draws(fitted_draws, rotate = TRUE)
 
 test_that("Identified rotation", {
   expect_equal(length(identified$rotmats), 4)
-  expect_s3_class(identified, "dynIRT_identified")
+  expect_s3_class(identified, "dbmm_identified")
   }
 )
 
 labeled <- label_draws(identified)
 
 test_that("Labeled draws", {
-  expect_s3_class(labeled, "dynIRT_labeled")
+  expect_s3_class(labeled, "dbmm_labeled")
   }
 )
 
 test_that("Figures", {
   p <- plot_intercept(labeled)
-  expect_s3_class(p, "dynIRTtest_viz")
+  expect_s3_class(p, "dbmm_viz")
 
   create_metric_label <- function(outcomes_labeled) {
     metric_labels <- attr(outcomes_labeled, "metric_item_labels") |>
@@ -82,13 +82,13 @@ test_that("Figures", {
   }
 
   p <- plot_intercept(labeled, item_labels = create_metric_label(labeled))
-  expect_s3_class(p, "dynIRTtest_viz")
+  expect_s3_class(p, "dbmm_viz")
 
   p <- plot_loadings(labeled)
-  expect_s3_class(p, "dynIRTtest_viz")
+  expect_s3_class(p, "dbmm_viz")
 
   p <- plot_loadings(labeled, item_labels = create_metric_label(labeled))
-  expect_s3_class(p, "dynIRTtest_viz")
+  expect_s3_class(p, "dbmm_viz")
 
   # check `check_item_labels` works
   wrong_labels <- create_metric_label(labeled)
@@ -98,19 +98,19 @@ test_that("Figures", {
               regexp = "Element names of `item_labels")
 
   p <- plot_scores_ave(labeled)
-  expect_s3_class(p, "dynIRTtest_viz")
+  expect_s3_class(p, "dbmm_viz")
 
   p <- plot_scores_timetrend(labeled)
-  expect_s3_class(p, "dynIRTtest_viz")
+  expect_s3_class(p, "dbmm_viz")
 
   new_unit_names <- state.name
   names(new_unit_names) <- state.abb
 
   p <- plot_scores_ave(labeled, unit_labels = new_unit_names)
-  expect_s3_class(p, "dynIRTtest_viz")
+  expect_s3_class(p, "dbmm_viz")
 
   p <- plot_scores_timetrend(labeled, unit_labels = new_unit_names)
-  expect_s3_class(p, "dynIRTtest_viz")
+  expect_s3_class(p, "dbmm_viz")
 
   }
 )
