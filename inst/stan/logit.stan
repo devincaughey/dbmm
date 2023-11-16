@@ -1,5 +1,3 @@
-/* This version produced workable results with 2 dimensions. */
-
 functions {
   /* De-mean and 'whiten' (cov = I) XX */
   matrix whiten(matrix XX) {
