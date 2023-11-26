@@ -127,7 +127,7 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
 
 #' Identify the rotation of the output
 #'
-#' @param raw_draws (`draws_df`) A posterior draws
+#' @param raw_draws (`draws_df`) Posterior draws
 #' @param varimax (logical) Should a varimax rotation be applied within each
 #' draw? Defaults to `TRUE`.
 #' @param normalize (logical) Should Kaiser normalization be performed before
@@ -138,20 +138,19 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
 #'
 #' @import magrittr
 #'
-identify_rotation <- function (raw_draws, varimax,
-                               normalize, item_type)
+identify_rotation <- function (raw_draws, varimax, normalize, item_type)
 {
 
-  Lb0 <- extract_draws_match(raw_draws = raw_draws,
-                            regex_pars = "(^lambda_binary\\[)|(^\\.)")
-  Lo0 <- extract_draws_match(raw_draws = raw_draws,
-                            regex_pars = "(^lambda_ordinal\\[)|(^\\.)")
-  Lm0 <- extract_draws_match(raw_draws = raw_draws,
-                            regex_pars = "(^lambda_metric\\[)|(^\\.)")
-  E0 <- extract_draws_match(raw_draws = raw_draws,
-                            regex_pars = "(^eta\\[)|(^\\.)")
-  S0 <- extract_draws_match(raw_draws = raw_draws,
-                            regex_pars = "(^sigma_eta_evol\\[)|(^\\.)")
+  Lb0 <- select_draws(raw_draws = raw_draws,
+                      regex_pars = "(^lambda_binary\\[)|(^\\.)")
+  Lo0 <- select_draws(raw_draws = raw_draws,
+                      regex_pars = "(^lambda_ordinal\\[)|(^\\.)")
+  Lm0 <- select_draws(raw_draws = raw_draws,
+                      regex_pars = "(^lambda_metric\\[)|(^\\.)")
+  E0 <- select_draws(raw_draws = raw_draws,
+                     regex_pars = "(^eta\\[)|(^\\.)")
+  S0 <- select_draws(raw_draws = raw_draws,
+                     regex_pars = "(^sigma_eta_evol\\[)|(^\\.)")
 
   S <- max(raw_draws$.iteration)
   C <- max(raw_draws$.chain)
@@ -203,14 +202,14 @@ identify_rotation <- function (raw_draws, varimax,
           Lo0_cs <- matrix(
             as.numeric(Lo0[row, lcols_o]), nrow = Io, ncol = D
           )
-          vm <- varimax(Lo0_cs, normalize = normalize)
+          vm <- stats::varimax(Lo0_cs, normalize = normalize)
           Lo1[row, lcols_o] <- t(as.numeric(vm$loadings))
         } else if (item_type == "metric") {
           row <- Lm0$.chain == c_cur & Lm0$.iteration == s
           Lm0_cs <- matrix(
             as.numeric(Lm0[row, lcols_m]), nrow = Im, ncol = D
           )
-          vm <- varimax(Lm0_cs, normalize = normalize)
+          vm <- stats::varimax(Lm0_cs, normalize = normalize)
           Lm1[row, lcols_m] <- t(as.numeric(vm$loadings))
         } else {
           stop("Invalid `item_type` argument")
@@ -309,11 +308,6 @@ identify_rotation <- function (raw_draws, varimax,
           Q3[s, c_cur, 1:D, 1:D] %>%
           as.numeric() %>%
           t()
-        S0_cs <- matrix(unlist(S0[row, 1:D, drop = FALSE]))
-        S3[row, 1:D] <-    # might need to transpose for conformability
-          t(S0_cs) %*%
-          abs(Q2[s, c_cur, 1:D, 1:D]) %*%
-          abs(Q3[s, c_cur, 1:D, 1:D])
       }
       for (t in 1:T) {
         E0_cst <- matrix(
@@ -328,7 +322,19 @@ identify_rotation <- function (raw_draws, varimax,
           as.numeric() %>%
           t()
       }
-    }
+      S0_cs <- t(matrix(unlist(S0[row, 1:D, drop = FALSE])))
+      if (isTRUE(varimax)) {
+          warning(paste("Because a varimax rotation has been applied,",
+                        "`sigma_eta_evol` has been left unchanged."))
+          ## TODO: Fix by using covariance matrix.
+          S3[row, 1:D] <- S0_cs
+      } else {
+          S3[row, 1:D] <-
+              S0_cs %*%
+              abs(Q2[s, c_cur, 1:D, 1:D]) %*%
+              abs(Q3[s, c_cur, 1:D, 1:D])
+          
+      }
   }
 
   id_draws <- raw_draws
@@ -676,8 +682,8 @@ label_draws <- function (draws, regex_pars = NULL, check = TRUE)
 
 
 #' @import magrittr
-extract_draws_match <- function(raw_draws, regex_pars) {
-  dplyr::select(raw_draws, dplyr::matches(regex_pars)) %>%
+select_draws <- function(draws_df, regex_pars) {
+  dplyr::select(draws_df, dplyr::matches(regex_pars)) %>%
     as.data.frame()
 }
 
