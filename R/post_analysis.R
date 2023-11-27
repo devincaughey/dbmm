@@ -69,12 +69,17 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 
 #' Identify the sign and rotation of the parameter draws
 
-#' @param raw_draws (`dbmm_draws`) A posterior draws
+#' @param raw_draws (`dbmm_draws`) Posterior draws
 #' @param rotate (logical) Should the factor draws be rotated? If `NULL` (the
 #'     default), `rotate` will be set to `TRUE` if and only if the number of
 #'     factors is greater than 1.
 #' @param varimax (logical) Should a varimax rotation be applied within each
 #'     draw? Defaults to `TRUE`.
+#' @param targets (matrix) Matrix of factor loadings to use a targets for target
+#'     rotation (using `GPArotation::targetT()`). Can include `NA` elements, in
+#'     which case partial rotation will be applied. Rows correspond to items and
+#'     columns to factors/dimensions. Must have the same number of rows as the
+#'     number of `item_type` items.
 #' @param normalize (logical) Should Kaiser normalization be performed before
 #'     varimax rotation? Defaults to `TRUE`.
 #' @param item_type (string) Should "binary", "ordinal", or "metric" loadings be
@@ -82,8 +87,8 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 #'     items will be chosen.
 #' @param sign (integer) Should the sign of the average identified loading be
 #'     negative (`-1`) or positive (`+1`, the default).
-#' @param check (logical) Should the class of `dbmm_draws` be checked?
-#'     Defaults to `TRUE`.
+#' @param check (logical) Should the class of `dbmm_draws` be checked?  Defaults
+#'     to `TRUE`.
 #'
 #' @return A `dbmm_identified` object. Identified draws from posterior draws.
 #'
@@ -91,12 +96,13 @@ extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
 #'
 #' @export
 identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
-                           normalize = TRUE, item_type = NULL, sign = NULL,
-                           check = TRUE)
+                           targets = NULL, normalize = TRUE, item_type = NULL,
+                           sign = NULL, check = TRUE)
 {
     if (check) {
         check_arg_type(arg = raw_draws, typename = "dbmm_draws")
     }
+    stopifnot(is.null(targets) || isFALSE(varimax))
     if (is.null(sign)) {
         sign <- 1
         cat("Using `sign = ", sign, "`\n", sep = "")
@@ -112,6 +118,7 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
         outcomes_id <- identify_rotation(
             raw_draws,
             varimax = varimax,
+            targets = targets,
             normalize = normalize,
             item_type = item_type
         )
@@ -138,7 +145,7 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
 #'
 #' @import magrittr
 #'
-identify_rotation <- function (raw_draws, varimax, normalize, item_type)
+identify_rotation <- function (raw_draws, varimax, targets, normalize, item_type)
 {
 
   Lb0 <- select_draws(raw_draws = raw_draws,
@@ -185,7 +192,7 @@ identify_rotation <- function (raw_draws, varimax, normalize, item_type)
   stopifnot(item_type %in% c("binary", "ordinal", "metric"))
   cat("\nUsing", item_type, "items to identify the model.\n")
 
-  if (varimax & D > 1) {
+  if (varimax && D > 1) {
     ## 1. Apply varimax rotation
     cat("\n**** Applying varimax rotations...")
     for (s in 1:S) {
@@ -219,6 +226,41 @@ identify_rotation <- function (raw_draws, varimax, normalize, item_type)
     }
     cat("done.\n")
   }
+    if (!is.null(targets) && D > 1) {
+        ## 1. Apply target rotation
+        cat("\n**** Applying target rotations...")
+        stopifnot(identical(which.max(c(Ib, Io, Im)), nrow(targets)))
+        for (s in 1:S) {
+            for (c_cur in 1:C) {
+                if (item_type == "binary") {
+                    row <- Lb0$.chain == c_cur & Lb0$.iteration == s
+                    Lb0_cs <- matrix(
+                        as.numeric(Lb0[row, lcols_b]), nrow = Ib, ncol = D
+                    )
+                    tm <- GPArotation::targetT(Lb0_cs, Target = targets)
+                    Lb1[row, lcols_b] <- t(as.numeric(tm$loadings))
+                } else if (item_type == "ordinal") {
+                    row <- Lo0$.chain == c_cur & Lo0$.iteration == s
+                    Lo0_cs <- matrix(
+                        as.numeric(Lo0[row, lcols_o]), nrow = Io, ncol = D
+                    )
+                    tm <- GPArotation::targetT(Lo0_cs, Target = targets)
+                    Lo1[row, lcols_o] <- t(as.numeric(tm$loadings))
+                } else if (item_type == "metric") {
+                    row <- Lm0$.chain == c_cur & Lm0$.iteration == s
+                    Lm0_cs <- matrix(
+                        as.numeric(Lm0[row, lcols_m]), nrow = Im, ncol = D
+                    )
+                    tm <- GPArotation::targetT(Lm0_cs, Target = targets)
+                    Lm1[row, lcols_m] <- t(as.numeric(tm$loadings))
+                } else {
+                    stop("Invalid `item_type` argument")
+                }
+                Q1[s, c_cur, 1:D, 1:D] <- tm$Th
+            }
+        }
+        cat("done.\n")
+    }
 
   ## 2. Sign-permute by chain
   cat("**** Applying sign-permute rotations...\n")
@@ -324,7 +366,7 @@ identify_rotation <- function (raw_draws, varimax, normalize, item_type)
       }
       S0_cs <- t(matrix(unlist(S0[row, 1:D, drop = FALSE])))
       if (isTRUE(varimax)) {
-          warning(paste("Because a varimax rotation has been applied,",
+          warning(paste("Because the loadings have been rotated,",
                         "`sigma_eta_evol` has been left unchanged."))
           ## TODO: Fix by using covariance matrix.
           S3[row, 1:D] <- S0_cs
