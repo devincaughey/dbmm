@@ -141,15 +141,15 @@ identify_draws <- function(raw_draws, rotate = NULL, varimax = TRUE,
 identify_rotation <- function (raw_draws, varimax, targets, normalize, item_type)
 {
 
-    Lb0 <- select_draws(raw_draws = raw_draws,
+    Lb0 <- select_draws_regex(draws_df = raw_draws,
                         regex_pars = "(^lambda_binary\\[)|(^\\.)")
-    Lo0 <- select_draws(raw_draws = raw_draws,
+    Lo0 <- select_draws_regex(draws_df = raw_draws,
                         regex_pars = "(^lambda_ordinal\\[)|(^\\.)")
-    Lm0 <- select_draws(raw_draws = raw_draws,
+    Lm0 <- select_draws_regex(draws_df = raw_draws,
                         regex_pars = "(^lambda_metric\\[)|(^\\.)")
-    E0 <- select_draws(raw_draws = raw_draws,
+    E0 <- select_draws_regex(draws_df = raw_draws,
                        regex_pars = "(^eta\\[)|(^\\.)")
-    S0 <- select_draws(raw_draws = raw_draws,
+    S0 <- select_draws_regex(draws_df = raw_draws,
                        regex_pars = "(^sigma_eta_evol\\[)|(^\\.)")
 
     S <- max(raw_draws$.iteration)
@@ -717,7 +717,7 @@ label_draws <- function (draws, regex_pars = NULL, check = TRUE)
 
 
 #' @import magrittr
-select_draws <- function(draws_df, regex_pars) {
+select_draws_regex <- function(draws_df, regex_pars) {
     dplyr::select(draws_df, dplyr::matches(regex_pars)) %>%
         as.data.frame()
 }
