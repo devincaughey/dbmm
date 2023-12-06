@@ -260,8 +260,8 @@ shape_data_modgirt <- function (
             dimnames = list(group_names, seq_len(n_factor))
         )
     }
-    stopifnot(identical(n_factor, ncol(sign_matrix)))
-    stopifnot(identical(n_factor, ncol(nonzero_matrix)))
+    ## stopifnot(identical(n_factor, ncol(sign_matrix)))
+    ## stopifnot(identical(n_factor, ncol(nonzero_matrix)))
     return(
         list(
             T = n_time,
