@@ -201,3 +201,63 @@ shape_data <- function (long_data,
 
     return(stan_data)
 }
+
+create_count_array <- function (
+    long_data,
+    time_var = "TIME",
+    group_var = "GROUP",
+    item_var = "ITEM",
+    response_var = "response",
+    weight_var = NULL
+) {
+    xtab_formula <- reformulate(c(time_var, group_var, item_var, response_var))
+    if (is.null(weight_var)) {
+        weight_formula <- NULL
+    } else {
+        weight_formula <- reformulate(weight_var)
+    }
+    des <- survey::svydesign(~1, data = long_data, weights = weight_formula)
+    return(survey::svytable(formula = xtab_formula, design = des))
+}
+
+shape_data_modgirt <- function (
+    count_array,
+    n_factor,
+    sign_matrix,
+    nonzero_matrix) {
+    stopifnot(identical(n_factor, ncol(sign_matrix)))
+    stopifnot(identical(n_factor, ncol(nonzero_matrix)))
+    n_time <- dim(count_array)[1]
+    n_group <- dim(count_array)[2]
+    n_item <- dim(count_array)[3]
+    n_category <- dim(count_array)[4]
+    group_names <- dimnames(count_array)[[3]]
+    if (missing(sign_matrix)) {
+        sign_matrix <- matrix(
+            data = 0,
+            nrow = n_item,
+            ncol = n_factor,
+            dimnames = list(group_names, seq_len(n_factor))
+        )
+    }
+    if (missing(nonzero_matrix)) {
+        nonzero_matrix <- matrix(
+            data = 0,
+            nrow = n_item,
+            ncol = n_factor,
+            dimnames = list(group_names, seq_len(n_factor))
+        )
+    }
+    return(
+        list(
+            T = n_time,
+            G = n_group,
+            Q = n_item,
+            K = n_category,
+            D = n_factor,
+            SSSS = count_array,
+            beta_nonzero = nonzero_matrix,
+            beta_sign = sign_matrix
+        )
+    )
+}
