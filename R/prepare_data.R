@@ -232,20 +232,6 @@ shape_data_modgirt <- function (
     sign_matrix,
     nonzero_matrix
 ) {
-    stopifnot(identical(n_factor, ncol(sign_matrix)))
-    stopifnot(identical(n_factor, ncol(nonzero_matrix)))
-    count_array <- create_count_array(
-        long_data = long_data,
-        time_var = time_var,
-        item_var = item_var,
-        response_var = response_var,
-        weight_var = weight_var
-    )
-    n_time <- dim(count_array)[1]
-    n_group <- dim(count_array)[2]
-    n_item <- dim(count_array)[3]
-    n_category <- dim(count_array)[4]
-    group_names <- dimnames(count_array)[[3]]
     if (missing(sign_matrix)) {
         sign_matrix <- matrix(
             data = 0,
@@ -262,6 +248,20 @@ shape_data_modgirt <- function (
             dimnames = list(group_names, seq_len(n_factor))
         )
     }
+    stopifnot(identical(n_factor, ncol(sign_matrix)))
+    stopifnot(identical(n_factor, ncol(nonzero_matrix)))
+    count_array <- create_count_array(
+        long_data = long_data,
+        time_var = time_var,
+        item_var = item_var,
+        response_var = response_var,
+        weight_var = weight_var
+    )
+    n_time <- dim(count_array)[1]
+    n_group <- dim(count_array)[2]
+    n_item <- dim(count_array)[3]
+    n_category <- dim(count_array)[4]
+    group_names <- dimnames(count_array)[[3]]
     return(
         list(
             T = n_time,
