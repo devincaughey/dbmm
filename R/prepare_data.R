@@ -203,13 +203,13 @@ shape_data <- function (long_data,
 }
 
 create_count_array <- function (
-    long_data,
-    time_var = "TIME",
-    group_var = "GROUP",
-    item_var = "ITEM",
-    response_var = "response",
-    weight_var = NULL
-) {
+                                long_data,
+                                time_var = "TIME",
+                                group_var = "GROUP",
+                                item_var = "ITEM",
+                                response_var = "response",
+                                weight_var = NULL
+                                ) {
     xtab_formula <- reformulate(c(time_var, group_var, item_var, response_var))
     if (is.null(weight_var)) {
         weight_formula <- NULL
@@ -222,16 +222,28 @@ create_count_array <- function (
 
 #' @export
 shape_data_modgirt <- function (
-    long_data,
-    time_var = "TIME",
-    group_var = "GROUP",
-    item_var = "ITEM",
-    response_var = "response",
-    weight_var = NULL,
-    n_factor,
-    sign_matrix,
-    nonzero_matrix
-) {
+                                long_data,
+                                time_var = "TIME",
+                                group_var = "GROUP",
+                                item_var = "ITEM",
+                                response_var = "response",
+                                weight_var = NULL,
+                                n_factor,
+                                sign_matrix,
+                                nonzero_matrix
+                                ) {
+    count_array <- create_count_array(
+        long_data = long_data,
+        time_var = time_var,
+        item_var = item_var,
+        response_var = response_var,
+        weight_var = weight_var
+    )
+    n_time <- dim(count_array)[1]
+    n_group <- dim(count_array)[2]
+    n_item <- dim(count_array)[3]
+    n_category <- dim(count_array)[4]
+    group_names <- dimnames(count_array)[[3]]
     if (missing(sign_matrix)) {
         sign_matrix <- matrix(
             data = 0,
@@ -250,18 +262,6 @@ shape_data_modgirt <- function (
     }
     stopifnot(identical(n_factor, ncol(sign_matrix)))
     stopifnot(identical(n_factor, ncol(nonzero_matrix)))
-    count_array <- create_count_array(
-        long_data = long_data,
-        time_var = time_var,
-        item_var = item_var,
-        response_var = response_var,
-        weight_var = weight_var
-    )
-    n_time <- dim(count_array)[1]
-    n_group <- dim(count_array)[2]
-    n_item <- dim(count_array)[3]
-    n_category <- dim(count_array)[4]
-    group_names <- dimnames(count_array)[[3]]
     return(
         list(
             T = n_time,
