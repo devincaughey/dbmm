@@ -229,8 +229,8 @@ shape_data_modgirt <- function (
                                 response_var = "response",
                                 weight_var = NULL,
                                 n_factor,
-                                sign_matrix,
-                                nonzero_matrix
+                                signed_loadings,
+                                nonzero_loadings
                                 ) {
     count_array <- create_count_array(
         long_data = long_data,
@@ -244,24 +244,24 @@ shape_data_modgirt <- function (
     n_item <- dim(count_array)[3]
     n_category <- dim(count_array)[4]
     group_names <- dimnames(count_array)[[3]]
-    if (missing(sign_matrix)) {
-        sign_matrix <- matrix(
+    if (missing(signed_loadings)) {
+        signed_loadings <- matrix(
             data = 0,
             nrow = n_item,
             ncol = n_factor,
             dimnames = list(group_names, seq_len(n_factor))
         )
     }
-    if (missing(nonzero_matrix)) {
-        nonzero_matrix <- matrix(
-            data = 0,
+    if (missing(nonzero_loadings)) {
+        nonzero_loadings <- matrix(
+            data = 1,
             nrow = n_item,
             ncol = n_factor,
             dimnames = list(group_names, seq_len(n_factor))
         )
     }
-    ## stopifnot(identical(n_factor, ncol(sign_matrix)))
-    ## stopifnot(identical(n_factor, ncol(nonzero_matrix)))
+    stopifnot(isTRUE(n_factor == ncol(signed_loadings)))
+    stopifnot(isTRUE(n_factor == ncol(nonzero_loadings)))
     return(
         list(
             T = n_time,
@@ -270,8 +270,8 @@ shape_data_modgirt <- function (
             K = n_category,
             D = n_factor,
             SSSS = count_array,
-            beta_nonzero = nonzero_matrix,
-            beta_sign = sign_matrix
+            beta_nonzero = nonzero_loadings,
+            beta_sign = signed_loadings
         )
     )
 }
