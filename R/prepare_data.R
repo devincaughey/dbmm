@@ -220,11 +220,12 @@ create_count_array <- function (
     return(survey::svytable(formula = xtab_formula, design = des))
 }
 
+#' @export
 shape_data_modgirt <- function (
-    count_array,
-    n_factor,
-    sign_matrix,
-    nonzero_matrix) {
+                                count_array,
+                                n_factor,
+                                sign_matrix,
+                                nonzero_matrix) {
     stopifnot(identical(n_factor, ncol(sign_matrix)))
     stopifnot(identical(n_factor, ncol(nonzero_matrix)))
     n_time <- dim(count_array)[1]
