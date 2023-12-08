@@ -46,36 +46,36 @@ shape_data <- function (long_data,
                         max_cats = 10,
                         standardize = TRUE,
                         make_indicator_for_zeros = TRUE,
-                        periods_to_estimate = NULL) {
+                        periods_to_estimate) {
     ## TODO: check the input?
 
     stdize <- function (x) {
         (x - mean(x, na.rm = TRUE)) / stats::sd(x, na.rm = TRUE)
     }
 
-    if (is.null(periods_to_estimate)) {
+    if (missing(periods_to_estimate)) {
         periods_to_estimate <-
             min(long_data[[time_var]]):max(long_data[[time_var]])
     }
 
-    long_data <- long_data[long_data[[time_var]] %in% periods_to_estimate, ]
-    long_data$unit <- long_data[[unit_var]]
-    long_data$UNIT <- factor(long_data[[unit_var]])
-    long_data$time <- long_data[[time_var]]
-    long_data$TIME <- factor(long_data[[time_var]], periods_to_estimate)
-    long_data$item <- long_data[[item_var]]
-    long_data$value <- as.numeric(long_data[[value_var]])
-    long_data <- dplyr::select(long_data,
+    use_data <- long_data[long_data[[time_var]] %in% periods_to_estimate, ]
+    use_data$unit <- use_data[[unit_var]]
+    use_data$UNIT <- factor(use_data[[unit_var]])
+    use_data$time <- use_data[[time_var]]
+    use_data$TIME <- factor(use_data[[time_var]], periods_to_estimate)
+    use_data$item <- use_data[[item_var]]
+    use_data$value <- as.numeric(use_data[[value_var]])
+    use_data <- dplyr::select(use_data,
                                unit, UNIT, time,
                                TIME, item, value)
-    stopifnot(!anyNA(long_data$unit))
-    stopifnot(!anyNA(long_data$time))
-    stopifnot(!anyNA(long_data$item))
-    stopifnot(!anyNA(long_data$value))
+    stopifnot(!anyNA(use_data$unit))
+    stopifnot(!anyNA(use_data$time))
+    stopifnot(!anyNA(use_data$item))
+    stopifnot(!anyNA(use_data$value))
 
-    items <- sort(unique(long_data$item))
+    items <- sort(unique(use_data$item))
 
-    unique_df <- long_data %>%
+    unique_df <- use_data %>%
         dplyr::summarise(n = length(unique(.data$value)), .by = .data$item)
 
     drop_items <- dplyr::filter(unique_df, .data$n < 2)$item
@@ -95,16 +95,16 @@ shape_data <- function (long_data,
     metric_items <- sort(metric_items)
     if (make_indicator_for_zeros) {
         for (i in seq_along(metric_items)) {
-            obs_i <- which(long_data$item == metric_items[i])
-            is_zero <- long_data$value[obs_i] == 0
-            if (any(is_zero) && 0 %in% range(long_data$value[obs_i])) {
+            obs_i <- which(use_data$item == metric_items[i])
+            is_zero <- use_data$value[obs_i] == 0
+            if (any(is_zero) && 0 %in% range(use_data$value[obs_i])) {
                 ## TODO: Add collinearity check
-                long_data$value[obs_i[is_zero]] <- NA_real_
+                use_data$value[obs_i[is_zero]] <- NA_real_
                 zi_i <- stringr::str_c(metric_items[i], "_zi")
-                newdat <- long_data[obs_i, ]
+                newdat <- use_data[obs_i, ]
                 newdat$value <- as.integer(!is_zero)
                 newdat$item <- zi_i
-                long_data <- dplyr::bind_rows(long_data, newdat)
+                use_data <- dplyr::bind_rows(use_data, newdat)
                 binary_items <- c(binary_items, zi_i)
             }
         }
@@ -117,7 +117,7 @@ shape_data <- function (long_data,
     cat("\nCategorizing the following items as metric:\n")
     cat(c("  *", paste(metric_items, collapse = "\n  * "), "\n"))
 
-    binary_data <- long_data %>%
+    binary_data <- use_data %>%
         dplyr::filter(.data$item %in% binary_items) %>%
         dplyr::mutate(ITEM = factor(.data$item, levels = binary_items)) %>%
         dplyr::group_by(.data$ITEM) %>%
@@ -126,7 +126,7 @@ shape_data <- function (long_data,
         dplyr::ungroup() %>%
         dplyr::arrange(.data$TIME, .data$ITEM, .data$UNIT) # time must vary last
 
-    ordinal_data <- long_data %>%
+    ordinal_data <- use_data %>%
         dplyr::filter(.data$item %in% ordinal_items) %>%
         dplyr::mutate(ITEM = factor(.data$item, levels = ordinal_items)) %>%
         dplyr::group_by(.data$ITEM) %>%
@@ -135,7 +135,7 @@ shape_data <- function (long_data,
         dplyr::ungroup() %>%
         dplyr::arrange(.data$TIME, .data$ITEM, .data$UNIT) # time must vary last
 
-    metric_data <- long_data %>%
+    metric_data <- use_data %>%
         dplyr::filter(.data$item %in% metric_items) %>%
         dplyr::mutate(ITEM = factor(.data$item, levels = metric_items)) %>%
         dplyr::mutate(yy = .data$value) %>%
@@ -149,25 +149,25 @@ shape_data <- function (long_data,
             dplyr::ungroup()
     }
 
-    tob_b <- sapply(1:nlevels(long_data$TIME), function (t) {
+    tob_b <- sapply(1:nlevels(use_data$TIME), function (t) {
         x <- as.integer(binary_data$TIME) == t
         if (any(x)) c(min(which(x)), max(which(x)))
         else c(0, 0)
     })
-    tob_o <- sapply(1:nlevels(long_data$TIME), function (t) {
+    tob_o <- sapply(1:nlevels(use_data$TIME), function (t) {
         x <- as.integer(ordinal_data$TIME) == t
         if (any(x)) c(min(which(x)), max(which(x)))
         else c(0, 0)
     })
-    tob_m <- sapply(1:nlevels(long_data$TIME), function (t) {
+    tob_m <- sapply(1:nlevels(use_data$TIME), function (t) {
         x <- as.integer(metric_data$TIME) == t
         if (any(x)) c(min(which(x)), max(which(x)))
         else c(0, 0)
     })
 
     stan_data <- list(
-        J = nlevels(long_data$UNIT),
-        T = nlevels(long_data$TIME),
+        J = nlevels(use_data$UNIT),
+        T = nlevels(use_data$TIME),
         N_binary = nrow(binary_data),
         I_binary = nlevels(binary_data$ITEM),
         yy_binary = as.integer(binary_data$yy),
@@ -191,8 +191,8 @@ shape_data <- function (long_data,
         tt_metric = as.integer(metric_data$TIME),
         tob_m = t(tob_m)
     )
-    attr(stan_data, "unit_labels") <- levels(long_data$UNIT)
-    attr(stan_data, "time_labels") <- levels(long_data$TIME)
+    attr(stan_data, "unit_labels") <- levels(use_data$UNIT)
+    attr(stan_data, "time_labels") <- levels(use_data$TIME)
     attr(stan_data, "binary_item_labels") <- levels(binary_data$ITEM)
     attr(stan_data, "ordinal_item_labels") <- levels(ordinal_data$ITEM)
     attr(stan_data, "metric_item_labels") <- levels(metric_data$ITEM)
@@ -202,14 +202,12 @@ shape_data <- function (long_data,
     return(stan_data)
 }
 
-create_count_array <- function (
-                                long_data,
+create_counts <- function (long_data,
+                                unit_var = "UNIT",
                                 time_var = "TIME",
-                                group_var = "GROUP",
                                 item_var = "ITEM",
-                                response_var = "response",
-                                weight_var = NULL
-                                ) {
+                                value_var = "value",
+                                weight_var = NULL) {
     xtab_formula <- reformulate(c(time_var, group_var, item_var, response_var))
     if (is.null(weight_var)) {
         weight_formula <- NULL
@@ -217,39 +215,53 @@ create_count_array <- function (
         weight_formula <- reformulate(weight_var)
     }
     des <- survey::svydesign(~1, data = long_data, weights = weight_formula)
-    return(survey::svytable(formula = xtab_formula, design = des))
+    xtab <- survey::svytable(formula = xtab_formula, design = des) 
+    return(xtab)
 }
 
 #' @export
-shape_data_modgirt <- function (
-                                long_data,
-                                time_var = "TIME",
-                                group_var = "GROUP",
-                                item_var = "ITEM",
-                                response_var = "response",
+shape_data_modgirt <- function (long_data,
+                                unit_var,
+                                time_var,
+                                item_var,
+                                value_var,
                                 weight_var = NULL,
                                 n_factor,
                                 signed_loadings,
-                                nonzero_loadings
-                                ) {
-    count_array <- create_count_array(
-        long_data = long_data,
-        time_var = time_var,
-        item_var = item_var,
-        response_var = response_var,
-        weight_var = weight_var
-    )
+                                nonzero_loadings,
+                                periods_to_estimate) {
+    ## If not specified, estimate every period between first and last
+    if (missing(periods_to_estimate)) {
+        periods_to_estimate <-
+            min(long_data[[time_var]]):max(long_data[[time_var]])
+    }
+    ## Subset data and create identifier variables
+    use_data <- long_data[long_data[[time_var]] %in% periods_to_estimate, ]
+    use_data$unit <- use_data[[unit_var]]
+    use_data$time <- use_data[[time_var]]
+    use_data$item <- use_data[[item_var]]
+    use_data$value <- as.numeric(use_data[[value_var]])
+    stopifnot(!anyNA(use_data$unit))
+    stopifnot(!anyNA(use_data$time))
+    stopifnot(!anyNA(use_data$item))
+    stopifnot(!anyNA(use_data$value))
+    ## Create factors (drops absent levels)
+    use_data$UNIT <- factor(use_data[[unit_var]])
+    use_data$TIME <- factor(use_data[[time_var]], levels = periods_to_estimate)
+    use_data$ITEM <- factor(use_data[[item_var]])
+    ## Create four-dimensional cross-tabulation
+    count_array <- create_counts(long_data = use_data, weight_var = weight_var)
     n_time <- dim(count_array)[1]
-    n_group <- dim(count_array)[2]
+    n_unit <- dim(count_array)[2]
     n_item <- dim(count_array)[3]
-    n_category <- dim(count_array)[4]
-    group_names <- dimnames(count_array)[[3]]
+    n_value <- dim(count_array)[4]
+    unit_names <- dimnames(count_array)[[3]]
     if (missing(signed_loadings)) {
         signed_loadings <- matrix(
             data = 0,
             nrow = n_item,
             ncol = n_factor,
-            dimnames = list(group_names, seq_len(n_factor))
+            dimnames = list(item_names, seq_len(n_factor))
         )
     }
     if (missing(nonzero_loadings)) {
@@ -257,7 +269,7 @@ shape_data_modgirt <- function (
             data = 1,
             nrow = n_item,
             ncol = n_factor,
-            dimnames = list(group_names, seq_len(n_factor))
+            dimnames = list(item_names, seq_len(n_factor))
         )
     }
     stopifnot(isTRUE(n_factor == ncol(signed_loadings)))
@@ -265,9 +277,9 @@ shape_data_modgirt <- function (
     return(
         list(
             T = n_time,
-            G = n_group,
+            G = n_unit,
             Q = n_item,
-            K = n_category,
+            K = n_value,
             D = n_factor,
             SSSS = count_array,
             beta_nonzero = nonzero_loadings,
