@@ -66,8 +66,8 @@ shape_data <- function (long_data,
     use_data$item <- use_data[[item_var]]
     use_data$value <- as.numeric(use_data[[value_var]])
     use_data <- dplyr::select(use_data,
-                               unit, UNIT, time,
-                               TIME, item, value)
+                              unit, UNIT, time,
+                              TIME, item, value)
     stopifnot(!anyNA(use_data$unit))
     stopifnot(!anyNA(use_data$time))
     stopifnot(!anyNA(use_data$item))
@@ -203,11 +203,11 @@ shape_data <- function (long_data,
 }
 
 create_counts <- function (long_data,
-                                unit_var = "UNIT",
-                                time_var = "TIME",
-                                item_var = "ITEM",
-                                value_var = "value",
-                                weight_var = NULL) {
+                           unit_var = "UNIT",
+                           time_var = "TIME",
+                           item_var = "ITEM",
+                           value_var = "value",
+                           weight_var = NULL) {
     xtab_formula <- reformulate(c(time_var, unit_var, item_var, value_var))
     if (is.null(weight_var)) {
         weight_formula <- NULL
@@ -244,7 +244,7 @@ shape_data_modgirt <- function (long_data,
     use_data$time <- use_data[[time_var]]
     use_data$item <- use_data[[item_var]]
     use_data$value <- as.numeric(use_data[[value_var]])
-    stopifnot(!anyNA(use_data$unit))
+    stopifnot(!anyNA(use_data$unit) || 
     stopifnot(!anyNA(use_data$time))
     stopifnot(!anyNA(use_data$item))
     stopifnot(!anyNA(use_data$value))
@@ -252,22 +252,18 @@ shape_data_modgirt <- function (long_data,
     use_data$UNIT <- factor(use_data[[unit_var]])
     use_data$TIME <- factor(use_data[[time_var]], levels = periods_to_estimate)
     use_data$ITEM <- factor(use_data[[item_var]])
-    unit_names <- levels(use_data$UNIT)
-    time_names <- levels(use_data$TIME)
-    item_names <- levels(use_data$ITEM)
     ## Create four-dimensional cross-tabulation
     count_array <- create_counts(long_data = use_data, weight_var = weight_var)
     n_time <- dim(count_array)[1]
     n_unit <- dim(count_array)[2]
     n_item <- dim(count_array)[3]
     n_value <- dim(count_array)[4]
-    item_names <- dimnames(count_array)[[3]]
     if (missing(signed_loadings)) {
         signed_loadings <- matrix(
             data = 0,
             nrow = n_item,
             ncol = n_factor,
-            dimnames = list(item_names, seq_len(n_factor))
+            dimnames = list(levels(use_data$ITEM), seq_len(n_factor))
         )
     }
     if (missing(nonzero_loadings)) {
@@ -275,7 +271,7 @@ shape_data_modgirt <- function (long_data,
             data = 1,
             nrow = n_item,
             ncol = n_factor,
-            dimnames = list(item_names, seq_len(n_factor))
+            dimnames = list(levels(use_data$ITEM), seq_len(n_factor))
         )
     }
     stopifnot(isTRUE(n_factor == ncol(signed_loadings)))
