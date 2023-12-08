@@ -230,10 +230,13 @@ shape_data_modgirt <- function (long_data,
                                 signed_loadings,
                                 nonzero_loadings,
                                 periods_to_estimate) {
-    ## If not specified, estimate every period between first and last
     if (missing(periods_to_estimate)) {
-        periods_to_estimate <-
-            min(long_data[[time_var]]):max(long_data[[time_var]])
+        if (is.factor(long_data[[time_var]])) {
+            periods_to_estimate <- levels(long_data[[time_var]])
+        } else {
+            periods_to_estimate <-
+                min(long_data[[time_var]]):max(long_data[[time_var]])
+        }
     }
     ## Subset data and create identifier variables
     use_data <- long_data[long_data[[time_var]] %in% periods_to_estimate, ]
