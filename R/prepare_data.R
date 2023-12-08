@@ -252,13 +252,16 @@ shape_data_modgirt <- function (long_data,
     use_data$UNIT <- factor(use_data[[unit_var]])
     use_data$TIME <- factor(use_data[[time_var]], levels = periods_to_estimate)
     use_data$ITEM <- factor(use_data[[item_var]])
+    unit_names <- levels(use_data$UNIT)
+    time_names <- levels(use_data$TIME)
+    item_names <- levels(use_data$ITEM)
     ## Create four-dimensional cross-tabulation
     count_array <- create_counts(long_data = use_data, weight_var = weight_var)
     n_time <- dim(count_array)[1]
     n_unit <- dim(count_array)[2]
     n_item <- dim(count_array)[3]
     n_value <- dim(count_array)[4]
-    unit_names <- dimnames(count_array)[[3]]
+    item_names <- dimnames(count_array)[[3]]
     if (missing(signed_loadings)) {
         signed_loadings <- matrix(
             data = 0,
