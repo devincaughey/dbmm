@@ -244,7 +244,7 @@ shape_data_modgirt <- function (long_data,
     use_data$time <- use_data[[time_var]]
     use_data$item <- use_data[[item_var]]
     use_data$value <- as.numeric(use_data[[value_var]])
-    stopifnot(!anyNA(use_data$unit) || 
+    stopifnot(!anyNA(use_data$unit))
     stopifnot(!anyNA(use_data$time))
     stopifnot(!anyNA(use_data$item))
     stopifnot(!anyNA(use_data$value))
