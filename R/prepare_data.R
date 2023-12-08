@@ -208,7 +208,7 @@ create_counts <- function (long_data,
                                 item_var = "ITEM",
                                 value_var = "value",
                                 weight_var = NULL) {
-    xtab_formula <- reformulate(c(time_var, unit_var, item_var, response_var))
+    xtab_formula <- reformulate(c(time_var, unit_var, item_var, value_var))
     if (is.null(weight_var)) {
         weight_formula <- NULL
     } else {
