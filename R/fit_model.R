@@ -95,31 +95,30 @@
 #' @import cmdstanr
 #'
 #' @export
-fit <- function (
-    data,
-    chains = 4,
-    parallelize_within_chains = FALSE,
-    threads_per_chain = NULL,
-    force_recompile = FALSE,
-    init_kappa = FALSE,
-    init = NULL,
-    return_data = TRUE,
-    n_dim = 1,
-    constant_alpha = FALSE,
-    separate_eta = TRUE,
-    lambda_zeros = NULL,
-    df_sigma_metric = 4,
-    df_sigma_alpha_evol = 4,
-    df_sigma_eta_evol = 4,
-    mu_sigma_metric = 0.5,
-    mu_sigma_alpha_evol = 0.5,
-    mu_sigma_eta_evol = 0.5,
-    sd_sigma_metric = 0.5,
-    sd_sigma_alpha_evol = 0.5,
-    sd_sigma_eta_evol = 0.5,
-    seed = NULL,
-    link = "probit",
-    ...) {
+fit <- function(data,
+                chains = 4,
+                parallelize_within_chains = FALSE,
+                threads_per_chain = NULL,
+                force_recompile = FALSE,
+                init_kappa = FALSE,
+                init = NULL,
+                return_data = TRUE,
+                n_dim = 1,
+                constant_alpha = FALSE,
+                separate_eta = TRUE,
+                lambda_zeros = NULL,
+                df_sigma_metric = 4,
+                df_sigma_alpha_evol = 4,
+                df_sigma_eta_evol = 4,
+                mu_sigma_metric = 0.5,
+                mu_sigma_alpha_evol = 0.5,
+                mu_sigma_eta_evol = 0.5,
+                sd_sigma_metric = 0.5,
+                sd_sigma_alpha_evol = 0.5,
+                sd_sigma_eta_evol = 0.5,
+                seed = NULL,
+                link = "probit",
+                ...) {
     check_arg_type(arg = data, typename = "dbmm_data")
 
     if (parallelize_within_chains & !is.null(threads_per_chain)) {
@@ -128,10 +127,11 @@ fit <- function (
 
         specified_cores <- threads_per_chain * chains
         if (parallel::detectCores() <= specified_cores) {
-            cli::cli_alert_warning(paste(
+            w <- paste(
                 "The number of specified cores exceeds",
                 "the number of cores in your computer."
-            ))
+            )
+            cli::cli_alert_warning(w)
         }
     }
 
@@ -157,7 +157,7 @@ fit <- function (
         nrow = data$I_binary,
         ncol = data$D,
         dimnames = list(
-            attr(data, "binary_item_labels"), 
+            attr(data, "binary_item_labels"),
             as.character(1:data$D)
         )
     )
@@ -167,7 +167,7 @@ fit <- function (
         nrow = data$I_ordinal,
         ncol = data$D,
         dimnames = list(
-            attr(data, "ordinal_item_labels"), 
+            attr(data, "ordinal_item_labels"),
             as.character(1:data$D)
         )
     )
@@ -193,7 +193,7 @@ fit <- function (
     }
 
     if (data$D > 1 && !isTRUE(lambda_zeros) && !is.null(lambda_zeros)) {
-        for (i in 1:nrow(lambda_zeros)) {
+        for (i in seq_len(nrow(lambda_zeros))) {
             if (lambda_zeros[i, 1] %in% attr(data, "binary_item_labels")) {
                 nonzero_binary[lambda_zeros[i, 1], lambda_zeros[i, 2]] <- 0
             }
@@ -256,11 +256,12 @@ fit <- function (
     return(out)
 }
 
-fit_modgirt <- function (
+fit_modgirt <- function(
     stan_data,
     chains = 4,
     return_data = TRUE,
     n_factor = 1,
+    force_recompile = FALSE,
     signed_loadings,
     nonzero_loadings,
     link = "probit",
