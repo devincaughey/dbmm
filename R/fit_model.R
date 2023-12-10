@@ -118,9 +118,8 @@ fit <- function (data,
                  sd_sigma_eta_evol = 0.5,
                  seed = NULL,
                  link = "probit",
-                 ...)
-{
-
+                 ...
+) {
     check_arg_type(arg = data, typename = "dbmm_data")
 
     if (parallelize_within_chains & !is.null(threads_per_chain)) {
@@ -129,7 +128,10 @@ fit <- function (data,
 
         specified_cores <- threads_per_chain * chains
         if (parallel::detectCores() <= specified_cores) {
-            cli::cli_alert_warning("The number of specified cores exceeds the number of cores in your computer.")
+            cli::cli_alert_warning(paste(
+                "The number of specified cores exceeds",
+                "the number of cores in your computer."
+            )
         }
     }
 
@@ -154,21 +156,30 @@ fit <- function (data,
         data = 1,
         nrow = data$I_binary,
         ncol = data$D,
-        dimnames = list(attr(data, "binary_item_labels"), as.character(1:data$D))
+        dimnames = list(
+            attr(data, "binary_item_labels"), 
+            as.character(1:data$D)
+        )
     )
 
     nonzero_ordinal <- matrix(
         data = 1,
         nrow = data$I_ordinal,
         ncol = data$D,
-        dimnames = list(attr(data, "ordinal_item_labels"), as.character(1:data$D))
+        dimnames = list(
+            attr(data, "ordinal_item_labels"), 
+            as.character(1:data$D)
+        )
     )
 
     nonzero_metric <- matrix(
         data = 1,
         nrow = data$I_metric,
         ncol = data$D,
-        dimnames = list(attr(data, "metric_item_labels"), as.character(1:data$D))
+        dimnames = list(
+            attr(data, "metric_item_labels"),
+            as.character(1:data$D)
+        )
     )
 
     if (data$D > 1 && isTRUE(lambda_zeros)) {
@@ -255,7 +266,8 @@ fit_modgirt <- function (
     link = "probit",
     seed = NULL,
     ...
-    ) {
+) {
+    n_item <- stan_data$Q
     if (missing(signed_loadings)) {
         signed_loadings <- matrix(
             data = 0,
