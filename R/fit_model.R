@@ -95,31 +95,31 @@
 #' @import cmdstanr
 #'
 #' @export
-fit <- function (data,
-                 chains = 4,
-                 parallelize_within_chains = FALSE,
-                 threads_per_chain = NULL,
-                 force_recompile = FALSE,
-                 init_kappa = FALSE,
-                 init = NULL,
-                 return_data = TRUE,
-                 n_dim = 1,
-                 constant_alpha = FALSE,
-                 separate_eta = TRUE,
-                 lambda_zeros = NULL,
-                 df_sigma_metric = 4,
-                 df_sigma_alpha_evol = 4,
-                 df_sigma_eta_evol = 4,
-                 mu_sigma_metric = 0.5,
-                 mu_sigma_alpha_evol = 0.5,
-                 mu_sigma_eta_evol = 0.5,
-                 sd_sigma_metric = 0.5,
-                 sd_sigma_alpha_evol = 0.5,
-                 sd_sigma_eta_evol = 0.5,
-                 seed = NULL,
-                 link = "probit",
-                 ...
-) {
+fit <- function (
+    data,
+    chains = 4,
+    parallelize_within_chains = FALSE,
+    threads_per_chain = NULL,
+    force_recompile = FALSE,
+    init_kappa = FALSE,
+    init = NULL,
+    return_data = TRUE,
+    n_dim = 1,
+    constant_alpha = FALSE,
+    separate_eta = TRUE,
+    lambda_zeros = NULL,
+    df_sigma_metric = 4,
+    df_sigma_alpha_evol = 4,
+    df_sigma_eta_evol = 4,
+    mu_sigma_metric = 0.5,
+    mu_sigma_alpha_evol = 0.5,
+    mu_sigma_eta_evol = 0.5,
+    sd_sigma_metric = 0.5,
+    sd_sigma_alpha_evol = 0.5,
+    sd_sigma_eta_evol = 0.5,
+    seed = NULL,
+    link = "probit",
+    ...) {
     check_arg_type(arg = data, typename = "dbmm_data")
 
     if (parallelize_within_chains & !is.null(threads_per_chain)) {
@@ -131,7 +131,7 @@ fit <- function (data,
             cli::cli_alert_warning(paste(
                 "The number of specified cores exceeds",
                 "the number of cores in your computer."
-            )
+            ))
         }
     }
 
