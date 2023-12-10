@@ -39,7 +39,7 @@ transformed parameters {
   cov_matrix[D] Sigma_theta; // diagonal matrix of within-group variances
   Sigma_theta = diag_matrix(sd_theta .* sd_theta);
   cov_matrix[D] Sigma_bar_theta_evol; // diagonal matrix of within-group variances
-  Sigma_bar_theta_evol = diag_matrix(sd_bar_theta_evol .* sd_bar_theta_evol;
+  Sigma_bar_theta_evol = diag_matrix(sd_bar_theta_evol .* sd_bar_theta_evol);
   for (q in 1 : Q) {
     for (d in 1 : D) {
       if (beta_sign[q, d] == 0) {
