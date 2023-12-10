@@ -261,7 +261,7 @@ fit_modgirt <- function (
             data = 0,
             nrow = n_item,
             ncol = n_factor,
-            dimnames = list(dimnames(stan_data$SSSS)ITEM seq_len(n_factor))
+            dimnames = list(dimnames(stan_data$SSSS$ITEM), seq_len(n_factor))
         )
     }
     if (missing(nonzero_loadings)) {
