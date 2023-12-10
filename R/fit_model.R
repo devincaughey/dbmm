@@ -269,7 +269,7 @@ fit_modgirt <- function (
             data = 1,
             nrow = n_item,
             ncol = n_factor,
-            dimnames = list(dimnames(stan_data$SSSS)ITEM, seq_len(n_factor))
+            dimnames = list(dimnames(stan_data$SSSS$ITEM), seq_len(n_factor))
         )
     }
     stopifnot(isTRUE(n_factor == ncol(signed_loadings)))
