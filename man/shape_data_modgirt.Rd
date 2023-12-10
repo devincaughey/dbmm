@@ -6,6 +6,7 @@
 \usage{
 shape_data_modgirt(
   long_data,
+  unit_var,
   time_var,
   item_var,
   value_var,
@@ -15,6 +16,8 @@ shape_data_modgirt(
 }
 \arguments{
 \item{long_data}{The long-format data frame containing the raw data.}
+
+\item{unit_var}{The name of the variable representing the unit identifier.}
 
 \item{time_var}{The name of the variable representing the time identifier.}
 
@@ -26,8 +29,6 @@ shape_data_modgirt(
 weights (optional).}
 
 \item{periods_to_estimate}{The periods to estimate (optional).}
-
-\item{unit_var}{The name of the variable representing the unit identifier.}
 }
 \value{
 A list containing the dimensions of the data (T, G, Q, K, D), the

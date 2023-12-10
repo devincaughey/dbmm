@@ -240,7 +240,7 @@ create_counts <- function (long_data,
 #'
 #' @export
 shape_data_modgirt <- function(long_data,
-             
+                               unit_var,
                                time_var,
                                item_var,
                                value_var,
