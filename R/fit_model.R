@@ -96,7 +96,6 @@
 #'
 #' @export
 fit <- function (data,
-                                        # removed `file` argument for now
                  chains = 4,
                  parallelize_within_chains = FALSE,
                  threads_per_chain = NULL,
@@ -117,7 +116,7 @@ fit <- function (data,
                  sd_sigma_metric = 0.5,
                  sd_sigma_alpha_evol = 0.5,
                  sd_sigma_eta_evol = 0.5,
-                 seed = 123,
+                 seed = NULL,
                  link = "probit",
                  ...)
 {
@@ -247,5 +246,51 @@ fit <- function (data,
 }
 
 fit_modgirt <- function (
-
-                         )
+    stan_data
+    chains = 4,
+    return_data = TRUE,
+    n_factor = 1,
+    signed_loadings,
+    nonzero_loadings,
+    link = "probit",
+    seed = NULL,
+    ...
+    ) {
+    if (missing(signed_loadings)) {
+        signed_loadings <- matrix(
+            data = 0,
+            nrow = n_item,
+            ncol = n_factor,
+            dimnames = list(dimnames(stan_data$SSSS)ITEM seq_len(n_factor))
+        )
+    }
+    if (missing(nonzero_loadings)) {
+        nonzero_loadings <- matrix(
+            data = 1,
+            nrow = n_item,
+            ncol = n_factor,
+            dimnames = list(dimnames(stan_data$SSSS)ITEM, seq_len(n_factor))
+        )
+    }
+    stopifnot(isTRUE(n_factor == ncol(signed_loadings)))
+    stopifnot(isTRUE(n_factor == ncol(nonzero_loadings)))
+    stan_data$D <- n_factor
+    stan_data$beta_nonzero <- nonzero_loadings
+    stan_data$beta_sign <- signed_loadings
+    file <- system.file(
+        paste0("stan/modgirt_", link, ".stan"),
+        package = "dbmm"
+    )
+    m0 <- cmdstan_model(stan_file = file)
+    m1 <- m0$compile(force_recompile = force_recompile)
+    modgirt_fit <- m1$sample(stan_data, chains = chains, seed = seed, ...)
+    ## Prepare output
+    attr(modgirt_fit, "unit_labels") <- attr(stan_data, "unit_labels")
+    attr(modgirt_fit, "time_labels") <- attr(stan_data, "time_labels")
+    attr(modgirt_fit, "item_labels") <- attr(stan_data, "item_labels")
+    out <- list(fit = modgirt_fit)
+    if (return_data) {
+        out$stan_data <- stan_data
+    }
+    return(out)
+}
