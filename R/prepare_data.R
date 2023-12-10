@@ -220,6 +220,28 @@ create_counts <- function (long_data,
 }
 
 #' @export
+#' shape_data_modgirt function
+#'
+#' This function prepares the data for the MODGIRT analysis by creating a
+#' four-dimensional cross-tabulation and setting up the necessary variables 
+#' and parameters.
+#'
+#' @param long_data The long-format data frame containing the raw data.
+#' @param unit_var The name of the variable representing the unit identifier.
+#' @param time_var The name of the variable representing the time identifier.
+#' @param item_var The name of the variable representing the item identifier.
+#' @param value_var The name of the variable representing the repsonse value.
+#' @param weight_var The name of the variable representing subject-specific
+#'   weights (optional).
+#' @param periods_to_estimate The periods to estimate (optional).
+#'
+#' @return A list containing the dimensions of the data (T, G, Q, K, D), the
+#'  four-dimensional cross-tabulation (SSSS), the matrix of nonzero loadings
+#'  (beta_nonzero), and the matrix of signed loadings (beta_sign).
+#'
+#' @examples
+#'
+#' @export
 shape_data_modgirt <- function (long_data,
                                 unit_var,
                                 time_var,
@@ -229,6 +251,15 @@ shape_data_modgirt <- function (long_data,
                                 n_factor,
                                 signed_loadings,
                                 nonzero_loadings,
+                                periods_to_estimate) {
+    # Function code here...
+}
+shape_data_modgirt <- function (long_data,
+                                unit_var,
+                                time_var,
+                                item_var,
+                                value_var,
+                                weight_var = NULL,
                                 periods_to_estimate) {
     if (missing(periods_to_estimate)) {
         if (is.factor(long_data[[time_var]])) {
@@ -258,34 +289,15 @@ shape_data_modgirt <- function (long_data,
     n_unit <- dim(count_array)[2]
     n_item <- dim(count_array)[3]
     n_value <- dim(count_array)[4]
-    if (missing(signed_loadings)) {
-        signed_loadings <- matrix(
-            data = 0,
-            nrow = n_item,
-            ncol = n_factor,
-            dimnames = list(levels(use_data$ITEM), seq_len(n_factor))
-        )
-    }
-    if (missing(nonzero_loadings)) {
-        nonzero_loadings <- matrix(
-            data = 1,
-            nrow = n_item,
-            ncol = n_factor,
-            dimnames = list(levels(use_data$ITEM), seq_len(n_factor))
-        )
-    }
-    stopifnot(isTRUE(n_factor == ncol(signed_loadings)))
-    stopifnot(isTRUE(n_factor == ncol(nonzero_loadings)))
-    return(
-        list(
-            T = n_time,
-            G = n_unit,
-            Q = n_item,
-            K = n_value,
-            D = n_factor,
-            SSSS = count_array,
-            beta_nonzero = nonzero_loadings,
-            beta_sign = signed_loadings
-        )
+    stan_data <- list(
+        T = n_time,
+        G = n_unit,
+        Q = n_item,
+        K = n_value,
+        D = n_factor,
+        SSSS = count_array
     )
+    attr(stan_data, "unit_labels") <- levels(use_data$UNIT)
+    attr(stan_data, "time_labels") <- levels(use_data$TIME)
+    attr(stan_data, "item_labels") <- levels(use_data$ITEM)
 }
