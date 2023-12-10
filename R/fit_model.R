@@ -256,6 +256,27 @@ fit <- function(data,
     return(out)
 }
 
+#' Fit a multidimensional ordinal group-level IRT model using Stan
+#'
+#' This function fits a MODGIRT model using Stan.
+#' It takes in the following arguments:
+#'
+#' @param stan_data The data for the model.
+#' @param chains The number of chains to run in parallel (default is 4).
+#' @param return_data A logical value indicating whether to return the input
+#' data along with the model fit (default is TRUE).
+#' @param n_factor The number of factors in the model.
+#' @param force_recompile A logical value indicating whether to force
+#' recompilation of the Stan model (default is FALSE).
+#' @param signed_loadings The signed loadings matrix.
+#' @param nonzero_loadings The nonzero loadings matrix.
+#' @param link The link function to use (default is "probit").
+#' @param seed The random seed for reproducibility.
+#' @param ... Additional arguments to be passed to the Stan sampling function.
+#'
+#' @return A list containing the model fit and optionally the input data.
+#'
+#' @export
 fit_modgirt <- function(
     stan_data,
     chains = 4,
