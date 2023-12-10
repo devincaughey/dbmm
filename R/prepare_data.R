@@ -299,4 +299,5 @@ shape_data_modgirt <- function (long_data,
     attr(stan_data, "unit_labels") <- levels(use_data$UNIT)
     attr(stan_data, "time_labels") <- levels(use_data$TIME)
     attr(stan_data, "item_labels") <- levels(use_data$ITEM)
+    return(stan_data)
 }
