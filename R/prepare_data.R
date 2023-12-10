@@ -294,7 +294,6 @@ shape_data_modgirt <- function (long_data,
         G = n_unit,
         Q = n_item,
         K = n_value,
-        D = n_factor,
         SSSS = count_array
     )
     attr(stan_data, "unit_labels") <- levels(use_data$UNIT)
