@@ -3,6 +3,7 @@
 export(check_convergence)
 export(extract_draws)
 export(fit)
+export(fit_modgirt)
 export(identify_draws)
 export(label_draws)
 export(plot_intercept)

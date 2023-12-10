@@ -219,7 +219,6 @@ create_counts <- function (long_data,
     return(xtab)
 }
 
-#' @export
 #' shape_data_modgirt function
 #'
 #' This function prepares the data for the MODGIRT analysis by creating a
@@ -239,28 +238,14 @@ create_counts <- function (long_data,
 #'  four-dimensional cross-tabulation (SSSS), the matrix of nonzero loadings
 #'  (beta_nonzero), and the matrix of signed loadings (beta_sign).
 #'
-#' @examples
-#'
 #' @export
-shape_data_modgirt <- function (long_data,
-                                unit_var,
-                                time_var,
-                                item_var,
-                                value_var,
-                                weight_var = NULL,
-                                n_factor,
-                                signed_loadings,
-                                nonzero_loadings,
-                                periods_to_estimate) {
-    # Function code here...
-}
-shape_data_modgirt <- function (long_data,
-                                unit_var,
-                                time_var,
-                                item_var,
-                                value_var,
-                                weight_var = NULL,
-                                periods_to_estimate) {
+shape_data_modgirt <- function(long_data,
+             
+                               time_var,
+                               item_var,
+                               value_var,
+                               weight_var = NULL,
+                               periods_to_estimate) {
     if (missing(periods_to_estimate)) {
         if (is.factor(long_data[[time_var]])) {
             periods_to_estimate <- levels(long_data[[time_var]])

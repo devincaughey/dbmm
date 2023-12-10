@@ -218,7 +218,7 @@ fit <- function(data,
 
     m1 <- m0$compile(cpp_options = cpp_opts, force_recompile = force_recompile)
 
-    if (init_kappa & !is.null(init)) {
+    if (init_kappa && !is.null(init)) {
         cat("\nIgnoring `init_kappa = TRUE` because `init` is not `NULL`.\n")
     }
 
