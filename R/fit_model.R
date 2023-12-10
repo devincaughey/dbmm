@@ -246,7 +246,7 @@ fit <- function (data,
 }
 
 fit_modgirt <- function (
-    stan_data
+    stan_data,
     chains = 4,
     return_data = TRUE,
     n_factor = 1,
