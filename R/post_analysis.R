@@ -831,7 +831,15 @@ harmonize_varimax <- function (beta_rsp) {
                 permute_vectors = tankard$permute_vectors))
 }
 
-varimax_loading_draws <- function(loading_draws, n_iter, n_chain, n_factor) {
+rename_loading_matrix <- function(loading_matrix) {
+    colnames(loading_matrix) <- gsub(
+        pattern = "x\\[([0-9]+),([0-9]+)\\]",
+        replacement = "LambdaV\\2_\\1",
+        x = colnames(loading_matrix)
+    )
+    return(loading_matrix)
+}
+make_vm_rvar <- function(loading_draws, n_iter, n_chain, n_factor) {
     ## `loading_draws` should be a `draws_of` of an `draws_rvar` object
     rotmat_array <- array(dim = c(n_iter, n_chain, n_factor, n_factor))
     for (i in seq_len(n_iter)) {
@@ -842,14 +850,6 @@ varimax_loading_draws <- function(loading_draws, n_iter, n_chain, n_factor) {
     }
     rotmat_rvar <- posterior::rvar(rotmat_array, with_chains = TRUE)
     return(rotmat_rvar)
-}
-rename_loading_matrix <- function(loading_matrix) {
-    colnames(loading_matrix) <- gsub(
-        pattern = "x\\[([0-9]+),([0-9]+)\\]",
-        replacement = "LambdaV\\2_\\1",
-        x = colnames(loading_matrix)
-    )
-    return(loading_matrix)
 }
 make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
     sp_array <- array(dim = c(n_iter, n_chain, n_factor, n_factor))
@@ -891,23 +891,23 @@ identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
         posterior::subset_draws(modgirt_rvar, variable = "Sigma_theta")
     Sigma_bar_theta_evol_rvar <-
         posterior::subset_draws(modgirt_rvar, variable = "Sigma_bar_theta_evol")
-    ## Create arrays to store rotation, sign, and permutation matrices
+    ## Create draw-specific varimax rotations
     draws_of_beta <- posterior::draws_of(beta_rvar$beta, with_chains = TRUE)
-    ## Apply varimax rotations to each draw
-    rotmat_rvar <-
-        varimax_loading_draws(draws_of_beta, n_iter, n_chain, n_factor)
-    beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, rotmat_rvar)
-    ## Apply signed permutations
+    vm_rvar <- make_vm_rvar(draws_of_beta, n_iter, n_chain, n_factor)
+    ## Apply varimax rotations to `beta`
+    beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, vm_rvar)
+    ## Create draw-specifc signed permutations
     beta_matrix <- posterior::as_draws_matrix(t(beta_rvar$beta))
     lambda_matrix <- rename_loading_matrix(beta_matrix)
     rsp_out <- factor.switching::rsp_exact(lambda_matrix)
     sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
+    ## Apply signed permutations to `beta`
     beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, sp_rvar)
-    ## Rotate `bar_theta`
-    for (t in seq_len(modgirt_fit$stan_data$T)) {
+    ## Apply rotations to `bar_theta`
+    for (t in seq_len(dim(bar_theta_rvar$bar_theta)[1])) {
         bar_theta_rvar$bar_theta[t, , ] <- posterior::`%**%`(
             bar_theta_rvar$bar_theta[t, , , drop = TRUE],
-            rotmat_rvar
+            vm_rvar
         )
         bar_theta_rvar$bar_theta[t, , ] <- posterior::`%**%`(
             bar_theta_rvar$bar_theta[t, , , drop = TRUE],
@@ -918,13 +918,13 @@ identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
     if (rotate_covariance) {
         Sigma_theta_rvar$Sigma_theta <-
             posterior::`%**%`(Sigma_theta_rvar$Sigma_theta,
-                              rotmat_rvar)
+                              vm_rvar)
         Sigma_theta_rvar$Sigma_theta <-
             posterior::`%**%`(Sigma_theta_rvar$Sigma_theta,
                               abs(sp_rvar))
         Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol <-
             posterior::`%**%`(Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol,
-                              rotmat_rvar)
+                              vm_rvar)
         Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol <-
             posterior::`%**%`(Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol,
                               abs(sp_rvar))
@@ -941,7 +941,7 @@ identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
     )
     out_ls <- list(
         modgirt_rvar = modgirt_rvar_id,
-        rotmat_rvar = rotmat_rvar,
+        vm_rvar = vm_rvar,
         sp_rvar = sp_rvar
     )
     return(out_ls)
