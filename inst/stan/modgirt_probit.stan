@@ -38,8 +38,8 @@ transformed parameters {
   array[T] matrix[G, D] bar_theta; // group ideal point means
   cov_matrix[D] Sigma_theta; // diagonal matrix of within-group variances
   Sigma_theta = diag_matrix(sd_theta .* sd_theta);
-  cov_matrix[D] Sigma_bar_theta_evol; // diagonal matrix of within-group variances
-  Sigma_bar_theta_evol = diag_matrix(sd_bar_theta_evol .* sd_bar_theta_evol);
+  cov_matrix[D] Omega; // diagonal matrix of transition variances
+  Omega = diag_matrix(sd_bar_theta_evol .* sd_bar_theta_evol);
   for (q in 1 : Q) {
     for (d in 1 : D) {
       if (beta_sign[q, d] == 0) {
@@ -60,7 +60,8 @@ transformed parameters {
       for (g in 1 : G) {
         for (d in 1 : D) {
           bar_theta[t][g, d] = bar_theta[t - 1][g, d]
-                               + z_bar_theta[t, g, d] * sd_bar_theta_evol[d];
+                               + z_bar_theta[t, g, d] 
+                               * sd_bar_theta_evol[d];
         }
       }
     }
