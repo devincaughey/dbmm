@@ -7,10 +7,10 @@
 reorder_factors(modgirt_rvar)
 }
 \arguments{
-\item{modgirt_rvar}{Draws from a MODGIRT model}
+\item{modgirt_rvar}{A \code{draws_rvar} object from a MODGIRT model}
 }
 \value{
-The draws with factors ordered by explanatory power
+A \code{draws_rvar} object with factors ordered by explanatory power
 }
 \description{
 This function takes a model based on posterior draws and reorders the factors

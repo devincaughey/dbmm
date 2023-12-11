@@ -951,9 +951,9 @@ identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
 #' based on the posterior sums of squares. Factors with larger sums of squares
 #' will be placed first in the reordered model.
 #'
-#' @param modgirt_rvar Draws from a MODGIRT model
+#' @param modgirt_rvar A `draws_rvar` object from a MODGIRT model
 #'
-#' @return The draws with factors ordered by explanatory power
+#' @return A `draws_rvar` object with factors ordered by explanatory power
 #'
 #' @export
 reorder_factors <- function(modgirt_rvar) {
