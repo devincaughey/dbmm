@@ -830,3 +830,92 @@ harmonize_varimax <- function (beta_rsp) {
                 sign_vectors = tankard$sign_vectors,
                 permute_vectors = tankard$permute_vectors))
 }
+
+identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
+    ## Store draws in `rvar` object
+    modgirt_rvar <- posterior::as_draws_rvars(modgirt_fit$fit$draws())
+    n_chain <- posterior::nchains(modgirt_rvar)
+    n_iter <- posterior::niterations(modgirt_rvar)
+    n_factor <- modgirt_fit$stan_data$D
+    beta_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "beta")
+    bar_theta_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "bar_theta")
+    Sigma_theta_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "Sigma_theta")
+    Sigma_bar_theta_evol_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "Sigma_bar_theta_evol")
+    ## Create arrays to store rotation, sign, and permutation matrices
+    draws_of_beta <- posterior::draws_of(beta_rvar$beta, with_chains = TRUE)
+    rotmat_array <- array(dim = c(n_iter, n_chain, n_factor, n_factor))
+    sp_array <- array(dim = dim(rotmat_array))
+    ## Apply varimax rotations to each draw
+    for (i in seq_len(n_iter)) {
+        for (c in seq_len(n_chain)) {
+            vm <- varimax(draws_of_beta[i, c, , ])
+            rotmat_array[i, c, , ] <- vm$rotmat
+        }
+    }
+    rotmat_rvar <- posterior::rvar(rotmat_array, with_chains = TRUE)
+    beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, rotmat_rvar)
+    ## Apply signed permutations
+    lambda_matrix <- posterior::as_draws_matrix(t(beta_rvar$beta))
+    colnames(lambda_matrix) <- gsub(
+        pattern = "x\\[([0-9]+),([0-9]+)\\]",
+        replacement = "LambdaV\\2_\\1",
+        x = colnames(lambda_matrix)
+    )
+    rsp_out <- factor.switching::rsp_exact(lambda_matrix)
+    for (i in seq_len(n_iter)) {
+        for (c in seq_len(n_chain)) {
+            sv <- rsp_out$sign_vectors[(c - 1)*n_iter + i, ]
+            pv <- rsp_out$permute_vectors[(c - 1)*n_iter + i, ]
+            sp_array[i, c, , ] <-
+                t(diag(sv) %*% seriation::permutation_vector2matrix(pv))
+        }
+    }
+    sp_rvar <- posterior::rvar(sp_array, with_chains = TRUE)
+    beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, sp_rvar)
+    ## Rotate `bar_theta`
+    for (t in seq_len(modgirt_fit$stan_data$T)) {
+        bar_theta_rvar$bar_theta[t, , ] <- posterior::`%**%`(
+            bar_theta_rvar$bar_theta[t, , , drop = TRUE],
+            rotmat_rvar
+        )
+        bar_theta_rvar$bar_theta[t, , ] <- posterior::`%**%`(
+            bar_theta_rvar$bar_theta[t, , , drop = TRUE],
+            sp_rvar
+        )
+    }
+    ## Rotate covariance matrices (not sure this is right)
+    if (rotate_covariance) {
+        Sigma_theta_rvar$Sigma_theta <-
+            posterior::`%**%`(Sigma_theta_rvar$Sigma_theta,
+                              rotmat_rvar)
+        Sigma_theta_rvar$Sigma_theta <-
+            posterior::`%**%`(Sigma_theta_rvar$Sigma_theta,
+                              abs(sp_rvar))
+        Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol <-
+            posterior::`%**%`(Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol,
+                              rotmat_rvar)
+        Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol <-
+            posterior::`%**%`(Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol,
+                              abs(sp_rvar))
+    }
+    ## Prepare output
+    modgirt_rvar_id <- posterior::draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = beta_rvar$beta,
+        bar_theta = bar_theta_rvar$bar_theta,
+        Sigma_theta = Sigma_theta_rvar$Sigma_theta,
+        Sigma_bar_theta_evol = Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol,
+        .nchains = n_chain
+    )
+    out_ls <- list(
+        modgirt_rvar = modgirt_rvar_id,
+        rotmat_rvar = rotmat_rvar,
+        sp_rvar = sp_rvar
+    )
+    return(out_ls)
+}
