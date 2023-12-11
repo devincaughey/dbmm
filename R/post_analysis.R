@@ -831,7 +831,40 @@ harmonize_varimax <- function (beta_rsp) {
                 permute_vectors = tankard$permute_vectors))
 }
 
-
+varimax_loading_draws <- function(loading_draws, n_iter, n_chain, n_factor) {
+    ## `loading_draws` should be a `draws_of` of an `draws_rvar` object
+    rotmat_array <- array(dim = c(n_iter, n_chain, n_factor, n_factor))
+    for (i in seq_len(n_iter)) {
+        for (c in seq_len(n_chain)) {
+            vm <- varimax(loading_draws[i, c, , ], normalize = TRUE)
+            rotmat_array[i, c, , ] <- vm$rotmat
+        }
+    }
+    rotmat_rvar <- posterior::rvar(rotmat_array, with_chains = TRUE)
+    return(rotmat_rvar)
+}
+rename_loading_matrix <- function(loading_matrix) {
+    colnames(loading_matrix) <- gsub(
+        pattern = "x\\[([0-9]+),([0-9]+)\\]",
+        replacement = "LambdaV\\2_\\1",
+        x = colnames(loading_matrix)
+    )
+    return(loading_matrix)
+}
+make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
+    sp_array <- array(dim = c(n_iter, n_chain, n_factor, n_factor))
+    for (i in seq_len(n_iter)) {
+        for (c in seq_len(n_chain)) {
+            ## Assumes vectors are ordered by chain then iteration
+            sv <- rsp_out$sign_vectors[(c - 1) * n_iter + i, ]
+            pv <- rsp_out$permute_vectors[(c - 1) * n_iter + i, ]
+            sp_array[i, c, , ] <-
+                t(diag(sv) %*% seriation::permutation_vector2matrix(pv))
+        }
+    }
+    sp_rvar <- posterior::rvar(sp_array, with_chains = TRUE)
+    return(sp_rvar)
+}
 
 #' Identify MODGIRT model
 #'
@@ -860,34 +893,15 @@ identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
         posterior::subset_draws(modgirt_rvar, variable = "Sigma_bar_theta_evol")
     ## Create arrays to store rotation, sign, and permutation matrices
     draws_of_beta <- posterior::draws_of(beta_rvar$beta, with_chains = TRUE)
-    rotmat_array <- array(dim = c(n_iter, n_chain, n_factor, n_factor))
-    sp_array <- array(dim = dim(rotmat_array))
     ## Apply varimax rotations to each draw
-    for (i in seq_len(n_iter)) {
-        for (c in seq_len(n_chain)) {
-            vm <- varimax(draws_of_beta[i, c, , ])
-            rotmat_array[i, c, , ] <- vm$rotmat
-        }
-    }
-    rotmat_rvar <- posterior::rvar(rotmat_array, with_chains = TRUE)
+    rotmat_rvar <-
+        varimax_loading_draws(draws_of_beta, n_iter, n_chain, n_factor)
     beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, rotmat_rvar)
     ## Apply signed permutations
-    lambda_matrix <- posterior::as_draws_matrix(t(beta_rvar$beta))
-    colnames(lambda_matrix) <- gsub(
-        pattern = "x\\[([0-9]+),([0-9]+)\\]",
-        replacement = "LambdaV\\2_\\1",
-        x = colnames(lambda_matrix)
-    )
+    beta_matrix <- posterior::as_draws_matrix(t(beta_rvar$beta))
+    lambda_matrix <- rename_loading_matrix(beta_matrix)
     rsp_out <- factor.switching::rsp_exact(lambda_matrix)
-    for (i in seq_len(n_iter)) {
-        for (c in seq_len(n_chain)) {
-            sv <- rsp_out$sign_vectors[(c - 1)*n_iter + i, ]
-            pv <- rsp_out$permute_vectors[(c - 1)*n_iter + i, ]
-            sp_array[i, c, , ] <-
-                t(diag(sv) %*% seriation::permutation_vector2matrix(pv))
-        }
-    }
-    sp_rvar <- posterior::rvar(sp_array, with_chains = TRUE)
+    sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
     beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, sp_rvar)
     ## Rotate `bar_theta`
     for (t in seq_len(modgirt_fit$stan_data$T)) {
