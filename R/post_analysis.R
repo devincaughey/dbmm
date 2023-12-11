@@ -831,6 +831,17 @@ harmonize_varimax <- function (beta_rsp) {
                 permute_vectors = tankard$permute_vectors))
 }
 
+#' Identify MODGIRT model
+#'
+#' This function identifies the MODGIRT model by postprocessing the draws from
+#' the posterior distribution.
+#'
+#' @param modgirt_fit The fitted MODGIRT model object.
+#' @param rotate_covariance Logical indicating whether to rotate the covariance
+#' matrices. Default is FALSE.
+#'
+#' @return A list containing the identified MODGIRT model parameters.
+#' @export
 identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
     ## Store draws in `rvar` object
     modgirt_rvar <- posterior::as_draws_rvars(modgirt_fit$fit$draws())
