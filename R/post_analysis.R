@@ -831,6 +831,8 @@ harmonize_varimax <- function (beta_rsp) {
                 permute_vectors = tankard$permute_vectors))
 }
 
+
+
 #' Identify MODGIRT model
 #'
 #' This function identifies the MODGIRT model by postprocessing the draws from
