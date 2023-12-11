@@ -889,8 +889,8 @@ identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
         posterior::subset_draws(modgirt_rvar, variable = "bar_theta")
     Sigma_theta_rvar <-
         posterior::subset_draws(modgirt_rvar, variable = "Sigma_theta")
-    Sigma_bar_theta_evol_rvar <-
-        posterior::subset_draws(modgirt_rvar, variable = "Sigma_bar_theta_evol")
+    Omega_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "Omega")
     ## Create draw-specific varimax rotations
     draws_of_beta <- posterior::draws_of(beta_rvar$beta, with_chains = TRUE)
     vm_rvar <- make_vm_rvar(draws_of_beta, n_iter, n_chain, n_factor)
@@ -922,12 +922,10 @@ identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
         Sigma_theta_rvar$Sigma_theta <-
             posterior::`%**%`(Sigma_theta_rvar$Sigma_theta,
                               abs(sp_rvar))
-        Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol <-
-            posterior::`%**%`(Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol,
-                              vm_rvar)
-        Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol <-
-            posterior::`%**%`(Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol,
-                              abs(sp_rvar))
+        Omega_rvar$Omega <-
+            posterior::`%**%`(Omega_rvar$Omega, vm_rvar)
+        Omega_rvar$Omega <-
+            posterior::`%**%`(Omega_rvar$Omega, abs(sp_rvar))
     }
     ## Prepare output
     modgirt_rvar_id <- posterior::draws_rvars(
@@ -936,7 +934,7 @@ identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
         beta = beta_rvar$beta,
         bar_theta = bar_theta_rvar$bar_theta,
         Sigma_theta = Sigma_theta_rvar$Sigma_theta,
-        Sigma_bar_theta_evol = Sigma_bar_theta_evol_rvar$Sigma_bar_theta_evol,
+        Omega = Omega_rvar$Omega,
         .nchains = n_chain
     )
     out_ls <- list(
