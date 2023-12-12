@@ -60,7 +60,7 @@ transformed parameters {
     }
     if (t > 1) {
       for (g in 1 : G) {
-        bar_theta[t][g, 1:D] = 
+        to_vector(bar_theta[t][g, 1:D]) = 
           to_vector(bar_theta[t - 1][g, 1:D]) 
           + chol_Omega * to_vector(z_bar_theta[t, g, 1:D]);
       }
