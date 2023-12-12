@@ -37,7 +37,7 @@ check_convergence <- function(raw_draws) {
 #' @import cmdstanr
 #'
 #' @export
-extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
+extract_draws <- function(fit, drop_rex = "^z_", format = "df", check = TRUE)
 {
 
     if (check) {
@@ -876,6 +876,9 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
 #' matrices and include them in the output. Default is FALSE.
 #'
 #' @return A list containing the identified MODGIRT model parameters.
+#'
+#' @import posterior
+#'
 #' @export
 identify_modgirt <- function(modgirt_fit, include_covariance = FALSE) {
     ## Store draws in `rvar` object
@@ -900,14 +903,11 @@ identify_modgirt <- function(modgirt_fit, include_covariance = FALSE) {
     ## Apply signed permutations to `beta`
     beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, sp_rvar)
     ## Apply rotations to `bar_theta`
+    vm_sp_rvar <- posterior::`%**%`(vm_rvar, sp_rvar)
     for (t in seq_len(dim(bar_theta_rvar$bar_theta)[1])) {
         bar_theta_rvar$bar_theta[t, , ] <- posterior::`%**%`(
             bar_theta_rvar$bar_theta[t, , , drop = TRUE],
-            vm_rvar
-        )
-        bar_theta_rvar$bar_theta[t, , ] <- posterior::`%**%`(
-            bar_theta_rvar$bar_theta[t, , , drop = TRUE],
-            sp_rvar
+            vm_sp_rvar
         )
     }
     if (include_covariance) { # TODO: debug
@@ -916,13 +916,8 @@ identify_modgirt <- function(modgirt_fit, include_covariance = FALSE) {
         omega_rvar <-
             posterior::subset_draws(modgirt_rvar, variable = "Omega")
         sigma_theta_rvar$Sigma_theta <-
-            posterior::`%**%`(sigma_theta_rvar$Sigma_theta, vm_rvar)
-        sigma_theta_rvar$Sigma_theta <-
-            posterior::`%**%`(sigma_theta_rvar$Sigma_theta, abs(sp_rvar))
-        omega_rvar$Omega <-
-            posterior::`%**%`(omega_rvar$Omega, vm_rvar)
-        omega_rvar$Omega <-
-            posterior::`%**%`(omega_rvar$Omega, abs(sp_rvar))
+            vm_sp_rvar %**% sigma_theta_rvar$Sigma_theta %**% t(vm_sp_rvar)
+        omega_rvar$Omega <- vm_sp_rvar %**% omega_rvar$Omega %**% t(vm_sp_rvar)
         modgirt_rvar_id <- posterior::draws_rvars(
             lp__ = modgirt_rvar$lp__,
             alpha = modgirt_rvar$alpha,
