@@ -55,12 +55,14 @@ transformed parameters {
   for (t in 1 : T) {
     if (t == 1) {
       /* Make period 1 ideal points orthogonal and mean zero */
-      bar_theta[t][1 : G, 1 : D] = whiten(to_matrix(z_bar_theta[t, 1 : G, 1 : D]));
+      bar_theta[t][1 : G, 1 : D] = 
+        whiten(to_matrix(z_bar_theta[t, 1 : G, 1 : D]));
     }
     if (t > 1) {
       for (g in 1 : G) {
         bar_theta[t][g, 1:D] = 
-          bar_theta[t - 1][g, 1:D] + chol_Omega * to_vector(z_bar_theta[t, g, 1:D]);
+          to_vector(bar_theta[t - 1][g, 1:D]) 
+          + chol_Omega * to_vector(z_bar_theta[t, g, 1:D]);
       }
     }
     for (q in 1 : Q) {
