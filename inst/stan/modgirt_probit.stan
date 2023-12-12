@@ -40,6 +40,7 @@ transformed parameters {
   Sigma_theta = diag_matrix(sd_theta .* sd_theta);
   cov_matrix[D] Omega; // diagonal matrix of transition variances
   Omega = diag_matrix(sd_bar_theta_evol .* sd_bar_theta_evol);
+  matrix[D, D] chol_Omega = cholesky_decompose(Omega);
   for (q in 1 : Q) {
     for (d in 1 : D) {
       if (beta_sign[q, d] == 0) {
@@ -58,11 +59,8 @@ transformed parameters {
     }
     if (t > 1) {
       for (g in 1 : G) {
-        for (d in 1 : D) {
-          bar_theta[t][g, d] = bar_theta[t - 1][g, d]
-                               + z_bar_theta[t, g, d] 
-                               * sd_bar_theta_evol[d];
-        }
+        bar_theta[t][g, 1:D] = 
+          bar_theta[t - 1][g, 1:D] + chol_Omega * to_vector(z_bar_theta[t, g, 1:D]);
       }
     }
     for (q in 1 : Q) {
