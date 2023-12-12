@@ -62,7 +62,7 @@ transformed parameters {
       for (g in 1 : G) {
         vector[D] bt_vec_tm1 = to_vector(bar_theta[t-1][g, 1:D]);
         vector[D] zbt_t = to_vector(z_bar_theta[t, g, 1:D]);
-        vector[D] bt_vec_t = bt_vec_tm1 + chol_Omega * zbt_t;
+        row_vector[D] bt_vec_t = bt_vec_tm1 + chol_Omega * zbt_t;
         bar_theta[t-1][g, 1:D] = bt_vec_t;
       }
     }
