@@ -14,6 +14,6 @@ A \code{draws_rvar} object with factors ordered by explanatory power
 }
 \description{
 This function takes a model based on posterior draws and reorders the factors
-based on the posterior sums of squares. Factors with larger sums of squares
+based on their estimated sums of squares. Factors with larger sums of squares
 will be placed first in the reordered model.
 }

@@ -872,12 +872,12 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
 #' the posterior distribution.
 #'
 #' @param modgirt_fit The fitted MODGIRT model object.
-#' @param rotate_covariance Logical indicating whether to rotate the covariance
-#' matrices. Default is FALSE.
+#' @param include_covariance Logical indicating whether to rotate the covariance
+#' matrices and include them in the output. Default is FALSE.
 #'
 #' @return A list containing the identified MODGIRT model parameters.
 #' @export
-identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
+identify_modgirt <- function(modgirt_fit, include_covariance = FALSE) {
     ## Store draws in `rvar` object
     modgirt_rvar <- posterior::as_draws_rvars(modgirt_fit$fit$draws())
     n_chain <- posterior::nchains(modgirt_rvar)
@@ -887,10 +887,6 @@ identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
         posterior::subset_draws(modgirt_rvar, variable = "beta")
     bar_theta_rvar <-
         posterior::subset_draws(modgirt_rvar, variable = "bar_theta")
-    Sigma_theta_rvar <-
-        posterior::subset_draws(modgirt_rvar, variable = "Sigma_theta")
-    Omega_rvar <-
-        posterior::subset_draws(modgirt_rvar, variable = "Omega")
     ## Create draw-specific varimax rotations
     draws_of_beta <- posterior::draws_of(beta_rvar$beta, with_chains = TRUE)
     vm_rvar <- make_vm_rvar(draws_of_beta, n_iter, n_chain, n_factor)
@@ -914,29 +910,35 @@ identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
             sp_rvar
         )
     }
-    ## Rotate covariance matrices (not sure this is right)
-    if (rotate_covariance) {
-        Sigma_theta_rvar$Sigma_theta <-
-            posterior::`%**%`(Sigma_theta_rvar$Sigma_theta,
-                              vm_rvar)
-        Sigma_theta_rvar$Sigma_theta <-
-            posterior::`%**%`(Sigma_theta_rvar$Sigma_theta,
-                              abs(sp_rvar))
-        Omega_rvar$Omega <-
-            posterior::`%**%`(Omega_rvar$Omega, vm_rvar)
-        Omega_rvar$Omega <-
-            posterior::`%**%`(Omega_rvar$Omega, abs(sp_rvar))
+    if (include_covariance) { # TODO: debug
+        sigma_theta_rvar <-
+            posterior::subset_draws(modgirt_rvar, variable = "Sigma_theta")
+        omega_rvar <-
+            posterior::subset_draws(modgirt_rvar, variable = "Omega")
+        sigma_theta_rvar$Sigma_theta <-
+            posterior::`%**%`(sigma_theta_rvar$Sigma_theta, vm_rvar)
+        sigma_theta_rvar$Sigma_theta <-
+            posterior::`%**%`(sigma_theta_rvar$Sigma_theta, abs(sp_rvar))
+        omega_rvar$Omega <-
+            posterior::`%**%`(omega_rvar$Omega, vm_rvar)
+        omega_rvar$Omega <-
+            posterior::`%**%`(omega_rvar$Omega, abs(sp_rvar))
+        modgirt_rvar_id <- posterior::draws_rvars(
+            lp__ = modgirt_rvar$lp__,
+            alpha = modgirt_rvar$alpha,
+            beta = beta_rvar$beta,
+            bar_theta = bar_theta_rvar$bar_theta,
+            Sigma_theta = sigma_theta_rvar$Sigma_theta,
+            Omega = omega_rvar$Omega
+        )
+    } else {
+        modgirt_rvar_id <- posterior::draws_rvars(
+            lp__ = modgirt_rvar$lp__,
+            alpha = modgirt_rvar$alpha,
+            beta = beta_rvar$beta,
+            bar_theta = bar_theta_rvar$bar_theta
+        )
     }
-    ## Prepare output
-    modgirt_rvar_id <- posterior::draws_rvars(
-        lp__ = modgirt_rvar$lp__,
-        alpha = modgirt_rvar$alpha,
-        beta = beta_rvar$beta,
-        bar_theta = bar_theta_rvar$bar_theta,
-        Sigma_theta = Sigma_theta_rvar$Sigma_theta,
-        Omega = Omega_rvar$Omega,
-        .nchains = n_chain
-    )
     out_ls <- list(
         modgirt_rvar = modgirt_rvar_id,
         vm_rvar = vm_rvar,
@@ -948,7 +950,7 @@ identify_modgirt <- function(modgirt_fit, rotate_covariance = FALSE) {
 #' Reorder factors in a model based on sums of squared loadings
 #'
 #' This function takes a model based on posterior draws and reorders the factors
-#' based on the posterior sums of squares. Factors with larger sums of squares
+#' based on their estimated sums of squares. Factors with larger sums of squares
 #' will be placed first in the reordered model.
 #'
 #' @param modgirt_rvar A `draws_rvar` object from a MODGIRT model
