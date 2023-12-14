@@ -25,7 +25,7 @@ data {
   array[Q, D] int beta_sign; // loading sign restrictions
 }
 parameters {
-  array[Q] ordered[K - 1] alpha_raw; // thresholds (difficulties)
+  array[Q] ordered[K - 1] z_alpha; // thresholds (difficulties)
   array[Q, D] real beta_free; // unconstrained discriminations
   array[Q, D] real<lower=0> beta_pos; // sign-constrained discriminations
   array[T, G, D] real z_bar_theta;
@@ -34,6 +34,7 @@ parameters {
 }
 transformed parameters {
   array[T, Q] vector[K - 1] alpha; // thresholds (difficulty)
+  array[T, Q] alpha_drift;         // allow for question-specific time trends
   matrix[Q, D] beta;
   array[T] matrix[G, D] bar_theta; // group ideal point means
   cov_matrix[D] Sigma_theta; // diagonal matrix of within-group variances
@@ -67,8 +68,8 @@ transformed parameters {
       }
     }
     for (q in 1 : Q) {
-      /* Use same alpha each period */
-      alpha[t, q][1 : (K - 1)] = alpha_raw[q][1 : (K - 1)];
+      alpha_drift[t, q] = 0; // could estimate but for now set to 0.
+      alpha[t, q][1 : (K - 1)] = z_alpha[q][1 : (K - 1)] + alpha_drift[t, q];
     }
   }
 }
@@ -78,7 +79,7 @@ model {
   to_array_1d(beta_free[1 : Q, 1 : D]) ~ std_normal();
   to_array_1d(beta_pos[1 : Q, 1 : D]) ~ std_normal();
   for (q in 1 : Q) {
-    alpha_raw[q][1 : (K - 1)] ~ std_normal();
+    z_alpha[q][1 : (K - 1)] ~ std_normal();
   }
   for (d in 1 : D) {
     sd_theta[d] ~ cauchy(0, 1);
@@ -92,8 +93,8 @@ model {
         real denom; // denominator of linear predictor
         vector[K - 1] cuts; // ordered probit cutpoints
 	      real sb;
-	      sb = quad_form(Sigma_theta[1 : D, 1 : D], to_vector(beta[q][1 : D]));
-        denom = sqrt(1 + sb);
+	      sbs = quad_form(Sigma_theta[1 : D, 1 : D], to_vector(beta[q][1 : D]));
+        denom = sqrt(1 + sbs);
         cuts = alpha[t, q][1 : (K - 1)] / denom;
         for (g in 1 : G) {
           real eta; // linear predictor
