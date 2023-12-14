@@ -34,7 +34,7 @@ parameters {
 }
 transformed parameters {
   array[T, Q] vector[K - 1] alpha; // thresholds (difficulty)
-  array[T, Q] alpha_drift;         // allow for question-specific time trends
+  array[T, Q] real alpha_drift;         // allow for question-specific time trends
   matrix[Q, D] beta;
   array[T] matrix[G, D] bar_theta; // group ideal point means
   cov_matrix[D] Sigma_theta; // diagonal matrix of within-group variances
