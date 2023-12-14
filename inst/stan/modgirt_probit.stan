@@ -92,7 +92,7 @@ model {
       for (q in 1 : Q) {
         real denom; // denominator of linear predictor
         vector[K - 1] cuts; // ordered probit cutpoints
-	      real sb;
+	      real sbs;
 	      sbs = quad_form(Sigma_theta[1 : D, 1 : D], to_vector(beta[q][1 : D]));
         denom = sqrt(1 + sbs);
         cuts = alpha[t, q][1 : (K - 1)] / denom;
