@@ -916,8 +916,9 @@ identify_modgirt <- function(modgirt_fit, include_covariance = FALSE) {
         omega_rvar <-
             posterior::subset_draws(modgirt_rvar, variable = "Omega")
         sigma_theta_rvar$Sigma_theta <-
-            vm_sp_rvar %**% sigma_theta_rvar$Sigma_theta %**% t(vm_sp_rvar)
-        omega_rvar$Omega <- vm_sp_rvar %**% omega_rvar$Omega %**% t(vm_sp_rvar)
+            t(vm_sp_rvar) %**% sigma_theta_rvar$Sigma_theta %**% vm_sp_rvar
+        omega_rvar$Omega <-
+            t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
         modgirt_rvar_id <- posterior::draws_rvars(
             lp__ = modgirt_rvar$lp__,
             alpha = modgirt_rvar$alpha,
