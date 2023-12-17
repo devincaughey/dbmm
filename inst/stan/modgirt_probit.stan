@@ -30,7 +30,9 @@ parameters {
   array[Q, D] real<lower=0> beta_pos; // sign-constrained discriminations
   array[T, G, D] real z_bar_theta;
   vector<lower=0>[D] sd_theta; // within-group SD of theta
+  corr_matrix[D] corr_theta;   // within-group correlation of theta across dimensions
   vector<lower=0>[D] sd_bar_theta_evol; // evolution SD of bar_theta
+  /* corr_matrix[D] corr_evol;   // cross-dimension correlation of transition model */
 }
 transformed parameters {
   array[T, Q] vector[K - 1] alpha; // thresholds (difficulty)
@@ -38,7 +40,7 @@ transformed parameters {
   matrix[Q, D] beta;
   array[T] matrix[G, D] bar_theta; // group ideal point means
   cov_matrix[D] Sigma_theta; // diagonal matrix of within-group variances
-  Sigma_theta = diag_matrix(sd_theta .* sd_theta);
+  Sigma_theta = quad_form_diag(corr_theta, sd_theta); // within-group covariance of theta
   cov_matrix[D] Omega; // diagonal matrix of transition variances
   Omega = diag_matrix(sd_bar_theta_evol .* sd_bar_theta_evol);
   matrix[D, D] chol_Omega = cholesky_decompose(Omega);
@@ -81,10 +83,9 @@ model {
   for (q in 1 : Q) {
     z_alpha[q][1 : (K - 1)] ~ std_normal();
   }
-  for (d in 1 : D) {
-    sd_theta[d] ~ cauchy(0, 1);
-    sd_bar_theta_evol[d] ~ cauchy(0, .1);
-  }
+  sd_theta ~ cauchy(0, 1);
+  corr_theta ~ lkj_corr(2);
+  sd_bar_theta_evol ~ cauchy(0, .1);
   /* Likelihood */
   if (K > 1) {
     /* ordinal outcomes */
