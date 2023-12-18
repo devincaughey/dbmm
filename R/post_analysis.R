@@ -872,15 +872,13 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
 #' the posterior distribution.
 #'
 #' @param modgirt_fit The fitted MODGIRT model object.
-#' @param include_covariance Logical indicating whether to rotate the covariance
-#' matrices and include them in the output. Default is FALSE.
 #'
 #' @return A list containing the identified MODGIRT model parameters.
 #'
 #' @import posterior
 #'
 #' @export
-identify_modgirt <- function(modgirt_fit, include_covariance = FALSE) {
+identify_modgirt <- function(modgirt_fit) {
     ## Store draws in `rvar` object
     modgirt_rvar <- posterior::as_draws_rvars(modgirt_fit$fit$draws())
     n_chain <- posterior::nchains(modgirt_rvar)
@@ -910,31 +908,37 @@ identify_modgirt <- function(modgirt_fit, include_covariance = FALSE) {
             vm_sp_rvar
         )
     }
-    if (include_covariance) { # TODO: debug
-        sigma_theta_rvar <-
-            posterior::subset_draws(modgirt_rvar, variable = "Sigma_theta")
-        omega_rvar <-
-            posterior::subset_draws(modgirt_rvar, variable = "Omega")
-        sigma_theta_rvar$Sigma_theta <-
-            t(vm_sp_rvar) %**% sigma_theta_rvar$Sigma_theta %**% vm_sp_rvar
-        omega_rvar$Omega <-
-            t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
-        modgirt_rvar_id <- posterior::draws_rvars(
-            lp__ = modgirt_rvar$lp__,
-            alpha = modgirt_rvar$alpha,
-            beta = beta_rvar$beta,
-            bar_theta = bar_theta_rvar$bar_theta,
-            Sigma_theta = sigma_theta_rvar$Sigma_theta,
-            Omega = omega_rvar$Omega
+    sigma_theta_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "Sigma_theta")
+    corr_theta_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "corr_theta")
+    corr_bar_theta_evol_rvar <-
+        posterior::subset_draws(
+            modgirt_rvar,
+            variable = "corr_bar_theta_evol"
         )
-    } else {
-        modgirt_rvar_id <- posterior::draws_rvars(
-            lp__ = modgirt_rvar$lp__,
-            alpha = modgirt_rvar$alpha,
-            beta = beta_rvar$beta,
-            bar_theta = bar_theta_rvar$bar_theta
-        )
-    }
+    omega_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "Omega")
+    sigma_theta_rvar$Sigma_theta <-
+        t(vm_sp_rvar) %**% sigma_theta_rvar$Sigma_theta %**% vm_sp_rvar
+    corr_theta_rvar$corr_theta <-
+        t(vm_sp_rvar) %**% corr_theta_rvar$corr_theta %**% vm_sp_rvar
+    corr_bar_theta_evol_rvar$corr_bar_theta_evol <-
+        t(vm_sp_rvar) %**% 
+        corr_bar_theta_evol_rvar$corr_bar_theta_evol %**% 
+        vm_sp_rvar
+    omega_rvar$Omega <-
+        t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
+    modgirt_rvar_id <- posterior::draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = beta_rvar$beta,
+        bar_theta = bar_theta_rvar$bar_theta,
+        Sigma_theta = sigma_theta_rvar$Sigma_theta,
+        corr_theta = corr_theta_rvar$corr_theta,
+        Omega = omega_rvar$Omega,
+        corr_bar_theta_evol = corr_bar_theta_evol_rvar$corr_bar_theta_evol
+    )
     out_ls <- list(
         modgirt_rvar = modgirt_rvar_id,
         vm_rvar = vm_rvar,
@@ -965,7 +969,9 @@ sort_factors <- function(modgirt_rvar) {
         beta = modgirt_rvar$beta[, fo],
         bar_theta = modgirt_rvar$bar_theta[, , fo],
         Sigma_theta = modgirt_rvar$Sigma_theta[fo, fo],
-        Omega = modgirt_rvar$Omega[fo, fo]
+        corr_theta = modgirt_rvar$corr_theta[fo, fo],
+        Omega = modgirt_rvar$Omega[fo, fo],
+        corr_bar_theta_evol = modgirt_rvar$corr_bar_theta_evol[fo, fo]
     )
     return(sorted_rvar)
 }
