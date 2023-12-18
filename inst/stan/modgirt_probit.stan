@@ -32,18 +32,18 @@ parameters {
   vector<lower=0>[D] sd_theta; // within-group SD of theta
   corr_matrix[D] corr_theta;   // within-group correlation of theta across dimensions
   vector<lower=0>[D] sd_bar_theta_evol; // evolution SD of bar_theta
-  /* corr_matrix[D] corr_evol;   // cross-dimension correlation of transition model */
+  corr_matrix[D] corr_bar_theta_evol;   // cross-dimension correlation of transition model */
 }
 transformed parameters {
   array[T, Q] vector[K - 1] alpha; // thresholds (difficulty)
-  array[T, Q] real alpha_drift;         // allow for question-specific time trends
+  array[T, Q] real alpha_drift;     // question-specific time trends
   matrix[Q, D] beta;
   array[T] matrix[G, D] bar_theta; // group ideal point means
-  cov_matrix[D] Sigma_theta; // diagonal matrix of within-group variances
-  Sigma_theta = quad_form_diag(corr_theta, sd_theta); // within-group covariance of theta
-  cov_matrix[D] Omega; // diagonal matrix of transition variances
-  Omega = diag_matrix(sd_bar_theta_evol .* sd_bar_theta_evol);
+  cov_matrix[D] Sigma_theta; // within-group variance-covariance
+  cov_matrix[D] Omega; // transition variance-covariance
   matrix[D, D] chol_Omega = cholesky_decompose(Omega);
+  Sigma_theta = quad_form_diag(corr_theta, sd_theta);
+  Omega = quad_form_diag(corr_bar_theta_evol, sd_bar_theta_evol);
   for (q in 1 : Q) {
     for (d in 1 : D) {
       if (beta_sign[q, d] == 0) {
@@ -86,6 +86,7 @@ model {
   sd_theta ~ cauchy(0, 1);
   corr_theta ~ lkj_corr(2);
   sd_bar_theta_evol ~ cauchy(0, .1);
+  corr_bar_theta_evol ~ lkj_corr(2);
   /* Likelihood */
   if (K > 1) {
     /* ordinal outcomes */
