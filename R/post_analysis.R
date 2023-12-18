@@ -943,23 +943,23 @@ identify_modgirt <- function(modgirt_fit, include_covariance = FALSE) {
     return(out_ls)
 }
 
-#' Reorder factors in a model based on sums of squared loadings
+#' Order factors in a model based on sums of squared loadings
 #'
-#' This function takes a model based on posterior draws and reorders the factors
+#' This function takes a model based on posterior draws and orders the factors
 #' based on their estimated sums of squares. Factors with larger sums of squares
-#' will be placed first in the reordered model.
+#' will be placed first in the sort model.
 #'
 #' @param modgirt_rvar A `draws_rvar` object from a MODGIRT model
 #'
 #' @return A `draws_rvar` object with factors ordered by explanatory power
 #'
 #' @export
-reorder_factors <- function(modgirt_rvar) {
+sort_factors <- function(modgirt_rvar) {
     ss <- posterior::rvar_apply(modgirt_rvar$beta, 2, function(x) {
         posterior::rvar_sum(x^2)
     })
     fo <- order(-posterior::E(ss))
-    reordered_rvar <- posterior::draws_rvars(
+    sorted_rvar <- posterior::draws_rvars(
         lp__ = modgirt_rvar$lp__,
         alpha = modgirt_rvar$alpha,
         beta = modgirt_rvar$beta[, fo],
@@ -967,5 +967,5 @@ reorder_factors <- function(modgirt_rvar) {
         Sigma_theta = modgirt_rvar$Sigma_theta[fo, fo],
         Omega = modgirt_rvar$Omega[fo, fo]
     )
-    return(reordered_rvar)
+    return(sorted_rvar)
 }
