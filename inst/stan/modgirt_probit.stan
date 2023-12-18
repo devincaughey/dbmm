@@ -41,9 +41,9 @@ transformed parameters {
   array[T] matrix[G, D] bar_theta; // group ideal point means
   cov_matrix[D] Sigma_theta; // within-group variance-covariance
   cov_matrix[D] Omega; // transition variance-covariance
-  matrix[D, D] chol_Omega = cholesky_decompose(Omega);
   Sigma_theta = quad_form_diag(corr_theta, sd_theta);
   Omega = quad_form_diag(corr_bar_theta_evol, sd_bar_theta_evol);
+  matrix[D, D] chol_Omega = cholesky_decompose(Omega);
   for (q in 1 : Q) {
     for (d in 1 : D) {
       if (beta_sign[q, d] == 0) {
