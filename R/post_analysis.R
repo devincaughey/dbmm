@@ -966,11 +966,45 @@ sort_factors <- function(modgirt_rvar) {
     return(sorted_rvar)
 }
 
+#' Set Signs
+#'
+#' This function sets the signs of the parameters in a model based on 
+#' user-defined signs.
+#'
+#' @param modgirt_rvar The model object containing the parameters.
+#' @param signs A vector of signs to be applied to the parameters. 
+#' Scalar values are allowed and will be recycled. Default is 1.
+#'
+#' @return A modified model object with the signs of the parameters updated.
+#'
+#' @details This function sets the signs of the parameters in the model object
+#' \code{modgirt_rvar} based on the user-defined signs provided in the 
+#' \code{signs} argument. The function applies the sign flips to the parameters 
+#' and returns a modified model object with the updated signs.
+#'
+#' @examples
+#' # Set signs to -1 for all parameters
+#' set_signs(modgirt_rvar, signs = -1)
+#'
+#' # Set signs to 1 for all parameters
+#' set_signs(modgirt_rvar)
+#'
+#' @importFrom posterior draws_rvars
+#' @importFrom rstan E
+#' @importFrom stats sign
+#' @importFrom stats diag
+#' @importFrom stats seq_len
+#' @importFrom stats colMeans
+#' @importFrom base stopifnot
+#'
+#' @export
 set_signs <- function(modgirt_rvar, signs = 1) {
     n_time <- dim(modgirt_rvar$bar_theta)[1]
     n_factor <- dim(modgirt_rvar$bar_theta)[3]
     stopifnot(length(signs == 1) || length(signs) == D)
-    sm <- diag(signs, nrow = n_factor, ncol = n_factor)
+    init_signs <- sign(colMeans(E(modgirt_rvar$beta)))
+    sign_flips <- ifelse(init_signs == signs, init_signs, -init_signs)
+    sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
     for (t in seq_len(n_time)) {
         modgirt_rvar$bar_theta[t, , drop = TRUE] <-
             modgirt_rvar$bar_theta[t, , drop = TRUE] %**% sm
