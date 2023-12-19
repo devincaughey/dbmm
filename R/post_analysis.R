@@ -881,13 +881,13 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
 identify_modgirt <- function(modgirt_fit) {
     ## Store draws in `rvar` object
     modgirt_rvar <- posterior::as_draws_rvars(modgirt_fit$fit$draws())
-    n_chain <- posterior::nchains(modgirt_rvar)
-    n_iter <- posterior::niterations(modgirt_rvar)
-    n_factor <- modgirt_fit$stan_data$D
     beta_rvar <-
         posterior::subset_draws(modgirt_rvar, variable = "beta")
     bar_theta_rvar <-
         posterior::subset_draws(modgirt_rvar, variable = "bar_theta")
+    n_chain <- posterior::nchains(modgirt_rvar)
+    n_iter <- posterior::niterations(modgirt_rvar)
+    n_factor <- ncol(beta_rvar$beta)
     ## Create draw-specific varimax rotations
     draws_of_beta <- posterior::draws_of(beta_rvar$beta, with_chains = TRUE)
     vm_rvar <- make_vm_rvar(draws_of_beta, n_iter, n_chain, n_factor)
