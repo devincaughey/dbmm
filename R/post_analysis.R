@@ -965,3 +965,22 @@ sort_factors <- function(modgirt_rvar) {
     )
     return(sorted_rvar)
 }
+
+set_signs <- function(modgirt_rvar, signs = 1) {
+    n_time <- dim(modgirt_rvar$bar_theta)[1]
+    n_factor <- dim(modgirt_rvar$bar_theta)[3]
+    stopifnot(length(signs == 1) || length(signs) == D)
+    sm <- diag(signs, nrow = n_factor, ncol = n_factor)
+    for (t in seq_len(n_time) {
+        modgirt_rvar$bar_theta[t, , drop = TRUE] <-
+            modgirt_rvar$bar_theta[t, , drop = TRUE] %**% sm
+    }
+    posterior::draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = modgirt_rvar$beta %**% sm,
+        bar_theta = modgirt_rvar$bar_theta,
+        Sigma_theta = t(sm) %**% modgirt_rvar$Sigma_theta %**% sm,
+        Omega = t(sm) %**% modgirt_rvar$Omega %**% sm
+    )
+}
