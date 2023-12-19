@@ -4,13 +4,10 @@
 \alias{identify_modgirt}
 \title{Identify MODGIRT model}
 \usage{
-identify_modgirt(modgirt_fit, include_covariance = FALSE)
+identify_modgirt(modgirt_fit)
 }
 \arguments{
 \item{modgirt_fit}{The fitted MODGIRT model object.}
-
-\item{include_covariance}{Logical indicating whether to rotate the covariance
-matrices and include them in the output. Default is FALSE.}
 }
 \value{
 A list containing the identified MODGIRT model parameters.
