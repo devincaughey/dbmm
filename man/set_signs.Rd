@@ -25,11 +25,3 @@ This function sets the signs of the parameters in the model object
 \code{signs} argument. The function applies the sign flips to the parameters
 and returns a modified model object with the updated signs.
 }
-\examples{
-# Set signs to -1 for all parameters
-set_signs(modgirt_rvar, signs = -1)
-
-# Set signs to 1 for all parameters
-set_signs(modgirt_rvar)
-
-}

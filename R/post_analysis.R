@@ -982,20 +982,7 @@ sort_factors <- function(modgirt_rvar) {
 #' \code{signs} argument. The function applies the sign flips to the parameters 
 #' and returns a modified model object with the updated signs.
 #'
-#' @examples
-#' # Set signs to -1 for all parameters
-#' set_signs(modgirt_rvar, signs = -1)
-#'
-#' # Set signs to 1 for all parameters
-#' set_signs(modgirt_rvar)
-#'
-#' @importFrom posterior draws_rvars
-#' @importFrom rstan E
-#' @importFrom stats sign
-#' @importFrom stats diag
-#' @importFrom stats seq_len
-#' @importFrom stats colMeans
-#' @importFrom base stopifnot
+#' @import posterior
 #'
 #' @export
 set_signs <- function(modgirt_rvar, signs = 1) {
