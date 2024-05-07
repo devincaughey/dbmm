@@ -879,7 +879,7 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
 #'
 #' @export
 identify_modgirt <- function(modgirt_fit) {
-    ## Store draws in `rvar` object
+    ## Store draws in `rvars` object
     modgirt_rvar <- posterior::as_draws_rvars(modgirt_fit$fit$draws())
     beta_rvar <-
         posterior::subset_draws(modgirt_rvar, variable = "beta")
@@ -990,7 +990,7 @@ set_signs <- function(modgirt_rvar, signs = 1) {
     n_factor <- dim(modgirt_rvar$bar_theta)[3]
     stopifnot(length(signs == 1) || length(signs) == D)
     init_signs <- sign(colMeans(E(modgirt_rvar$beta)))
-    sign_flips <- ifelse(init_signs == signs, init_signs, -init_signs)
+    sign_flips <- ifelse(init_signs == signs, 1, -1)
     sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
     for (t in seq_len(n_time)) {
         modgirt_rvar$bar_theta[t, , drop = TRUE] <-
