@@ -840,15 +840,13 @@ rename_loading_matrix <- function(loading_matrix) {
     return(loading_matrix)
 }
 make_vm_rvar <- function(loading_draws, n_iter, n_chain, n_factor,
-                         rotation = "varimax") {
+                         method = "varimax") {
     ## `loading_draws` should be a `draws_of` of an `draws_rvar` object
     rotmat_array <- array(dim = c(n_iter, n_chain, n_factor, n_factor))
     for (i in seq_len(n_iter)) {
         for (c in seq_len(n_chain)) {
-            if (isTRUE(rotation == "varimax")) {
-                vm <- varimax(loading_draws[i, c, , ], normalize = TRUE)
-                rotmat_array[i, c, , ] <- vm$rotmat
-            }
+            vm <- GPArotation::GPFRSorth(loading_draws[i, c, , ], method = method)
+            rotmat_array[i, c, , ] <- vm$Th
         }
     }
     rotmat_rvar <- posterior::rvar(rotmat_array, with_chains = TRUE)
