@@ -880,7 +880,7 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
 #' @import posterior
 #'
 #' @export
-identify_modgirt <- function(modgirt_fit) {
+identify_modgirt <- function(modgirt_fit, method = "varimax") {
     ## Store draws in `rvars` object
     modgirt_rvar <- posterior::as_draws_rvars(modgirt_fit$fit$draws())
     beta_rvar <-
@@ -892,7 +892,8 @@ identify_modgirt <- function(modgirt_fit) {
     n_factor <- ncol(beta_rvar$beta)
     ## Create draw-specific varimax rotations
     draws_of_beta <- posterior::draws_of(beta_rvar$beta, with_chains = TRUE)
-    vm_rvar <- make_vm_rvar(draws_of_beta, n_iter, n_chain, n_factor)
+    vm_rvar <- make_vm_rvar(draws_of_beta, n_iter, n_chain, n_factor,
+                            method = method)
     ## Apply varimax rotations to `beta`
     beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, vm_rvar)
     ## Create draw-specifc signed permutations
