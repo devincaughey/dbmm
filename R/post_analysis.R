@@ -868,7 +868,8 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
     return(sp_rvar)
 }
 
-#' Identify MODGIRT model
+
+#' Identify MODGIRT draws
 #'
 #' This function identifies the MODGIRT model by postprocessing the draws from
 #' the posterior distribution.
@@ -913,13 +914,13 @@ identify_modgirt <- function(modgirt_fit, method = "varimax") {
     }
     sigma_theta_rvar <-
         posterior::subset_draws(modgirt_rvar, variable = "Sigma_theta")
-    corr_theta_rvar <-
-        posterior::subset_draws(modgirt_rvar, variable = "corr_theta")
-    corr_bar_theta_evol_rvar <-
-        posterior::subset_draws(
-            modgirt_rvar,
-            variable = "corr_bar_theta_evol"
-        )
+    ## corr_theta_rvar <-
+    ##     posterior::subset_draws(modgirt_rvar, variable = "corr_theta")
+    ## corr_bar_theta_evol_rvar <-
+    ##     posterior::subset_draws(
+    ##         modgirt_rvar,
+    ##         variable = "corr_bar_theta_evol"
+    ##     )
     omega_rvar <-
         posterior::subset_draws(modgirt_rvar, variable = "Omega")
     sigma_theta_rvar$Sigma_theta <-
@@ -941,6 +942,47 @@ identify_modgirt <- function(modgirt_fit, method = "varimax") {
     )
     return(out_ls)
 }
+
+#' Apply rotation to MODGIRT draws
+#'
+#' This function applies the given rotation to draws from the posterior
+#' distribution of the MODGIRT parameters
+#'
+#' @param modgirt_rvar A `draws_rvar` object from a MODGIRT model
+#' @param rotat An I-by-D rotation matrix
+#'
+#' @return A list containing rotated draws
+#'
+#' @import posterior
+#'
+#' @export
+rotate_modgirt <- function(modgirt_rvar, rotmat) {
+    ## Create parameter-specific `draws_rvar` objects
+    beta_rvar <- subset_draws(modgirt_rvar, variable = "beta")
+    bar_theta_rvar <- subset_draws(modgirt_rvar, variable = "bar_theta")
+    sigma_theta_rvar <- subset_draws(modgirt_rvar, variable = "Sigma_theta")
+    omega_rvar <- subset_draws(modgirt_rvar, variable = "Omega")
+    n_time <- dim(bar_theta_rvar$bar_theta)[1]
+    ## Apply rotations
+    beta_rvar$beta <- beta_rvar$beta %**% rotmat
+    for (t in seq_len(n_time)) {
+        bar_theta_rvar$bar_theta[t, , ] <- 
+            bar_theta_rvar$bar_theta[t, , , drop = TRUE] %**% rotmat
+    }
+    sigma_theta_rvar$Sigma_theta <-
+        t(rotmat) %**% sigma_theta_rvar$Sigma_theta %**% rotmat
+    omega_rvar$Omega <- t(rotmat) %**% omega_rvar$Omega %**% rotmat
+    modgirt_rvar_id <- posterior::draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = beta_rvar$beta,
+        bar_theta = bar_theta_rvar$bar_theta,
+        Sigma_theta = sigma_theta_rvar$Sigma_theta,
+        Omega = omega_rvar$Omega
+    )
+}
+
+
 
 #' Order factors in a model based on sums of squared loadings
 #'
