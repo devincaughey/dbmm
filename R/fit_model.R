@@ -262,7 +262,7 @@ fit <- function(data,
 #' It takes in the following arguments:
 #'
 #' @param stan_data The data for the model.
-#' @param chains The number of chains to run in parallel (default is 4).
+#' @param chains The number of chains to use (default is 4).
 #' @param return_data A logical value indicating whether to return the input
 #' data along with the model fit (default is TRUE).
 #' @param n_factor The number of factors in the model.
