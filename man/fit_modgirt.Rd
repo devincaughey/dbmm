@@ -20,7 +20,7 @@ fit_modgirt(
 \arguments{
 \item{stan_data}{The data for the model.}
 
-\item{chains}{The number of chains to run in parallel (default is 4).}
+\item{chains}{The number of chains to use (default is 4).}
 
 \item{return_data}{A logical value indicating whether to return the input
 data along with the model fit (default is TRUE).}
