@@ -2,9 +2,9 @@
 % Please edit documentation in R/post_analysis.R
 \name{identify_modgirt}
 \alias{identify_modgirt}
-\title{Identify MODGIRT model}
+\title{Identify MODGIRT draws}
 \usage{
-identify_modgirt(modgirt_fit)
+identify_modgirt(modgirt_fit, method = "varimax")
 }
 \arguments{
 \item{modgirt_fit}{The fitted MODGIRT model object.}
