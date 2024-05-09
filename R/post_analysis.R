@@ -945,7 +945,7 @@ identify_modgirt <- function(modgirt_fit, method = "varimax") {
 
 #' Apply rotation to MODGIRT draws
 #'
-#' This function applies the given rotation to draws from the posterior
+#' This function applies the given rotation to each draw from the posterior
 #' distribution of the MODGIRT parameters
 #'
 #' @param modgirt_rvar A `draws_rvar` object from a MODGIRT model
