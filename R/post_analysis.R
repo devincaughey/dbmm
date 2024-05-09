@@ -951,7 +951,7 @@ identify_modgirt <- function(modgirt_fit, method = "varimax") {
 #' @param modgirt_rvar A `draws_rvar` object from a MODGIRT model
 #' @param rotat An I-by-D rotation matrix
 #'
-#' @return A list containing rotated draws
+#' @return A `draws_rvar` object of rotated draws
 #'
 #' @import posterior
 #'
@@ -972,14 +972,15 @@ rotate_modgirt <- function(modgirt_rvar, rotmat) {
     sigma_theta_rvar$Sigma_theta <-
         t(rotmat) %**% sigma_theta_rvar$Sigma_theta %**% rotmat
     omega_rvar$Omega <- t(rotmat) %**% omega_rvar$Omega %**% rotmat
-    modgirt_rvar_id <- posterior::draws_rvars(
+    modgirt_rvar_rot <- draws_rvars(
         lp__ = modgirt_rvar$lp__,
         alpha = modgirt_rvar$alpha,
         beta = beta_rvar$beta,
         bar_theta = bar_theta_rvar$bar_theta,
         Sigma_theta = sigma_theta_rvar$Sigma_theta,
         Omega = omega_rvar$Omega
-    )
+        )
+    return(modgirt_rvar_rot)
 }
 
 
