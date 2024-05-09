@@ -953,6 +953,10 @@ identify_modgirt <- function(modgirt_fit, method = "varimax") {
 #'
 #' @return A `draws_rvar` object of rotated draws
 #'
+#' @examples
+#' rotmat <- GPArotation::GPFRSorth(E(modgirt_signed$beta))$th
+#' modgirt_rotated <- rotate_modgirt(modgirt_signed, rotmat)
+#' 
 #' @import posterior
 #'
 #' @export
