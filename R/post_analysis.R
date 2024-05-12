@@ -961,6 +961,8 @@ identify_modgirt <- function(modgirt_fit, method = "varimax") {
 #'
 #' @export
 rotate_modgirt <- function(modgirt_rvar, rotmat) {
+    ## inverse of transpose (needed for oblique rotation)
+    G <- solve(t(rotmat))
     ## Create parameter-specific `draws_rvar` objects
     beta_rvar <- subset_draws(modgirt_rvar, variable = "beta")
     bar_theta_rvar <- subset_draws(modgirt_rvar, variable = "bar_theta")
@@ -968,22 +970,21 @@ rotate_modgirt <- function(modgirt_rvar, rotmat) {
     omega_rvar <- subset_draws(modgirt_rvar, variable = "Omega")
     n_time <- dim(bar_theta_rvar$bar_theta)[1]
     ## Apply rotations
-    beta_rvar$beta <- beta_rvar$beta %**% rotmat
+    beta_rvar$beta <- beta_rvar$beta %**% G
     for (t in seq_len(n_time)) {
         bar_theta_rvar$bar_theta[t, , ] <- 
-            bar_theta_rvar$bar_theta[t, , , drop = TRUE] %**% rotmat
+            bar_theta_rvar$bar_theta[t, , , drop = TRUE] %**% G
     }
     sigma_theta_rvar$Sigma_theta <-
-        t(rotmat) %**% sigma_theta_rvar$Sigma_theta %**% rotmat
-    omega_rvar$Omega <- t(rotmat) %**% omega_rvar$Omega %**% rotmat
+        t(G) %**% sigma_theta_rvar$Sigma_theta %**% G
+    omega_rvar$Omega <- t(G) %**% omega_rvar$Omega %**% G
     modgirt_rvar_rot <- draws_rvars(
         lp__ = modgirt_rvar$lp__,
         alpha = modgirt_rvar$alpha,
         beta = beta_rvar$beta,
         bar_theta = bar_theta_rvar$bar_theta,
         Sigma_theta = sigma_theta_rvar$Sigma_theta,
-        Omega = omega_rvar$Omega
-        )
+        Omega = omega_rvar$Omega)
     return(modgirt_rvar_rot)
 }
 
@@ -1055,3 +1056,4 @@ set_signs <- function(modgirt_rvar, signs = 1) {
         Omega = t(sm) %**% modgirt_rvar$Omega %**% sm
     )
 }
+
