@@ -962,7 +962,12 @@ identify_modgirt <- function(modgirt_fit, method = "varimax") {
 #' @export
 rotate_modgirt <- function(modgirt_rvar, rotmat) {
     ## inverse of transpose (needed for oblique rotation)
-    G <- solve(t(rotmat))
+    if (is_rvar(rotmat)) {
+        rvar_solve <- rfun(solve)
+        G <- rvar_solve(t(rotmat))
+    } else {
+        G <- solve(t(rotmat))
+    }
     ## Create parameter-specific `draws_rvar` objects
     beta_rvar <- subset_draws(modgirt_rvar, variable = "beta")
     bar_theta_rvar <- subset_draws(modgirt_rvar, variable = "bar_theta")
