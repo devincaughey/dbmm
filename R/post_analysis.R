@@ -840,13 +840,16 @@ rename_loading_matrix <- function(loading_matrix) {
     return(loading_matrix)
 }
 make_vm_rvar <- function(loading_draws, n_iter, n_chain, n_factor,
-                         method = "varimax") {
+                         method = "varimax", maxit = 1000, randomStarts = 1) {
     ## `loading_draws` should be a `draws_of` of an `draws_rvar` object
     rotmat_array <- array(dim = c(n_iter, n_chain, n_factor, n_factor))
     for (i in seq_len(n_iter)) {
         for (c in seq_len(n_chain)) {
             vm <- GPArotation::GPFRSorth(loading_draws[i, c, , ],
-                                         method = method, normalize = TRUE)
+                                         method = method,
+                                         normalize = TRUE,
+                                         maxit = maxit,
+                                         randomStarts = randomStarts)
             rotmat_array[i, c, , ] <- vm$Th
         }
     }
@@ -874,7 +877,7 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
 #' This function identifies the MODGIRT model by postprocessing the draws from
 #' the posterior distribution.
 #'
-#' @param x The fitted MODGIRT model object or `draws_rvars` object
+#' @param x A fitted MODGIRT model object or `draws_rvars` object
 #'
 #' @return A list containing the identified MODGIRT model parameters.
 #'
@@ -904,7 +907,7 @@ identify_modgirt <- function(x, method = "varimax") {
     ## Create draw-specifc signed permutations
     beta_matrix <- posterior::as_draws_matrix(t(beta_rvar$beta))
     lambda_matrix <- rename_loading_matrix(beta_matrix)
-    rsp_out <- factor.switching::rsp_exact(lambda_matrix)
+    rsp_out <- factor.switching::rsp_exact(lambda_matrix, rotate = FALSE)
     sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
     ## Apply signed permutations to `beta`
     beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, sp_rvar)
