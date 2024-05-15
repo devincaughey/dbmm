@@ -874,16 +874,20 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
 #' This function identifies the MODGIRT model by postprocessing the draws from
 #' the posterior distribution.
 #'
-#' @param modgirt_fit The fitted MODGIRT model object.
+#' @param x The fitted MODGIRT model object or `draws_rvars` object
 #'
 #' @return A list containing the identified MODGIRT model parameters.
 #'
 #' @import posterior
 #'
 #' @export
-identify_modgirt <- function(modgirt_fit, method = "varimax") {
+identify_modgirt <- function(x, method = "varimax") {
     ## Store draws in `rvars` object
-    modgirt_rvar <- posterior::as_draws_rvars(modgirt_fit$fit$draws())
+    if (posterior::is_draws_rvars(x)) {
+        modgirt_rvar <- x
+    } else {
+        modgirt_rvar <- posterior::as_draws_rvars(x$fit$draws())
+    }
     beta_rvar <-
         posterior::subset_draws(modgirt_rvar, variable = "beta")
     bar_theta_rvar <-
