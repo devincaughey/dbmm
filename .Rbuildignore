@@ -1,2 +1,9 @@
 ^LICENSE\.md$
 ^README\.Rmd$
+^vignettes/articles$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^dbmm\.Rproj$
+^\.Rproj\.user$
+^vignettes/*_files$
