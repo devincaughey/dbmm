@@ -15,7 +15,7 @@ shape_data(
   max_cats = 10,
   standardize = TRUE,
   make_indicator_for_zeros = TRUE,
-  periods_to_estimate = NULL
+  periods_to_estimate
 )
 }
 \arguments{
