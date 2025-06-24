@@ -215,14 +215,14 @@ create_counts <- function (long_data,
         weight_formula <- reformulate(weight_var)
     }
     des <- survey::svydesign(~1, data = long_data, weights = weight_formula)
-    xtab <- survey::svytable(formula = xtab_formula, design = des) 
+    xtab <- survey::svytable(formula = xtab_formula, design = des)
     return(xtab)
 }
 
 #' shape_data_modgirt function
 #'
 #' This function prepares the data for the MODGIRT analysis by creating a
-#' four-dimensional cross-tabulation and setting up the necessary variables 
+#' four-dimensional cross-tabulation and setting up the necessary variables
 #' and parameters.
 #'
 #' @param long_data The long-format data frame containing the raw data.
@@ -234,9 +234,8 @@ create_counts <- function (long_data,
 #'   weights (optional).
 #' @param periods_to_estimate The periods to estimate (optional).
 #'
-#' @return A list containing the dimensions of the data (T, G, Q, K, D), the
-#'  four-dimensional cross-tabulation (SSSS), the matrix of nonzero loadings
-#'  (beta_nonzero), and the matrix of signed loadings (beta_sign).
+#' @return A list containing the dimensions of the data (T, G, Q, K, D) and the
+#'  four-dimensional cross-tabulation (SSSS).
 #'
 #' @export
 shape_data_modgirt <- function(long_data,
