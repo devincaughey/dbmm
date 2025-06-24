@@ -4,10 +4,10 @@
 \alias{identify_rotation}
 \title{Identify the rotation of the output}
 \usage{
-identify_rotation(raw_draws, varimax, normalize, item_type)
+identify_rotation(raw_draws, varimax, targets, normalize, item_type)
 }
 \arguments{
-\item{raw_draws}{(\code{draws_df}) A posterior draws}
+\item{raw_draws}{(\code{draws_df}) Posterior draws}
 
 \item{varimax}{(logical) Should a varimax rotation be applied within each
 draw? Defaults to \code{TRUE}.}

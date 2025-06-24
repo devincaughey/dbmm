@@ -37,7 +37,7 @@ check_convergence <- function(raw_draws) {
 #' @import cmdstanr
 #'
 #' @export
-extract_draws <- function (fit, drop_rex = "^z_", format = "df", check = TRUE)
+extract_draws <- function(fit, drop_rex = "^z_", format = "df", check = TRUE)
 {
 
     if (check) {
@@ -830,3 +830,242 @@ harmonize_varimax <- function (beta_rsp) {
                 sign_vectors = tankard$sign_vectors,
                 permute_vectors = tankard$permute_vectors))
 }
+
+rename_loading_matrix <- function(loading_matrix) {
+    colnames(loading_matrix) <- gsub(
+        pattern = "x\\[([0-9]+),([0-9]+)\\]",
+        replacement = "LambdaV\\2_\\1",
+        x = colnames(loading_matrix)
+    )
+    return(loading_matrix)
+}
+make_vm_rvar <- function(loading_draws, n_iter, n_chain, n_factor,
+                         method = "varimax", maxit = 1000, randomStarts = 1) {
+    ## `loading_draws` should be a `draws_of` of an `draws_rvar` object
+    rotmat_array <- array(dim = c(n_iter, n_chain, n_factor, n_factor))
+    for (i in seq_len(n_iter)) {
+        for (c in seq_len(n_chain)) {
+            vm <- GPArotation::GPFRSorth(loading_draws[i, c, , ],
+                                         method = method,
+                                         normalize = TRUE,
+                                         maxit = maxit,
+                                         randomStarts = randomStarts)
+            rotmat_array[i, c, , ] <- vm$Th
+        }
+    }
+    rotmat_rvar <- posterior::rvar(rotmat_array, with_chains = TRUE)
+    return(rotmat_rvar)
+}
+make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
+    sp_array <- array(dim = c(n_iter, n_chain, n_factor, n_factor))
+    for (i in seq_len(n_iter)) {
+        for (c in seq_len(n_chain)) {
+            ## Assumes vectors are ordered by chain then iteration
+            sv <- rsp_out$sign_vectors[(c - 1) * n_iter + i, ]
+            pv <- rsp_out$permute_vectors[(c - 1) * n_iter + i, ]
+            sp_array[i, c, , ] <-
+                t(diag(sv) %*% seriation::permutation_vector2matrix(pv))
+        }
+    }
+    sp_rvar <- posterior::rvar(sp_array, with_chains = TRUE)
+    return(sp_rvar)
+}
+
+
+#' Identify MODGIRT draws
+#'
+#' This function identifies the MODGIRT model by postprocessing the draws from
+#' the posterior distribution.
+#'
+#' @param x A fitted MODGIRT model object or `draws_rvars` object
+#'
+#' @return A list containing the identified MODGIRT model parameters.
+#'
+#' @import posterior
+#'
+#' @export
+identify_modgirt <- function(x, method = "varimax") {
+    ## Store draws in `rvars` object
+    if (posterior::is_draws_rvars(x)) {
+        modgirt_rvar <- x
+    } else {
+        modgirt_rvar <- posterior::as_draws_rvars(x$fit$draws())
+    }
+    beta_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "beta")
+    bar_theta_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "bar_theta")
+    n_chain <- posterior::nchains(modgirt_rvar)
+    n_iter <- posterior::niterations(modgirt_rvar)
+    n_factor <- ncol(beta_rvar$beta)
+    ## Create draw-specific varimax rotations
+    draws_of_beta <- posterior::draws_of(beta_rvar$beta, with_chains = TRUE)
+    vm_rvar <- make_vm_rvar(draws_of_beta, n_iter, n_chain, n_factor,
+                            method = method)
+    ## Apply varimax rotations to `beta`
+    beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, vm_rvar)
+    ## Create draw-specifc signed permutations
+    beta_matrix <- posterior::as_draws_matrix(t(beta_rvar$beta))
+    lambda_matrix <- rename_loading_matrix(beta_matrix)
+    rsp_out <- factor.switching::rsp_exact(lambda_matrix, rotate = FALSE)
+    sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
+    ## Apply signed permutations to `beta`
+    beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, sp_rvar)
+    ## Apply rotations to `bar_theta`
+    vm_sp_rvar <- posterior::`%**%`(vm_rvar, sp_rvar)
+    for (t in seq_len(dim(bar_theta_rvar$bar_theta)[1])) {
+        bar_theta_rvar$bar_theta[t, , ] <- posterior::`%**%`(
+            bar_theta_rvar$bar_theta[t, , , drop = TRUE],
+            vm_sp_rvar
+        )
+    }
+    sigma_theta_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "Sigma_theta")
+    ## corr_theta_rvar <-
+    ##     posterior::subset_draws(modgirt_rvar, variable = "corr_theta")
+    ## corr_bar_theta_evol_rvar <-
+    ##     posterior::subset_draws(
+    ##         modgirt_rvar,
+    ##         variable = "corr_bar_theta_evol"
+    ##     )
+    omega_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "Omega")
+    sigma_theta_rvar$Sigma_theta <-
+        t(vm_sp_rvar) %**% sigma_theta_rvar$Sigma_theta %**% vm_sp_rvar
+    omega_rvar$Omega <-
+        t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
+    modgirt_rvar_id <- posterior::draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = beta_rvar$beta,
+        bar_theta = bar_theta_rvar$bar_theta,
+        Sigma_theta = sigma_theta_rvar$Sigma_theta,
+        Omega = omega_rvar$Omega
+    )
+    out_ls <- list(
+        modgirt_rvar = modgirt_rvar_id,
+        vm_rvar = vm_rvar,
+        sp_rvar = sp_rvar
+    )
+    return(out_ls)
+}
+
+#' Apply rotation to MODGIRT draws
+#'
+#' This function applies the given rotation to each draw from the posterior
+#' distribution of the MODGIRT parameters
+#'
+#' @param modgirt_rvar A `draws_rvar` object from a MODGIRT model
+#' @param rotat An I-by-D rotation matrix
+#'
+#' @return A `draws_rvar` object of rotated draws
+#'
+#' @examples
+#' rotmat <- varimax(E(modgirt_signed$beta))$rotmat
+#' modgirt_rotated <- rotate_modgirt(modgirt_signed, rotmat)
+#' 
+#' @import posterior
+#'
+#' @export
+rotate_modgirt <- function(modgirt_rvar, rotmat) {
+    ## inverse of transpose (needed for oblique rotation)
+    if (is_rvar(rotmat)) {
+        rvar_solve <- rfun(solve)
+        G <- rvar_solve(t(rotmat))
+    } else {
+        G <- solve(t(rotmat))
+    }
+    ## Create parameter-specific `draws_rvar` objects
+    beta_rvar <- subset_draws(modgirt_rvar, variable = "beta")
+    bar_theta_rvar <- subset_draws(modgirt_rvar, variable = "bar_theta")
+    sigma_theta_rvar <- subset_draws(modgirt_rvar, variable = "Sigma_theta")
+    omega_rvar <- subset_draws(modgirt_rvar, variable = "Omega")
+    n_time <- dim(bar_theta_rvar$bar_theta)[1]
+    ## Apply rotations
+    beta_rvar$beta <- beta_rvar$beta %**% G
+    for (t in seq_len(n_time)) {
+        bar_theta_rvar$bar_theta[t, , ] <- 
+            bar_theta_rvar$bar_theta[t, , , drop = TRUE] %**% G
+    }
+    sigma_theta_rvar$Sigma_theta <-
+        t(G) %**% sigma_theta_rvar$Sigma_theta %**% G
+    omega_rvar$Omega <- t(G) %**% omega_rvar$Omega %**% G
+    modgirt_rvar_rot <- draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = beta_rvar$beta,
+        bar_theta = bar_theta_rvar$bar_theta,
+        Sigma_theta = sigma_theta_rvar$Sigma_theta,
+        Omega = omega_rvar$Omega)
+    return(modgirt_rvar_rot)
+}
+
+
+
+#' Order factors in a model based on sums of squared loadings
+#'
+#' This function takes a model based on posterior draws and orders the factors
+#' based on their estimated sums of squares. Factors with larger sums of squares
+#' will be placed first in the sort model.
+#'
+#' @param modgirt_rvar A `draws_rvar` object from a MODGIRT model
+#'
+#' @return A `draws_rvar` object with factors ordered by explanatory power
+#'
+#' @export
+sort_factors <- function(modgirt_rvar) {
+    ss <- posterior::rvar_apply(modgirt_rvar$beta, 2, function(x) {
+        posterior::rvar_sum(x^2)
+    })
+    fo <- order(-posterior::E(ss))
+    sorted_rvar <- posterior::draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = modgirt_rvar$beta[, fo],
+        bar_theta = modgirt_rvar$bar_theta[, , fo],
+        Sigma_theta = modgirt_rvar$Sigma_theta[fo, fo],
+        Omega = modgirt_rvar$Omega[fo, fo]
+    )
+    return(sorted_rvar)
+}
+
+#' Set Signs
+#'
+#' This function sets the signs of the parameters in a model based on 
+#' user-defined signs.
+#'
+#' @param modgirt_rvar The model object containing the parameters.
+#' @param signs A vector of signs to be applied to the parameters. 
+#' Scalar values are allowed and will be recycled. Default is 1.
+#'
+#' @return A modified model object with the signs of the parameters updated.
+#'
+#' @details This function sets the signs of the parameters in the model object
+#' \code{modgirt_rvar} based on the user-defined signs provided in the 
+#' \code{signs} argument. The function applies the sign flips to the parameters 
+#' and returns a modified model object with the updated signs.
+#'
+#' @import posterior
+#'
+#' @export
+set_signs <- function(modgirt_rvar, signs = 1) {
+    n_time <- dim(modgirt_rvar$bar_theta)[1]
+    n_factor <- dim(modgirt_rvar$bar_theta)[3]
+    stopifnot(length(signs == 1) || length(signs) == D)
+    init_signs <- sign(colMeans(E(modgirt_rvar$beta)))
+    sign_flips <- ifelse(init_signs == signs, 1, -1)
+    sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
+    for (t in seq_len(n_time)) {
+        modgirt_rvar$bar_theta[t, , drop = TRUE] <-
+            modgirt_rvar$bar_theta[t, , drop = TRUE] %**% sm
+    }
+    posterior::draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = modgirt_rvar$beta %**% sm,
+        bar_theta = modgirt_rvar$bar_theta,
+        Sigma_theta = t(sm) %**% modgirt_rvar$Sigma_theta %**% sm,
+        Omega = t(sm) %**% modgirt_rvar$Omega %**% sm
+    )
+}
+
