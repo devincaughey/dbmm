@@ -1,0 +1,328 @@
+---
+title: "Getting Started with `dbmm`"
+output:
+  html_vignette:
+    toc: yes
+vignette: >
+  %\VignetteIndexEntry{Getting Started with `dbmm`} 
+  %\VignetteEngine{knitr::rmarkdown_notangle} 
+  %\VignetteEncoding{UTF-8}
+bibliography: references.bib
+link-citations: true
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+set.seed(1)
+
+```
+
+# Introduction
+
+`dbmm` fits dynamic Bayesian measurement models using the programming language [Stan](https://mc-stan.org/) via the R package [cmdstanr](https://mc-stan.org/cmdstanr/). Currently, there are two supported models. First is a dynamic factor (DF) model for indicators of mixed type (binary, ordinal, or metric). Second is a multidimensional ordinal dynamic group-level item response theory (MODGIRT) model. These models are primarily used for the estimation of dynamic models of aggregate public opinion. The package includes functions to help users shape their data for the specific requirements of `cmdstanr`, then provides custom fitting functions and a number of post-fit helper functions for users to identify their models, assess convergence, and plot output.
+
+# Usage of MODGIRT
+
+## Load and Shape Data
+
+```{r setup}
+suppressPackageStartupMessages({
+  library(dbmm)
+  library(dplyr)
+  library(tidyr)
+  library(stringr)
+  library(ggplot2)
+  library(estsubpop)
+  library(rstan)
+})
+
+```
+
+This vignette uses data from @cavaille_two_2015, cleaned and merged with the complete British Social Attitudes (BSA) survey. The full cleaning process is documented in @berwick_modgirt_2025. Here, we just use the cleaned data, which can be downloaded from the replication archive associated with @berwick_modgirt_2025.
+
+```{r}
+
+data = readr::read_rds("ct8611.rds")
+
+str(data)
+
+```
+
+To understand where to go from here, it's useful to examine what the package functions expect. There are two steps. First, we *shape* the data into the expected format, then *fit* the model on that formatted data. `dbmm` will do some of the shaping for us, but there are often some initial cleaning steps required of your raw data. Below, the code for shaping and then fitting the model are shown. Of note, we'll need to convert our data to "long" format (more on that later), identify each of the names of the columns containing time, unit, item, value, and weight variables, and decide on the number of factors to fit.
+
+```{r, eval=FALSE}
+
+# shape panel data  -------------------------------------------
+data_shaped <- shape_data_modgirt(
+  long_data = data_long,
+  time_var = time_var,
+  unit_var = "group",
+  item_var = "item",
+  value_var = "response",
+  weight_var = "wtfactor"
+)
+
+# fit panel model ------------------------------------------------
+modgirt_out <- fit_modgirt(
+  stan_data = data_shaped,
+  n_factor = n_dim
+)
+
+```
+
+Now, we proceed to cleaning the data up for the shaping function. In it's current format, each row represents one response to the BSA survey in a given year. However, `dbmm` requires that data is passed in a "long" format, where each row instead represents a response to a single item in a survey in a given year.
+
+```{r}
+
+head(data)
+
+```
+
+First, we define some constants that are relevant indices for the data. This step is not explicitly required, but can be helpful in the cleaning process to keep track of what purpose each variable serves. Here we also subset the full data to save computational time.
+
+```{r}
+
+time_var <- "year"
+geo_var <- "country"              
+demo_vars <- "hhincqe"
+group_vars <- c(geo_var, demo_vars)
+item_vars <- sort(str_subset(names(data), "(v[0-9]$)|(only04$)"))
+year_subset <- 1990:2000
+
+data_long <- data |>
+  filter(!!sym(time_var) %in% year_subset) |> 
+  mutate(
+    hhincqe = ordered(
+      x = hhincqe,
+      labels = c("inc q1", "inc q2", "inc q3", "inc q4", "inc q5")
+    ),
+    university = factor(
+      x = university, 
+      labels = c("no uni edu", "uni edu")
+    ),
+    popq = ordered(
+      x = popq,
+      labels = c("dens q1", "dens q2", "dens q3", "dens q4")
+    ),
+    subject_id = factor(serial),
+    ineq_accv2 = round(ineq_accv2),
+    across(all_of(item_vars), ordered),
+    across(all_of(item_vars), as.integer)
+  ) |>
+  filter(!duplicated(subject_id)) |> 
+  select(
+    subject_id, wtfactor, all_of(c(time_var, group_vars, item_vars))
+  ) |>
+  drop_na(all_of(c(time_var, group_vars))) |>
+  pivot_longer(
+    cols = all_of(item_vars),
+    names_to = "item",
+    values_to = "response",
+    values_drop_na = TRUE
+  ) |> 
+  mutate(
+    group = pick(all_of(group_vars)) |> 
+      purrr::pmap_chr(~ paste(..., sep = " & ")) |> 
+      factor(),
+    across(all_of(time_var), ~ factor(.x))
+  )
+
+head(data_long)
+
+```
+
+Now, we're prepared to actually shape the data using the included function. The primary function of the data is to automatically generate a list containing the dimensions of the data (`T`, `G`, `Q`, `K`, `D`) and the four-dimensional cross-tabulation (`SSSS`).
+
+```{r}
+
+data_shaped <- shape_data_modgirt(
+  long_data = data_long,
+  time_var = time_var,
+  unit_var = "group",
+  item_var = "item",
+  value_var = "response",
+  weight_var = "wtfactor"
+)
+
+str(data_shaped)
+
+```
+
+## Fit Model
+
+We fit the model using the included function. First, we set some parameters for the number of dimensions to fit, the number of chains the model should run on (here we use 2 for computational reasons, but the recommended is 4). We also set the number of warmup and sampling iterations quite low for computational speed, but usually users would set both of these values to at least 1000. The function also accepts all other options available to `cmdstanr::sample()`. For more details on those options and how to best choose them, see [here](https://mc-stan.org/cmdstanr/reference/model-method-sample.html).
+
+```{r}
+
+# set the number of cores available to `cmdstanr`
+options(mc.cores = parallel::detectCores())
+
+# parameters
+n_dim <- 2
+n_chain <- 2
+
+# fit panel model ------------------------------------------------
+modgirt_out <- fit_modgirt(
+  stan_data = data_shaped,
+  n_factor = n_dim,
+  chains = n_chain,
+  iter_warmup = 250,
+  iter_sampling = 250,
+  refresh = 0 # only print error messages
+)
+
+```
+
+## Assess Model Fit
+
+Like all latent variable models, identifying the MODGIRT likelihood requires restrictions on the parameter space. If the model has D latent factors, then D(D + 1) independent restrictions are required for local identification, and a further D restrictions for global identification [@rivers2003]. One set of common restrictions that are theoretically sufficient for global identification is the following:
+
+1.  Zero-mean group ideal points
+2.  Unit-variance group ideal points
+3.  Orthogonal factors
+4.  Rotation invariance
+5.  Sign invariance
+
+Interested users should consult @berwick_modgirt_2025 for more details on these restrictions, but in short, restrictions 1-3 are imposed during estimation (via the `fit_modgirt()` function), whereas restrictions 4-5 are recommended to be imposed post-fit using the `identify_modgirt()` function. The workhorse function in `identify_modgirt()` comes from @papastamoulis2022 and the associated R package `factor.switching`. The function has one option, `method`, which is by default set to "varimax". Users are welcome to choose other rotation objective criterion, which are passed directly to `GPArotation::GPFRSorth()` . For an overview of rotation criteria, see @sass2010.
+
+Below, first let's examine the convergence of the model before applying restrictions 4-5. The summary statistics of "rhat" and "ESS" look not great, but traceplots for some example group-specific means "bar_theta" in particular are clearly not mixed well. We can do better after applying restrictions 4-5.
+
+```{r}
+
+# distribution of rvars
+posterior::summarise_draws(modgirt_out$fit) |> summary()
+
+# traceplots
+posterior::as_draws_df(modgirt_out$fit) |> 
+  bayesplot::mcmc_trace(regex_pars = "^bar_theta\\[1,1")
+
+```
+
+After applying `identify_modgirt()` the summary statistics are appreciably improved, but most notably the traceplots look significantly better. Taken together, these steps demonstrate notably improved convergence of the model. The computational cost of identifying the model before examining draws is minimal, so in call cases we recommend taking this step.
+
+```{r}
+
+modgirt_id <- identify_modgirt(modgirt_out)
+
+# distribution of rvars
+posterior::summarise_draws(modgirt_id$modgirt_rvar) |> summary()
+
+# traceplots
+posterior::as_draws_df(modgirt_id$modgirt_rvar) |> 
+  bayesplot::mcmc_trace(regex_pars = "^bar_theta\\[1,1")
+```
+
+## Visualize Results
+
+In contrast to DF models, `dbmm` does not currently have any helper plotting functions. There are also many additional variables of interest that a user could plot. Here, we demonstrate how to plot the evolution of redistribution *to* and redistribution *from* among different income quintiles, as shown in @cavaille_two_2015 and @berwick_modgirt_2025. Along the way, we estimate population targets for use in the post-stratification step using the R package `estsubpop`. It can be installed using `pak::pak("devincaughey/estsubpop")`
+
+```{r}
+
+# sort factors and force values to be positive
+use_rvar <- sort_factors(modgirt_id$modgirt_rvar) |> set_signs(1)
+
+# estimate population targets for post-stratification ------
+# using `estsubpop`
+
+group_tab <- data_long |> 
+  mutate(year = as.integer(year)) |> 
+  count(group, year)
+
+group_tab_des <- survey::svydesign(ids = ~1, weights = ~n, data = group_tab)
+
+est_out <- est_subpop(
+  periods_to_est = 1:max(group_tab$year),
+  design_ls = list(group_tab_des),
+  formulae_ls = list(list( ~ group)),
+  period_var = "year",
+  pi_prior = "uniform",
+  n_prior = "vague",
+  n_evolve_meanlog = 10,
+  n_evolve_sdlog = NULL,
+  control = list(adapt_delta = .99, max_treedepth = 20),
+  sampling_model = "multinomial",
+  verbosity = 0,
+  chains = 4,
+  iter = 1000,
+  refresh = 0,
+  thin = 1,
+  seed = 1,
+  cores = 1
+)
+
+targets <- get_pi(est_out) |>
+  mutate(year = factor(
+    Period,
+    levels = 1:max(group_tab$year),
+    labels = distinct(data_long, year) |> arrange() |> pull()
+  )) |>
+  summarise(
+    prop_est = mean(value), 
+    prop_err = sd(value),
+    .by = c(year, group)
+  )
+
+# Create labels
+group_labels <- attr(modgirt_out$stan_data, "unit_labels")
+item_labels <- str_remove(attr(modgirt_out$stan_data, "item_labels"), "_only04")
+time_labels <- attr(modgirt_out$stan_data, "time_labels")
+
+# define custom `rvar` fun
+rvar_weighted.mean <- posterior::rfun(weighted.mean)
+
+# get betas ---------------------------------------------------------------
+bar_theta_rvar <- use_rvar |> 
+  tidybayes::spread_rvars(bar_theta[period, group, dimension]) |>
+  mutate(
+    group = factor(group, labels = group_labels),
+    time = factor(period, labels = time_labels),
+    year = as.integer(as.character(time)),
+    dim = factor(dimension, labels = c("to", "from"))
+  ) |>
+  separate(
+    col = group,
+    into = group_vars,
+    sep = " & ",
+    remove = FALSE
+  ) |> 
+  left_join(targets, join_by(time == year, group)) |> 
+  summarize(
+    bar_theta = rvar_weighted.mean(bar_theta, prop_est),
+    .by = c(hhincqe, time, dim)
+  ) |> 
+  filter(str_detect(hhincqe, "q[1,3,5]")) |>
+  mutate(
+    year = as.numeric(as.character(time)),
+    dimension = if_else(dim == "from", "Dimension 1 (Redistribution From)",
+                        "Dimension 2 (Redistribution To)")
+  )
+
+bar_theta_rvar |> 
+  ggplot() +
+  facet_wrap( ~ dimension, scales = "free_y") +
+  ggdist::stat_lineribbon(
+    aes(x = year, ydist = bar_theta, group = hhincqe),
+    .width = .5,
+    size = 1,
+    alpha = 1 / 3,
+    show.legend = FALSE,
+  ) +
+  ggrepel::geom_text_repel(
+    data = filter(bar_theta_rvar, year == max(year)),
+     mapping = aes(
+       y = posterior::E(bar_theta),
+       x = year + 1.1,
+       label = toupper(str_remove(hhincqe, "inc "))
+     ),
+     size = 2.8
+   ) +
+  scale_fill_grey() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(1900, 2000, 4))
+```
+
+# References
