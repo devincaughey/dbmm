@@ -23,7 +23,11 @@ set.seed(1)
 
 # Introduction
 
-`dbmm` fits dynamic Bayesian measurement models using the programming language [Stan](https://mc-stan.org/) via the R package [cmdstanr](https://mc-stan.org/cmdstanr/). Currently, there are two supported models. First is a dynamic factor (DF) model for indicators of mixed type (binary, ordinal, or metric). Second is a multidimensional ordinal dynamic group-level item response theory (MODGIRT) model. These models are primarily used for the estimation of dynamic models of aggregate public opinion. The package includes functions to help users shape their data for the specific requirements of `cmdstanr`, then provides custom fitting functions and a number of post-fit helper functions for users to identify their models, assess convergence, and plot output.
+`dbmm` fits dynamic Bayesian measurement models using the programming language [Stan](https://mc-stan.org/) via the R package [cmdstanr](https://mc-stan.org/cmdstanr/). Currently, there are two supported models. The first is a dynamic factor (DF) model for indicators of mixed type: binary, ordinal, or metric [cf. @quinn04bayes_factor]. The second is a multidimensional ordinal dynamic group-level item response theory (MODGIRT) model [@berwick_caughey25dynam_multid]. Both models allow for multiple latent factors (i.e., dimensions), usually but not necessarily orthogonal to one another.
+
+The typical use case for the DF model is to estimate a time-varying latent variable (or multiple such variables) from a time series of multiple indicators [e.g., measuring state policy conservatism using data on specific state policies\; @caughey_warshaw16dynam_state]. The typical use of the MODGIRT model is to measure one or more latent variables (e.g., mass economic and cultural conservatism) from aggregated responses to public opinion surveys.
+
+The package includes functions to help users shape their data for the specific requirements of `cmdstanr`, then provides custom fitting functions and a number of post-fit helper functions for users to identify their models, assess convergence, and plot output.
 
 # Usage of MODGIRT
 
@@ -37,12 +41,13 @@ suppressPackageStartupMessages({
   library(stringr)
   library(ggplot2)
   library(estsubpop)
+  library(cmdstanr)
   library(rstan)
 })
 
 ```
 
-This vignette uses data from @cavaille_two_2015, cleaned and merged with the complete British Social Attitudes (BSA) survey. The full cleaning process is documented in @berwick_modgirt_2025. Here, we just use the cleaned data, which can be downloaded from the replication archive associated with @berwick_modgirt_2025.
+This vignette uses data from @cavaille_two_2015, cleaned and merged with the complete British Social Attitudes (BSA) survey. The full cleaning process is documented in @berwick_caughey25dynam_multid. Here, we just use the cleaned data, which can be downloaded from the replication archive associated with @berwick_caughey25dynam_multid.
 
 ```{r}
 
@@ -158,9 +163,6 @@ We fit the model using the included function. First, we set some parameters for 
 
 ```{r}
 
-# set the number of cores available to `cmdstanr`
-options(mc.cores = parallel::detectCores())
-
 # parameters
 n_dim <- 2
 n_chain <- 2
@@ -170,6 +172,7 @@ modgirt_out <- fit_modgirt(
   stan_data = data_shaped,
   n_factor = n_dim,
   chains = n_chain,
+  parallel_chains = parallel::detectCores() - 1,
   iter_warmup = 250,
   iter_sampling = 250,
   refresh = 0 # only print error messages
@@ -179,17 +182,17 @@ modgirt_out <- fit_modgirt(
 
 ## Assess Model Fit
 
-Like all latent variable models, identifying the MODGIRT likelihood requires restrictions on the parameter space. If the model has D latent factors, then D(D + 1) independent restrictions are required for local identification, and a further D restrictions for global identification [@rivers2003]. One set of common restrictions that are theoretically sufficient for global identification is the following:
+Like all latent variable models, identifying the MODGIRT likelihood requires restrictions on the parameter space. If the model has $D$ latent factors, then $D(D + 1)$ independent restrictions are required for local identification, and a further $D$ restrictions for global identification [@rivers2003]. One set of common restrictions that are theoretically sufficient for global identification is the following:
 
-1.  Zero-mean group ideal points
-2.  Unit-variance group ideal points
-3.  Orthogonal factors
-4.  Rotation invariance
-5.  Sign invariance
+  1.  Zero-mean group ideal points
+  2.  Unit-variance group ideal points
+  3.  Orthogonal factors
+  4.  Rotation invariance
+  5.  Sign invariance
 
-Interested users should consult @berwick_modgirt_2025 for more details on these restrictions, but in short, restrictions 1-3 are imposed during estimation (via the `fit_modgirt()` function), whereas restrictions 4-5 are recommended to be imposed post-fit using the `identify_modgirt()` function. The workhorse function in `identify_modgirt()` comes from @papastamoulis2022 and the associated R package `factor.switching`. The function has one option, `method`, which is by default set to "varimax". Users are welcome to choose other rotation objective criterion, which are passed directly to `GPArotation::GPFRSorth()` . For an overview of rotation criteria, see @sass2010.
+Interested users should consult @berwick_caughey25dynam_multid for more details on these restrictions, but in short, restrictions 1--3 are imposed during estimation (via the `fit_modgirt()` function), whereas restrictions 4--5 are recommended to be imposed post-fit using the `identify_modgirt()` function. The workhorse function in `identify_modgirt()` is based on @papastamoulis2022 and the associated R package **factor.switching**. The function has one option, `method`, which is by default set to `"varimax"`. Users are welcome to choose other rotation objective criterion, which are passed directly to `GPArotation::GPFRSorth()` . For an overview of rotation criteria, see @sass2010.
 
-Below, first let's examine the convergence of the model before applying restrictions 4-5. The summary statistics of "rhat" and "ESS" look not great, but traceplots for some example group-specific means "bar_theta" in particular are clearly not mixed well. We can do better after applying restrictions 4-5.
+Below, first let's examine the convergence of the model before applying restrictions 4--5. The summary statistics of "rhat" and "ESS" look not great, and in particular the the traceplots for `bar_theta` are clearly multimodal, which is to be expected. We can resolve these problems by using `identify_modgirt()` to apply restrictions 4--5 to the parameter draws.
 
 ```{r}
 
@@ -202,7 +205,7 @@ posterior::as_draws_df(modgirt_out$fit) |>
 
 ```
 
-After applying `identify_modgirt()` the summary statistics are appreciably improved, but most notably the traceplots look significantly better. Taken together, these steps demonstrate notably improved convergence of the model. The computational cost of identifying the model before examining draws is minimal, so in call cases we recommend taking this step.
+After applying `identify_modgirt()` the summary statistics and traceplots look much better. This indicates that the (identified) model has converged and is mixing well.
 
 ```{r}
 
@@ -218,11 +221,11 @@ posterior::as_draws_df(modgirt_id$modgirt_rvar) |>
 
 ## Visualize Results
 
-In contrast to DF models, `dbmm` does not currently have any helper plotting functions. There are also many additional variables of interest that a user could plot. Here, we demonstrate how to plot the evolution of redistribution *to* and redistribution *from* among different income quintiles, as shown in @cavaille_two_2015 and @berwick_modgirt_2025. Along the way, we estimate population targets for use in the post-stratification step using the R package `estsubpop`. It can be installed using `pak::pak("devincaughey/estsubpop")`
+In contrast to DF models, `dbmm` does not currently have any helper plotting functions. There are also many additional variables of interest that a user could plot. Here, we demonstrate how to plot the evolution of redistribution *to* and redistribution *from* among different income quintiles, as shown in @cavaille_two_2015 and @berwick_caughey25dynam_multid. Along the way, we estimate population targets for use in the post-stratification step using the R package `estsubpop`. It can be installed using `pak::pak("devincaughey/estsubpop")`
 
 ```{r}
 
-# sort factors and force values to be positive
+# sort factors and make the average discrimination on each factor positive
 use_rvar <- sort_factors(modgirt_id$modgirt_rvar) |> set_signs(1)
 
 # estimate population targets for post-stratification ------
