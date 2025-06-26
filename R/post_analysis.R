@@ -1051,7 +1051,7 @@ sort_factors <- function(modgirt_rvar) {
 set_signs <- function(modgirt_rvar, signs = 1) {
     n_time <- dim(modgirt_rvar$bar_theta)[1]
     n_factor <- dim(modgirt_rvar$bar_theta)[3]
-    stopifnot(length(signs == 1) || length(signs) == D)
+    stopifnot(length(signs) == 1 || length(signs) == n_factor)
     init_signs <- sign(colMeans(E(modgirt_rvar$beta)))
     sign_flips <- ifelse(init_signs == signs, 1, -1)
     sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
