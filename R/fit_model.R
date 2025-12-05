@@ -210,7 +210,7 @@ fit <- function(data,
     data$nonzero_metric <- nonzero_metric
 
     ## Compile model
-    file <- system.file(paste0("stan/", link, ".stan"), package = "dbmm")
+    file <- system.file(paste0("stan/dbmm_", link, ".stan"), package = "dbmm")
 
     m0 <- cmdstan_model(stan_file = file)
 
