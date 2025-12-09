@@ -17,10 +17,6 @@
 #'     `parallelize_within_chains = FALSE`.
 #' @param force_recompile (logical) Should `cmdstanr::compile()` be required to
 #'     recompile the Stan model? Defaults to `FALSE`.
-#' @param init_kappa (logical) Should initial values for the item thresholds
-#'     `kappa` be pre-generated? This may reduce warnings of starting values
-#'     being rejected due to incompatibility with the order constraints on
-#'     `kappa`. Ignored unless `init = NULL`.
 #' @param init (multiple options) The initialization method to use for the
 #'     variables declared in the parameters block of the Stan program. For for
 #'     details, see the documentation for `cmdstanr::sample()`.
@@ -100,7 +96,6 @@ fit <- function(data,
                 parallelize_within_chains = FALSE,
                 threads_per_chain = NULL,
                 force_recompile = FALSE,
-                init_kappa = FALSE,
                 init = NULL,
                 return_data = TRUE,
                 n_dim = 1,
@@ -162,6 +157,16 @@ fit <- function(data,
         )
     )
 
+    nonzero_trichot <- matrix(
+        data = 1,
+        nrow = data$I_trichot,
+        ncol = data$D,
+        dimnames = list(
+            attr(data, "trichotomous_item_labels"),
+            as.character(1:data$D)
+        )
+    )
+
     nonzero_ordinal <- matrix(
         data = 1,
         nrow = data$I_ordinal,
@@ -183,10 +188,13 @@ fit <- function(data,
     )
 
     if (data$D > 1 && isTRUE(lambda_zeros)) {
-        most_items <- which.max(c(data$I_binary, data$I_ordinal, data$I_metric))
-        id_with <- c("binary", "ordinal", "metric")[most_items]
+        item_ns <-
+            c(data$I_binary, data$I_trichot, data$I_ordinal, data$I_metric)
+        most_items <- which.max(item_ns)
+        id_with <- c("binary", "trichotomous", "ordinal", "metric")[most_items]
         for (d in 2:data$D) {
             if (id_with == "binary") nonzero_binary[1:(d-1), d] <- 0
+            if (id_with == "trichotomous") nonzero_trichot[1:(d-1), d] <- 0
             if (id_with == "ordinal") nonzero_ordinal[1:(d-1), d] <- 0
             if (id_with == "metric") nonzero_metric[1:(d-1), d] <- 0
         }
@@ -197,6 +205,9 @@ fit <- function(data,
             if (lambda_zeros[i, 1] %in% attr(data, "binary_item_labels")) {
                 nonzero_binary[lambda_zeros[i, 1], lambda_zeros[i, 2]] <- 0
             }
+            if (lambda_zeros[i, 1] %in% attr(data, "trichotomous_item_labels")) {
+                nonzero_trichot[lambda_zeros[i, 1], lambda_zeros[i, 2]] <- 0
+            }
             if (lambda_zeros[i, 1] %in% attr(data, "ordinal_item_labels")) {
                 nonzero_ordinal[lambda_zeros[i, 1], lambda_zeros[i, 2]] <- 0
             }
@@ -206,6 +217,7 @@ fit <- function(data,
         }
     }
     data$nonzero_binary <- nonzero_binary
+    data$nonzero_trichot <- nonzero_trichot
     data$nonzero_ordinal <- nonzero_ordinal
     data$nonzero_metric <- nonzero_metric
 
@@ -218,22 +230,6 @@ fit <- function(data,
 
     m1 <- m0$compile(cpp_options = cpp_opts, force_recompile = force_recompile)
 
-    if (init_kappa && !is.null(init)) {
-        cat("\nIgnoring `init_kappa = TRUE` because `init` is not `NULL`.\n")
-    }
-
-    ## Initial Values
-    if (init_kappa & is.null(init)) {
-        kappa_inits <- replicate(chains, {
-            kappa <- stats::rnorm(data$I_ordinal * (data$K - 1))
-            kappa_mat <- apply(matrix(kappa, ncol = data$K - 1), 1, sort)
-            list(kappa = kappa_mat)
-        },
-        simplify = FALSE
-        )
-        init <- kappa_inits
-    }
-
     ## Fit model
     dynfac_fit <- m1$sample(data, chains = chains, init = init,
                             threads_per_chain = threads_per_chain, seed = seed,
@@ -243,6 +239,7 @@ fit <- function(data,
     attr(dynfac_fit, "unit_labels") <- attr(data, "unit_labels")
     attr(dynfac_fit, "time_labels") <- attr(data, "time_labels")
     attr(dynfac_fit, "binary_item_labels") <- attr(data, "binary_item_labels")
+    attr(dynfac_fit, "trichotomous_item_labels") <- attr(data, "trichotomous_item_labels")
     attr(dynfac_fit, "ordinal_item_labels") <- attr(data, "ordinal_item_labels")
     attr(dynfac_fit, "metric_item_labels") <- attr(data, "metric_item_labels")
     out <- list(fit = dynfac_fit)
