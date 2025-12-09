@@ -51,6 +51,7 @@ extract_draws <- function(fit, drop_rex = "^z_", format = "df", check = TRUE)
     attr(draws, "unit_labels") <- attr(fit$fit, "unit_labels")
     attr(draws, "time_labels") <- attr(fit$fit, "time_labels")
     attr(draws, "binary_item_labels") <- attr(fit$fit, "binary_item_labels")
+    attr(draws, "trichotomous_item_labels") <- attr(fit$fit, "trichotomous_item_labels")
     attr(draws, "ordinal_item_labels") <- attr(fit$fit, "ordinal_item_labels")
     attr(draws, "metric_item_labels") <- attr(fit$fit, "metric_item_labels")
 
@@ -75,7 +76,8 @@ extract_draws <- function(fit, drop_rex = "^z_", format = "df", check = TRUE)
 #'     number of `item_type` items.
 #' @param normalize (logical) Should Kaiser normalization be performed before
 #'     varimax rotation? Defaults to `TRUE`.
-#' @param item_type (string) Should "binary", "ordinal", or "metric" loadings be
+#' @param item_type (string) Should "binary", "trichotomous", "ordinal", or
+#'     "metric" loadings be
 #'     used to identify the model. If `NULL` (the default), the largest set of
 #'     items will be chosen.
 #' @param sign (integer) Should the sign of the average identified loading be
@@ -143,6 +145,8 @@ identify_rotation <- function (raw_draws, varimax, targets, normalize, item_type
 
     Lb0 <- select_draws_regex(draws_df = raw_draws,
                         regex_pars = "(^lambda_binary\\[)|(^\\.)")
+    Lt0 <- select_draws_regex(draws_df = raw_draws,
+                        regex_pars = "(^lambda_trichotomous\\[)|(^\\.)")
     Lo0 <- select_draws_regex(draws_df = raw_draws,
                         regex_pars = "(^lambda_ordinal\\[)|(^\\.)")
     Lm0 <- select_draws_regex(draws_df = raw_draws,
@@ -155,6 +159,7 @@ identify_rotation <- function (raw_draws, varimax, targets, normalize, item_type
     S <- max(raw_draws$.iteration)
     C <- max(raw_draws$.chain)
     Ib <- length(attr(raw_draws, "binary_item_labels"))
+    It <- length(attr(raw_draws, "trichotomous_item_labels"))
     Io <- length(attr(raw_draws, "ordinal_item_labels"))
     Im <- length(attr(raw_draws, "metric_item_labels"))
     J <- length(attr(raw_draws, "unit_labels"))
@@ -170,19 +175,22 @@ identify_rotation <- function (raw_draws, varimax, targets, normalize, item_type
     }
     Q1 <- Q0
     Lb1 <- Lb0
+    Lt1 <- Lt0
     Lo1 <- Lo0
     Lm1 <- Lm0
     lcols_b <- stringr::str_which(names(Lb0), "lambda")
+    lcols_t <- stringr::str_which(names(Lt0), "lambda")
     lcols_o <- stringr::str_which(names(Lo0), "lambda")
     lcols_m <- stringr::str_which(names(Lm0), "lambda")
     ecols <- stringr::str_which(names(E0), "eta")
     ecols_t <- stringr::str_split(names(E0)[ecols], "[\\[,\\]]",
                                   simplify = TRUE)[, 2]
 
+    item_types <- c("binary", "trichotomous", "ordinal", "metric")
     if (is.null(item_type)) {
-        item_type <- c("binary", "ordinal", "metric")[which.max(c(Ib, Io, Im))]
+        item_type <- item_types[which.max(c(Ib, It, Io, Im))]
     }
-    stopifnot(item_type %in% c("binary", "ordinal", "metric"))
+    stopifnot(item_type %in% item_types)
     cat("\nUsing", item_type, "items to identify the model.\n")
 
     if (varimax && D > 1) {
@@ -197,6 +205,13 @@ identify_rotation <- function (raw_draws, varimax, targets, normalize, item_type
                     )
                     vm <- stats::varimax(Lb0_cs, normalize = normalize)
                     Lb1[row, lcols_b] <- t(as.numeric(vm$loadings))
+                } else if (item_type == "trichotomous") {
+                    row <- Lt0$.chain == c_cur & Lt0$.iteration == s
+                    Lt0_cs <- matrix(
+                        as.numeric(Lt0[row, lcols_t]), nrow = It, ncol = D
+                    )
+                    vm <- stats::varimax(Lt0_cs, normalize = normalize)
+                    Lt1[row, lcols_t] <- t(as.numeric(vm$loadings))
                 } else if (item_type == "ordinal") {
                     row <- Lo0$.chain == c_cur & Lo0$.iteration == s
                     Lo0_cs <- matrix(
@@ -265,6 +280,11 @@ identify_rotation <- function (raw_draws, varimax, targets, normalize, item_type
                                             c_cur = c_cur,
                                             lcols = lcols_b,
                                             item_type = "binary")
+        } else if (item_type == "trichotomous") {
+            sp_out[[c_cur]] <- sign_permute(lambda_item = Lt1,
+                                            c_cur = c_cur,
+                                            lcols = lcols_t,
+                                            item_type = "trichotomous")
         } else if (item_type == "ordinal") {
             sp_out[[c_cur]] <- sign_permute(lambda_item = Lo1,
                                             c_cur = c_cur,
@@ -375,6 +395,8 @@ identify_rotation <- function (raw_draws, varimax, targets, normalize, item_type
     id_draws <- raw_draws
     id_draws[, stringr::str_detect(names(id_draws), "^lambda_binary\\[")] <-
         Lb3[, lcols_b]
+    id_draws[, stringr::str_detect(names(id_draws), "^lambda_trichotomous\\[")] <-
+        Lt3[, lcols_t]
     id_draws[, stringr::str_detect(names(id_draws), "^lambda_ordinal\\[")] <-
         Lo3[, lcols_o]
     id_draws[, stringr::str_detect(names(id_draws), "^lambda_metric\\[")] <-
@@ -498,8 +520,11 @@ label_draws <- function (draws, regex_pars = NULL, check = TRUE)
             sigma_eta_evol = "^sigma_eta_evol\\[",
             lambda_binary = "^lambda_binary\\[",
             alpha_binary = "^alpha_binary\\[",
+            lambda_trichot = "^lambda_trichot\\[",
+            kappa_trichot = "^kappa_trichot\\[",
+            alpha_trichot = "^alpha_trichot\\[",
             lambda_ordinal = "^lambda_ordinal\\[",
-            kappa = "^kappa\\[",
+            kappa_ordinal = "^kappa_ordinal\\[",
             alpha_ordinal = "^alpha_ordinal\\[",
             lambda_metric = "^lambda_metric\\[",
             sigma_metric = "^sigma_metric\\[",
@@ -638,6 +663,57 @@ label_draws <- function (draws, regex_pars = NULL, check = TRUE)
                                labels = attr(draws, "binary_item_labels")
                            )
                        ) %>%
+                dplyr::select(par, TIME, ITEM, value, dplyr::everything())
+        } else if (regex_pars_p == "^lambda_trichot\\[") {
+            draws_ls[[p]] <- draws_ls_p %>%
+                dplyr::mutate(
+                           par = stringr::str_split(.data$name,
+                                                    "[\\[,\\]]", simplify = TRUE)[, 1],
+                           item = stringr::str_split(.data$name,
+                                                     "[\\[,\\]]", simplify = TRUE)[, 2],
+                           dim = stringr::str_split(.data$name,
+                                                    "[\\[,\\]]", simplify = TRUE)[, 3],
+                           dplyr::across(item:dim, as.integer),
+                           ITEM = factor(
+                               x = .data$item,
+                               labels = attr(draws, "trichotomous_item_labels")
+                           )
+                       ) %>%
+                dplyr::select(par, ITEM, dim, value, dplyr::everything())
+        } else if (regex_pars_p == "^kappa_trichot\\[") {
+            draws_ls[[p]] <- draws_ls_p %>%
+                dplyr::mutate(
+                           par = stringr::str_split(.data$name,
+                                                    "[\\[,\\]]", simplify = TRUE)[, 1],
+                           item = stringr::str_split(.data$name,
+                                                     "[\\[,\\]]", simplify = TRUE)[, 2],
+                           threshold =
+                               stringr::str_split(.data$name,
+                                                  "[\\[,\\]]", simplify = TRUE)[, 3],
+                           dplyr::across(.data$threshold, as.integer),
+                           ITEM = factor(
+                               x = .data$item,
+                               labels = attr(draws, "trichotomous_item_labels")
+                           )
+                       ) %>%
+                dplyr::select(par, ITEM, threshold,
+                              value, dplyr::everything())
+        } else if (regex_pars_p == "^alpha_trichot\\[") {
+            draws_ls[[p]] <- draws_ls_p %>%
+                dplyr::mutate(
+                           par = stringr::str_split(.data$name,
+                                                    "[\\[,\\]]", simplify = TRUE)[, 1],
+                           time = stringr::str_split(.data$name,
+                                                     "[\\[,\\]]", simplify = TRUE)[, 2],
+                           item = stringr::str_split(.data$name,
+                                                     "[\\[,\\]]", simplify = TRUE)[, 3],
+                           dplyr::across(.data$time:.data$item, as.integer),
+                           TIME = factor(.data$time, labels = attr(draws, "time_labels")),
+                           ITEM = factor(
+                               x = .data$item,
+                               labels = attr(draws, "trichotomous_item_labels")
+                           )
+                       ) %>%
                 dplyr::select(par, TIME, ITEM,
                               value, dplyr::everything())
         } else if (regex_pars_p == "^lambda_ordinal\\[") {
@@ -655,9 +731,8 @@ label_draws <- function (draws, regex_pars = NULL, check = TRUE)
                                labels = attr(draws, "ordinal_item_labels")
                            )
                        ) %>%
-                dplyr::select(par, ITEM, dim,
-                              value, dplyr::everything())
-        } else if (regex_pars_p == "^kappa\\[") {
+                dplyr::select(par, ITEM, dim, value, dplyr::everything())
+        } else if (regex_pars_p == "^kappa_ordinal\\[") {
             draws_ls[[p]] <- draws_ls_p %>%
                 dplyr::mutate(
                            par = stringr::str_split(.data$name,
@@ -706,6 +781,8 @@ label_draws <- function (draws, regex_pars = NULL, check = TRUE)
     attr(draws_ls, "unit_labels") <- attr(draws, "unit_labels")
     attr(draws_ls, "time_labels") <- attr(draws, "time_labels")
     attr(draws_ls, "binary_item_labels") <- attr(draws, "binary_item_labels")
+    attr(draws_ls, "trichotomous_item_labels") <-
+        attr(draws, "trichotomous_item_labels")
     attr(draws_ls, "ordinal_item_labels") <- attr(draws, "ordinal_item_labels")
     attr(draws_ls, "metric_item_labels") <- attr(draws, "metric_item_labels")
 
@@ -732,7 +809,7 @@ select_draws_regex <- function(draws_df, regex_pars) {
 #' @return A sign-permuted object
 #'
 sign_permute <- function(lambda_item, c_cur, lcols,
-                         item_type = c("binary", "ordinal", "metric"))
+                         item_type = c("binary", "trichotomous", "ordinal", "metric"))
 {
     rows <- lambda_item$.chain == c_cur
 
@@ -750,6 +827,8 @@ sign_permute <- function(lambda_item, c_cur, lcols,
 
     if (item_type == "binary") {
         replace_original <- "lambda_binary\\[([0-9]+),([0-9]+)\\]$"
+    } else if (item_type == "trichotomous") {
+        replace_original <- "lambda_trichot\\[([0-9]+),([0-9]+)\\]$"
     } else if (item_type == "ordinal") {
         replace_original <- "lambda_ordinal\\[([0-9]+),([0-9]+)\\]$"
     } else if (item_type == "metric") {

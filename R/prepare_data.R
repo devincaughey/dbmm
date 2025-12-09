@@ -5,12 +5,15 @@
 #' @param time_var (string) Name of variable identifying time periods
 #' @param item_var (string) Name of variable identifying items
 #' @param value_var (string) Name of the response variable
-#' @param ordinal_items (character vector) Items that should be treated as
-#'     ordinal. If `NA` (the default), then any item with between 3 and
-#'     `max_cats` unique values will be treated as ordinal.
 #' @param binary_items (character vector) Items that should be treated as
 #'     binary. If `NA` (the default), then any item with 2 unique values will be
 #'     treated as binary.
+#' @param trichotomous_items (character vector) Items that should be treated as
+#'     trichotomous. If `NA` (the default), then any item with 3 unique values
+#'     will be treated as trichotomous.
+#' @param ordinal_items (character vector) Items that should be treated as
+#'     ordinal. If `NA` (the default), then any item with between 3 and
+#'     `max_cats` unique values will be treated as ordinal.
 #' @param max_cats (positive integer) Maximum number of response categories for
 #'     ordinal items. Defaults to `10`.
 #' @param standardize (logical) Should metric items be standardized? Defaults to
@@ -23,12 +26,12 @@
 #'     zero.
 #' @param periods_to_estimate (vector) Values of `time_var` for which to
 #'     estimate parameter values. If `NULL` (the default), `periods_to_estimate`
-#'     will be set to
-#'     `min(long_data[[time_var]]):max(long_data[[time_var]])`, under the
-#'     assumption that `long_data[[time_var]]` is an integer vector. Data from
-#'     periods not in `periods_to_estimate` will be dropped. If
-#'     `periods_to_estimate` includes a period for which there is no data,
-#'     parameter values for that year will be imputed by the dynamic model.
+#'     will be set to `min(long_data[[time_var]]):max(long_data[[time_var]])`,
+#'     under the assumption that `long_data[[time_var]]` is an integer
+#'     vector. Data from periods not in `periods_to_estimate` will be
+#'     dropped. If `periods_to_estimate` includes a period for which there is no
+#'     data, parameter values for that year will be imputed by the dynamic
+#'     model.
 #'
 #' @return A list formatted for Stan
 #'
@@ -41,8 +44,9 @@ shape_data <- function (long_data,
                         time_var,
                         item_var,
                         value_var,
-                        ordinal_items = NA,
                         binary_items = NA,
+                        trichotomous_items = NA,
+                        ordinal_items = NA,
                         max_cats = 10,
                         standardize = TRUE,
                         make_indicator_for_zeros = TRUE,
@@ -68,6 +72,7 @@ shape_data <- function (long_data,
     use_data <- dplyr::select(use_data,
                               unit, UNIT, time,
                               TIME, item, value)
+    use_data <- tidyr::drop_na(use_data)
     stopifnot(!anyNA(use_data$unit))
     stopifnot(!anyNA(use_data$time))
     stopifnot(!anyNA(use_data$item))
@@ -76,7 +81,7 @@ shape_data <- function (long_data,
     items <- sort(unique(use_data$item))
 
     unique_df <- use_data %>%
-        dplyr::summarise(n = length(unique(.data$value)), .by = .data$item)
+        dplyr::summarise(.by = .data$item, n = length(unique(.data$value)))
 
     drop_items <- dplyr::filter(unique_df, .data$n < 2)$item
     cat("\nDropping the following items due to lack of variation:\n")
@@ -85,13 +90,22 @@ shape_data <- function (long_data,
         binary_items <- unique_df$item[unique_df$n == 2]
         binary_items <- sort(setdiff(binary_items, drop_items))
     }
+    if (is.na(trichotomous_items)) {
+        trichotomous_items <- unique_df$item[unique_df$n == 3]
+        trichotomous_items <- sort(setdiff(trichotomous_items, drop_items))
+    }
     if (is.na(ordinal_items)) {
-        ordinal_items <- unique_df$item[unique_df$n < max_cats]
-        ordinal_items <- setdiff(ordinal_items, c(drop_items, binary_items))
+        ordinal_items <- unique_df$item[unique_df$n <= max_cats]
+        ordinal_items <- setdiff(
+            ordinal_items,
+            c(drop_items, binary_items, trichotomous_items)
+        )
         ordinal_items <- sort(ordinal_items)
     }
-
-    metric_items <- setdiff(items, c(binary_items, ordinal_items, drop_items))
+    metric_items <- setdiff(
+        items,
+        c(binary_items, trichotomous_items, ordinal_items, drop_items)
+    )
     metric_items <- sort(metric_items)
     if (make_indicator_for_zeros) {
         for (i in seq_along(metric_items)) {
@@ -112,6 +126,8 @@ shape_data <- function (long_data,
 
     cat("\nCategorizing the following items as binary:\n")
     cat(c("  *", paste(binary_items, collapse = "\n  * "), "\n"))
+    cat("\nCategorizing the following items as trichotomous:\n")
+    cat(c("  *", paste(trichotomous_items, collapse = "\n  * "), "\n"))
     cat("\nCategorizing the following items as ordinal:\n")
     cat(c("  *", paste(ordinal_items, collapse = "\n  * "), "\n"))
     cat("\nCategorizing the following items as metric:\n")
@@ -122,6 +138,15 @@ shape_data <- function (long_data,
         dplyr::mutate(ITEM = factor(.data$item, levels = binary_items)) %>%
         dplyr::group_by(.data$ITEM) %>%
         dplyr::mutate(yy = as.integer(ordered(.data$value)) - 1L) %>%
+        dplyr::filter(!is.na(.data$yy)) %>%
+        dplyr::ungroup() %>%
+        dplyr::arrange(.data$TIME, .data$ITEM, .data$UNIT) # time must vary last
+
+    trichotomous_data <- use_data %>%
+        dplyr::filter(.data$item %in% trichotomous_items) %>%
+        dplyr::mutate(ITEM = factor(.data$item, levels = trichotomous_items)) %>%
+        dplyr::group_by(.data$ITEM) %>%
+        dplyr::mutate(yy = as.integer(ordered(.data$value))) %>%
         dplyr::filter(!is.na(.data$yy)) %>%
         dplyr::ungroup() %>%
         dplyr::arrange(.data$TIME, .data$ITEM, .data$UNIT) # time must vary last
@@ -154,6 +179,11 @@ shape_data <- function (long_data,
         if (any(x)) c(min(which(x)), max(which(x)))
         else c(0, 0)
     })
+    tob_t <- sapply(1:nlevels(use_data$TIME), function (t) {
+        x <- as.integer(trichotomous_data$TIME) == t
+        if (any(x)) c(min(which(x)), max(which(x)))
+        else c(0, 0)
+    })
     tob_o <- sapply(1:nlevels(use_data$TIME), function (t) {
         x <- as.integer(ordinal_data$TIME) == t
         if (any(x)) c(min(which(x)), max(which(x)))
@@ -175,6 +205,13 @@ shape_data <- function (long_data,
         jj_binary = as.integer(binary_data$UNIT),
         tt_binary = as.integer(binary_data$TIME),
         tob_b = t(tob_b),
+        N_trichot = nrow(trichotomous_data),
+        I_trichot = nlevels(trichotomous_data$ITEM),
+        yy_trichot = as.integer(trichotomous_data$yy),
+        ii_trichot = as.integer(trichotomous_data$ITEM),
+        jj_trichot = as.integer(trichotomous_data$UNIT),
+        tt_trichot = as.integer(trichotomous_data$TIME),
+        tob_t = t(tob_t),
         N_ordinal = nrow(ordinal_data),
         I_ordinal = nlevels(ordinal_data$ITEM),
         K_ordinal = if (nrow(ordinal_data) > 0) max(ordinal_data$yy) else 1L,
@@ -194,6 +231,7 @@ shape_data <- function (long_data,
     attr(stan_data, "unit_labels") <- levels(use_data$UNIT)
     attr(stan_data, "time_labels") <- levels(use_data$TIME)
     attr(stan_data, "binary_item_labels") <- levels(binary_data$ITEM)
+    attr(stan_data, "trichotomous_item_labels") <- levels(trichotomous_data$ITEM)
     attr(stan_data, "ordinal_item_labels") <- levels(ordinal_data$ITEM)
     attr(stan_data, "metric_item_labels") <- levels(metric_data$ITEM)
 
