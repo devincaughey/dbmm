@@ -953,6 +953,19 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
     return(sp_rvar)
 }
 
+vgQ.maxvar1 <- function(L, ...) {
+  L <- as.matrix(L)
+  ## t(L) %*% L
+  M <- crossprod(L)
+  eig <- eigen(M, symmetric = TRUE)
+  v <- eig$vectors[, 1]      # leading eigenvector
+  lambda1 <- eig$values[1]   # leading eigenvalue
+  ## objective: negative leading eigenvalue
+  f <- -lambda1
+  ## gradient: -2 * (L v) v'
+  Gq <- -2 * (L %*% v) %*% t(v)
+  list(f = f, Gq = Gq, Method = "maxvar1")
+}
 
 #' Identify MODGIRT draws
 #'

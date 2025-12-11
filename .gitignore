@@ -3,3 +3,5 @@
 .Rhistory
 inst/stan/modgirt_probit
 inst/stan/dbmm_probit
+inst/stan/dbmm_probit
+inst/stan/dbmm_probit
