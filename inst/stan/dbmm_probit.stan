@@ -1,5 +1,4 @@
 functions {
-  /* De-mean and 'whiten' (cov = I) XX */
   vector p2l_vector (vector x) { // coverts vector from probit to logit scale
     vector[num_elements(x)] y;
     for (i in 1:num_elements(x)) {
@@ -14,6 +13,7 @@ functions {
     }
     return y;
   }
+  /* De-mean and 'whiten' (cov = I) XX */
   matrix whiten(matrix XX) {
     matrix[rows(XX), cols(XX)] DM;
     matrix[cols(XX), cols(XX)] SS;
@@ -198,6 +198,7 @@ parameters {
   matrix[I_metric, D] z_lambda_metric;           /* metric loadings */
   vector<lower=0>[I_metric] sigma_metric;        /* metric residual sd */
   vector<lower=0>[D] sigma_eta_evol;             /* evolution SD of eta */
+  corr_matrix[D] corr_eta_evol;   // cross-dimension correlation of transition model */
 }
 transformed parameters {
   array[T, J, D] real eta;                /* latent factors (whitened) */
@@ -213,6 +214,9 @@ transformed parameters {
   lambda_trichot = to_array_2d(z_lambda_trichot .* nonzero_trichot);
   lambda_ordinal = to_array_2d(z_lambda_ordinal .* nonzero_ordinal);
   lambda_metric = to_array_2d(z_lambda_metric .* nonzero_metric);
+  cov_matrix[D] Omega; // transition variance-covariance
+  Omega = quad_form_diag(corr_eta_evol, sigma_eta_evol);
+  matrix[D, D] chol_Omega = cholesky_decompose(Omega);
   for (t in 1:T) {
     if (t == 1) {
       eta[t, 1:J, 1:D] = to_array_2d(whiten(to_matrix(z_eta[t, 1:J, 1:D])));
@@ -220,15 +224,14 @@ transformed parameters {
       alpha_binary[t] = z_alpha_binary[t];
       alpha_trichot[t, ] = rep_array(0.0, I_trichot);
       alpha_ordinal[t, ] = rep_array(0.0, I_ordinal);
-    }
-    if (t > 1) {
+    } else {
       if (separate_eta == 1) {
 	eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
       } else {
 	for (j in 1:J) {
-	  for (d in 1:D) {
-	    eta[t, j, d] = eta[t - 1, j, d] + z_eta[t, j, d] * sigma_eta_evol[d];
-	  }
+	  vector[D] eta_vec_tm1 = to_vector(eta[t-1, j, 1:D]);
+	  vector[D] z_eta_t = to_vector(z_eta[t, j, 1:D]);
+	  eta[t][j, 1:D] = to_array_1d(eta_vec_tm1 + chol_Omega * z_eta_t);
 	}
       } 
       if (constant_alpha == 1) {
@@ -380,9 +383,8 @@ model {
   sigma_alpha_evol ~ student_t(df_sigma_alpha_evol,
 			       mu_sigma_alpha_evol,
 			       sd_sigma_alpha_evol);
-  sigma_eta_evol ~ student_t(df_sigma_eta_evol,
-			     mu_sigma_eta_evol,
-			     sd_sigma_eta_evol);
+  sigma_eta_evol ~ cauchy(0, .1);
+  corr_eta_evol ~ lkj_corr(2);
 }
 generated quantities {
   
