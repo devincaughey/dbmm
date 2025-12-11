@@ -940,10 +940,13 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
     for (i in seq_len(n_iter)) {
         for (c in seq_len(n_chain)) {
             ## Assumes vectors are ordered by chain then iteration
-            sv <- rsp_out$sign_vectors[(c - 1) * n_iter + i, ]
-            pv <- rsp_out$permute_vectors[(c - 1) * n_iter + i, ]
+            sv <- rsp_out$sign_vectors[(c - 1) * n_iter + i, , drop = TRUE]
+            pv <- rsp_out$permute_vectors[(c - 1) * n_iter + i, , drop = FALSE]
             sp_array[i, c, , ] <-
-                t(diag(sv) %*% seriation::permutation_vector2matrix(pv))
+                t(
+                    diag(sv, nrow = length(sv)) %*%
+                    seriation::permutation_vector2matrix(pv)
+                )
         }
     }
     sp_rvar <- posterior::rvar(sp_array, with_chains = TRUE)
@@ -972,15 +975,19 @@ identify_modgirt <- function(x, method = "varimax") {
     }
     beta_rvar <-
         posterior::subset_draws(modgirt_rvar, variable = "beta")
+    draws_of_beta <- posterior::draws_of(beta_rvar$beta, with_chains = TRUE)
     bar_theta_rvar <-
         posterior::subset_draws(modgirt_rvar, variable = "bar_theta")
     n_chain <- posterior::nchains(modgirt_rvar)
     n_iter <- posterior::niterations(modgirt_rvar)
     n_factor <- ncol(beta_rvar$beta)
     ## Create draw-specific varimax rotations
-    draws_of_beta <- posterior::draws_of(beta_rvar$beta, with_chains = TRUE)
-    vm_rvar <- make_vm_rvar(draws_of_beta, n_iter, n_chain, n_factor,
-                            method = method)
+    if (n_factor > 1) {
+        vm_rvar <- make_vm_rvar(draws_of_beta, n_iter, n_chain, n_factor,
+                                method = method)
+    } else {
+        vm_rvar <- matrix(1)
+    }
     ## Apply varimax rotations to `beta`
     beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, vm_rvar)
     ## Create draw-specific signed permutations
@@ -990,11 +997,12 @@ identify_modgirt <- function(x, method = "varimax") {
     sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
     ## Apply signed permutations to `beta`
     beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, sp_rvar)
-    ## Apply rotations to `bar_theta`
+    ## Make single RSP matrix
     vm_sp_rvar <- posterior::`%**%`(vm_rvar, sp_rvar)
+    ## Apply rotations to `bar_theta`
     for (t in seq_len(dim(bar_theta_rvar$bar_theta)[1])) {
         bar_theta_rvar$bar_theta[t, , ] <- posterior::`%**%`(
-            bar_theta_rvar$bar_theta[t, , , drop = TRUE],
+            as.matrix(bar_theta_rvar$bar_theta[t, , , drop = TRUE]),
             vm_sp_rvar
         )
     }
@@ -1158,25 +1166,18 @@ identify_dbmm <- function(x, method = "varimax", identify_with_type) {
     ## Subset to lambda draws (rvar)
     lambda_rvar <-
         posterior::subset_draws(draws_rvar, variable = "^lambda", regex = TRUE)
-    ## lambda_rvar_df <- lapply(lambda_rvar, as.data.frame) %>%
-    ##     dplyr::bind_rows(, .id = "item_type") %>%
-    ##     dplyr::mutate(item_type = stringr::str_remove(item_type, "lambda_")) %>%
-    ##     dplyr::rename_with(~stringr::str_replace(., "^V", "lambda_dim_"))
     draws_of_lambda <- lambda_rvar %>%
         lapply(draws_of, with_chains = TRUE) %>%
         abind::abind(along = 3)
-
     ## Dimensions (chains / iterations / factors)
     n_chain <- posterior::nchains(draws_rvar)
     n_iter <- posterior::niterations(draws_rvar)
     n_factor <- dim(draws_of_lambda)[4]
-
     ## Choose which loading variable to use based on item_type
     if (missing(identify_with_type)) {
         identify_with_type <-
             names(lambda_rvar)[which.max(sapply(lambda_rvar, length))][1]
-        identify_with_type <-
-            stringr::str_remove(identify_with_type, "^lambda_")
+        identify_with_type <- sub("^lambda_", "", identify_with_type)
     }
     varname <- switch(
         identify_with_type,
@@ -1187,29 +1188,30 @@ identify_dbmm <- function(x, method = "varimax", identify_with_type) {
         stop("Invalid `identify_with_type` argument; must be 'binary', 'trichot', 'ordinal' or 'metric'")
     )
     ## Make varimax matrices
-    vm_rvar <- make_vm_rvar(draws_of_lambda,
-                            n_iter = n_iter,
-                            n_chain = n_chain,
-                            n_factor = n_factor,
-                            method = method)
+    if (n_factor > 1) {
+        vm_rvar <- make_vm_rvar(
+            draws_of_lambda,
+            n_iter = n_iter,
+            n_chain = n_chain,
+            n_factor = n_factor,
+            method = method
+        )
+    } else {
+        vm_rvar <- matrix(1)
+    }
     ## Apply varimax rotations to lambdas
     for (t in seq_along(lambda_rvar)) {
         lambda_rvar[[t]] <- posterior::`%**%`(lambda_rvar[[t]], vm_rvar)        
     }
-
     ## Compute signed-permutation matrices (factor-switching alignment)
-    ## Convert rotated lambdas to a draws-matrix in the format expected by rsp_exact:
-    ## the `t(...)` follows the pattern used elsewhere in this file (e.g. modgirt)
+    ## Convert rotated lambdas to a draws-matrix in the format expected by :
     lambda_matrix <- posterior::as_draws_matrix(t(lambda_rvar[[varname]]))
     lambda_matrix <- rename_loading_matrix(lambda_matrix)
-
     ## factor.switching::rsp_exact expects rows ordered by (chain then iteration),
     ## and returns a list with sign_vectors and permute_vectors
     rsp_out <- factor.switching::rsp_exact(lambda_matrix, rotate = FALSE)
-
     ## Create sp_rvar (signed-permutation rvar) and apply to lambdas
-    sp_rvar <- make_sp_rvar(rsp_out, n_iter = n_iter, n_chain = n_chain,
-                            n_factor = n_factor)
+    sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
     ## Apply signed permutations to lambdas
     for (t in seq_along(lambda_rvar)) {
         lambda_rvar[[t]] <- posterior::`%**%`(lambda_rvar[[t]], sp_rvar)        
@@ -1220,17 +1222,34 @@ identify_dbmm <- function(x, method = "varimax", identify_with_type) {
     eta_rvar <- posterior::subset_draws(draws_rvar, variable = "eta")
     for (t in seq_len(dim(eta_rvar$eta)[1])) {
         eta_rvar$eta[t, , ] <- posterior::`%**%`(
-            eta_rvar$eta[t, , , drop = TRUE],
+            as.matrix(eta_rvar$eta[t, , , drop = TRUE]),
             vm_sp_rvar
         )
     }
-    draws_rvar_id <-
-        posterior::draws_rvars(
-                       lambda_binary = lambda_rvar$lambda_binary,
-                       lambda_trichot = lambda_rvar$lambda_trichot,
-                       lambda_ordinal = lambda_rvar$lambda_ordinal,
-                       lambda_metric = lambda_rvar$lambda_metric,
-                       eta = eta_rvar$eta,
-                       lp__ = draws_rvar$lp__
-                   )
+    omega_rvar <- posterior::subset_draws(draws_rvar, variable = "Omega")
+    omega_rvar$Omega <- t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
+    out <- posterior::draws_rvars(
+                          eta = eta_rvar$eta,
+                          lambda_binary = lambda_rvar$lambda_binary,
+                          lambda_trichot = lambda_rvar$lambda_trichot,
+                          lambda_ordinal = lambda_rvar$lambda_ordinal,
+                          lambda_metric = lambda_rvar$lambda_metric,
+                          alpha_binary = draws_rvar$alpha_binary,
+                          alpha_trichot = draws_rvar$alpha_trichot,
+                          alpha_ordinal = draws_rvar$alpha_ordinal,
+                          alpha_metric = draws_rvar$alpha_metric,
+                          kappa_trichot = draws_rvar$kappa_trichot,
+                          kappa_ordinal = draws_rvar$kappa_ordinal,
+                          sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
+                          sigma_metric = draws_rvar$sigma_metric,
+                          Omega = omega_rvar$Omega,
+                          lp__ = draws_rvar$lp__
+                      )
+    attr(out, "binary_item_labels") <- attr(x, "binary_item_labels")
+    attr(out, "trichotomous_item_labels") <- attr(x, "trichotomous_item_labels")
+    attr(out, "ordinal_item_labels") <- attr(x, "ordinal_item_labels")
+    attr(out, "metric_item_labels") <- attr(x, "metric_item_labels")
+    attr(out, "rotation matrix") <- vm_rvar
+    attr(out, "signed-permutation matrix") <- sp_rvar
+    return(out)
 }
