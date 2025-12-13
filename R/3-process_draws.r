@@ -294,7 +294,7 @@ summarize_mixfac <- function (x, summary_functions) {
         out_rvar <- list()
         for (i in 1:sum(is_rvar)) {
             if (length(x[is_rvar][[i]]) == 0) {
-                out_rvar[[i]] <- NULL
+                out_rvar[[i]] <- NA
             } else {
                 out_rvar[[i]] <-
                     x[is_rvar][[i]] %>%
