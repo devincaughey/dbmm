@@ -4,10 +4,10 @@
 \alias{identify_modgirt}
 \title{Identify MODGIRT draws}
 \usage{
-identify_modgirt(modgirt_fit, method = "varimax")
+identify_modgirt(x, method = "varimax")
 }
 \arguments{
-\item{modgirt_fit}{The fitted MODGIRT model object.}
+\item{x}{A fitted MODGIRT model object or \code{draws_rvars} object}
 }
 \value{
 A list containing the identified MODGIRT model parameters.
