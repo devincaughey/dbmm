@@ -260,12 +260,12 @@ combine_types_mixfac <- function (x) {
 summarize_mixfac <- function (x, summary_functions) {
     if (missing(summary_functions)) {
         summary_functions <- list(
-            mean = ~mean(.),
-            median = ~median(.),
-            sd = ~sd(.),
-            mad = ~mad(.),
-            q5 = ~as.numeric(quantile(., probs = .05)),
-            q95 = ~as.numeric(quantile(., probs = .95)),
+            mean = ~posterior::E(.),
+            median = ~posterior:::median.rvar(.),
+            sd = ~posterior::sd(.),
+            mad = ~posterior::mad(.),
+            q5 = ~as.numeric(posterior:::quantile.rvar(., probs = .05)),
+            q95 = ~as.numeric(posterior:::quantile.rvar(., probs = .95)),
             rhat = ~posterior::rhat(.),
             ess_bulk = ~posterior::ess_bulk(.),
             ess_tail = ~posterior::ess_tail(.)
