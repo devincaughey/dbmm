@@ -266,9 +266,9 @@ summarize_mixfac <- function (x, summary_functions) {
             mad = ~mad(.),
             q5 = ~as.numeric(quantile(., probs = .05)),
             q95 = ~as.numeric(quantile(., probs = .95)),
-            rhat = ~rhat(.),
-            ess_bulk = ~ess_bulk(.),
-            ess_tail = ~ess_tail(.)
+            rhat = ~posterior::rhat(.),
+            ess_bulk = ~posterior::ess_bulk(.),
+            ess_tail = ~posterior::ess_tail(.)
         )
     }
     sfun <- function (y) {
