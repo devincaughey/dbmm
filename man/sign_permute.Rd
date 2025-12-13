@@ -8,7 +8,7 @@ sign_permute(
   lambda_item,
   c_cur,
   lcols,
-  item_type = c("binary", "ordinal", "metric")
+  item_type = c("binary", "trichotomous", "ordinal", "metric")
 )
 }
 \arguments{

@@ -34,7 +34,8 @@ number of \code{item_type} items.}
 \item{normalize}{(logical) Should Kaiser normalization be performed before
 varimax rotation? Defaults to \code{TRUE}.}
 
-\item{item_type}{(string) Should "binary", "ordinal", or "metric" loadings be
+\item{item_type}{(string) Should "binary", "trichotomous", "ordinal", or
+"metric" loadings be
 used to identify the model. If \code{NULL} (the default), the largest set of
 items will be chosen.}
 
