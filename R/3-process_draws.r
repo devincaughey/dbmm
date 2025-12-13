@@ -165,17 +165,57 @@ identify_mixfac <- function(x, method = "varimax", identify_with_type) {
 label_mixfac <- function (x, make_long = TRUE, check = TRUE) {
     stopifnot(is_draws_rvars(x))
     n_factor <- dim(x$eta)[[3]]
-    dimnames(x$kappa_trichot) <- list(
-        item = attr(x, "trichotomous_item_labels"),
-        threshold = 1:dim(x$kappa_trichot)[2]
-    )
-    dimnames(x$kappa_ordinal) <- list(
-        item = attr(x, "ordinal_item_labels"),
-        threshold = 1:dim(x$kappa_ordinal)[2]
-    )
-    dimnames(x$sigma_metric) <- list(
-        item = attr(x, "metric_item_labels")
-    )
+    if (length(attr(x, "binary_item_labels")) > 0) {
+        dimnames(x$alpha_binary) <- list(
+            period = attr(x, "time_labels"),
+            item = attr(x, "binary_item_labels")
+        )
+        dimnames(x$lambda_binary) <- list(
+            item = attr(x, "binary_item_labels"),
+            factor = 1:n_factor
+        )
+    }
+    if (length(attr(x, "trichotomous_item_labels")) > 0) {
+        dimnames(x$alpha_trichot) <- list(
+            period = attr(x, "time_labels"),
+            item = attr(x, "trichotomous_item_labels")
+        )
+        dimnames(x$kappa_trichot) <- list(
+            item = attr(x, "trichotomous_item_labels"),
+            threshold = 1:dim(x$kappa_trichot)[2]
+        )
+        dimnames(x$lambda_trichot) <- list(
+            item = attr(x, "trichotomous_item_labels"),
+            factor = 1:n_factor
+        )
+    }
+    if (length(attr(x, "ordinal_item_labels")) > 0) {
+        dimnames(x$alpha_ordinal) <- list(
+            period = attr(x, "time_labels"),
+            item = attr(x, "ordinal_item_labels")
+        )
+        dimnames(x$kappa_ordinal) <- list(
+            item = attr(x, "ordinal_item_labels"),
+            threshold = 1:dim(x$kappa_ordinal)[2]
+        )
+        dimnames(x$lambda_ordinal) <- list(
+            item = attr(x, "ordinal_item_labels"),
+            factor = 1:n_factor
+        )
+    }
+    if (length(attr(x, "metric_item_labels")) > 0) {
+        dimnames(x$alpha_metric) <- list(
+            period = attr(x, "time_labels"),
+            item = attr(x, "metric_item_labels")
+        )
+        dimnames(x$lambda_metric) <- list(
+            item = attr(x, "metric_item_labels"),
+            factor = 1:n_factor
+        )
+        dimnames(x$sigma_metric) <- list(
+            item = attr(x, "metric_item_labels")
+        )
+    }
     dimnames(x$Omega) <- list(
         factor = 1:n_factor,
         factor = 1:n_factor
@@ -183,38 +223,6 @@ label_mixfac <- function (x, make_long = TRUE, check = TRUE) {
     dimnames(x$eta) <- list(
         period = attr(x, "time_labels"),
         unit = attr(x, "unit_labels"),
-        factor = 1:n_factor
-    )
-    dimnames(x$alpha_binary) <- list(
-        period = attr(x, "time_labels"),
-        item = attr(x, "binary_item_labels")
-    )
-    dimnames(x$alpha_trichot) <- list(
-        period = attr(x, "time_labels"),
-        item = attr(x, "trichotomous_item_labels")
-    )
-    dimnames(x$alpha_ordinal) <- list(
-        period = attr(x, "time_labels"),
-        item = attr(x, "ordinal_item_labels")
-    )
-    dimnames(x$alpha_metric) <- list(
-        period = attr(x, "time_labels"),
-        item = attr(x, "metric_item_labels")
-    )
-    dimnames(x$lambda_binary) <- list(
-        item = attr(x, "binary_item_labels"),
-        factor = 1:n_factor
-    )
-    dimnames(x$lambda_trichot) <- list(
-        item = attr(x, "trichotomous_item_labels"),
-        factor = 1:n_factor
-    )
-    dimnames(x$lambda_ordinal) <- list(
-        item = attr(x, "ordinal_item_labels"),
-        factor = 1:n_factor
-    )
-    dimnames(x$lambda_metric) <- list(
-        item = attr(x, "metric_item_labels"),
         factor = 1:n_factor
     )
     if (make_long) {
