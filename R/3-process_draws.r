@@ -293,14 +293,19 @@ summarize_mixfac <- function (x, summary_functions) {
     if (any(is_rvar)) {
         out_rvar <- list()
         for (i in 1:sum(is_rvar)) {
-            out_rvar[[i]] <- x[is_rvar][[i]] %>%
-                summarise_draws() %>%
-                mutate(
-                    variable = str_replace(
-                        variable,
-                        "(^x\\[is_rvar\\]\\[\\[i\\]\\])|(^\\.)",
-                        names(x[is_rvar])[i]
-                    ))
+            if (length(x[is_rvar][[i]]) == 0) {
+                out_rvar[[i]] <- NULL
+            } else {
+                out_rvar[[i]] <-
+                    x[is_rvar][[i]] %>%
+                    summarise_draws() %>%
+                    mutate(
+                        variable = str_replace(
+                            variable,
+                            "(^x\\[is_rvar\\]\\[\\[i\\]\\])|(^\\.)",
+                            names(x[is_rvar])[i]
+                        ))
+            }
             names(out_rvar)[i] <- names(x[is_rvar])[i]
         }
     }
