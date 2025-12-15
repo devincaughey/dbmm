@@ -1,7 +1,7 @@
 data(social_outcomes_2020_2021)
 
 social_outcomes_2020_2021 |>
-  tidyr::drop_na() -> social_outcomes_2020_2021_dropped_na
+    tidyr::drop_na() -> social_outcomes_2020_2021_dropped_na
 
 shaped_data <- shape_data(
     long_data = social_outcomes_2020_2021_dropped_na,
