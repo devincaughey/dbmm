@@ -143,7 +143,7 @@ shape_mixfac <- function(long_data,
 
     items <- sort(unique(use_data$item))
 
-    unique_df <- use_data %>%
+    unique_df <- use_data |>
         dplyr::summarise(.by = .data$item, n = length(unique(.data$value)))
 
     drop_items <- dplyr::filter(unique_df, .data$n < 2)$item
@@ -196,44 +196,44 @@ shape_mixfac <- function(long_data,
     cat("\nCategorizing the following items as metric:\n")
     cat(c("  *", paste(metric_items, collapse = "\n  * "), "\n"))
 
-    binary_data <- use_data %>%
-        dplyr::filter(.data$item %in% binary_items) %>%
-        dplyr::mutate(ITEM = factor(.data$item, levels = binary_items)) %>%
-        dplyr::group_by(.data$ITEM) %>%
-        dplyr::mutate(yy = as.integer(ordered(.data$value)) - 1L) %>%
-        dplyr::filter(!is.na(.data$yy)) %>%
-        dplyr::ungroup() %>%
+    binary_data <- use_data |>
+        dplyr::filter(.data$item %in% binary_items) |>
+        dplyr::mutate(ITEM = factor(.data$item, levels = binary_items)) |>
+        dplyr::group_by(.data$ITEM) |>
+        dplyr::mutate(yy = as.integer(ordered(.data$value)) - 1L) |>
+        dplyr::filter(!is.na(.data$yy)) |>
+        dplyr::ungroup() |>
         dplyr::arrange(.data$TIME, .data$ITEM, .data$UNIT) # time must vary last
 
-    trichotomous_data <- use_data %>%
-        dplyr::filter(.data$item %in% trichotomous_items) %>%
-        dplyr::mutate(ITEM = factor(.data$item, levels = trichotomous_items)) %>%
-        dplyr::group_by(.data$ITEM) %>%
-        dplyr::mutate(yy = as.integer(ordered(.data$value))) %>%
-        dplyr::filter(!is.na(.data$yy)) %>%
-        dplyr::ungroup() %>%
+    trichotomous_data <- use_data |>
+        dplyr::filter(.data$item %in% trichotomous_items) |>
+        dplyr::mutate(ITEM = factor(.data$item, levels = trichotomous_items)) |>
+        dplyr::group_by(.data$ITEM) |>
+        dplyr::mutate(yy = as.integer(ordered(.data$value))) |>
+        dplyr::filter(!is.na(.data$yy)) |>
+        dplyr::ungroup() |>
         dplyr::arrange(.data$TIME, .data$ITEM, .data$UNIT) # time must vary last
 
-    ordinal_data <- use_data %>%
-        dplyr::filter(.data$item %in% ordinal_items) %>%
-        dplyr::mutate(ITEM = factor(.data$item, levels = ordinal_items)) %>%
-        dplyr::group_by(.data$ITEM) %>%
-        dplyr::mutate(yy = as.integer(ordered(.data$value))) %>%
-        dplyr::filter(!is.na(.data$yy)) %>%
-        dplyr::ungroup() %>%
+    ordinal_data <- use_data |>
+        dplyr::filter(.data$item %in% ordinal_items) |>
+        dplyr::mutate(ITEM = factor(.data$item, levels = ordinal_items)) |>
+        dplyr::group_by(.data$ITEM) |>
+        dplyr::mutate(yy = as.integer(ordered(.data$value))) |>
+        dplyr::filter(!is.na(.data$yy)) |>
+        dplyr::ungroup() |>
         dplyr::arrange(.data$TIME, .data$ITEM, .data$UNIT) # time must vary last
 
-    metric_data <- use_data %>%
-        dplyr::filter(.data$item %in% metric_items) %>%
-        dplyr::mutate(ITEM = factor(.data$item, levels = metric_items)) %>%
-        dplyr::mutate(yy = .data$value) %>%
-        dplyr::filter(!is.na(.data$yy)) %>%
+    metric_data <- use_data |>
+        dplyr::filter(.data$item %in% metric_items) |>
+        dplyr::mutate(ITEM = factor(.data$item, levels = metric_items)) |>
+        dplyr::mutate(yy = .data$value) |>
+        dplyr::filter(!is.na(.data$yy)) |>
         dplyr::arrange(.data$TIME, .data$ITEM, .data$UNIT) # time must vary last
 
     if (standardize) {
-        metric_data <- metric_data %>%
-            dplyr::group_by(.data$ITEM) %>%
-            dplyr::mutate(yy = stdize(.data$yy)) %>%
+        metric_data <- metric_data |>
+            dplyr::group_by(.data$ITEM) |>
+            dplyr::mutate(yy = stdize(.data$yy)) |>
             dplyr::ungroup()
     }
 
