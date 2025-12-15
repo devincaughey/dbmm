@@ -391,3 +391,55 @@ identify_modgirt <- function(x, method = "varimax") {
     )
     return(out_ls)
 }
+
+
+#' Apply rotation to MODGIRT draws
+#'
+#' This function applies the given rotation to each draw from the posterior
+#' distribution of the MODGIRT parameters
+#'
+#' @param modgirt_rvar A `draws_rvar` object from a MODGIRT model
+#' @param rotat An I-by-D rotation matrix
+#'
+#' @return A `draws_rvar` object of rotated draws
+#'
+#' @examples
+#' rotmat <- varimax(E(modgirt_signed$beta))$rotmat
+#' modgirt_rotated <- rotate_modgirt(modgirt_signed, rotmat)
+#' 
+#' @import posterior
+#'
+#' @export
+rotate_modgirt <- function(modgirt_rvar, rotmat) {
+    ## inverse of transpose (needed for oblique rotation)
+    if (is_rvar(rotmat)) {
+        rvar_solve <- rfun(solve)
+        G <- rvar_solve(t(rotmat))
+    } else {
+        G <- solve(t(rotmat))
+    }
+    ## Create parameter-specific `draws_rvar` objects
+    beta_rvar <- subset_draws(modgirt_rvar, variable = "beta")
+    bar_theta_rvar <- subset_draws(modgirt_rvar, variable = "bar_theta")
+    sigma_theta_rvar <- subset_draws(modgirt_rvar, variable = "Sigma_theta")
+    omega_rvar <- subset_draws(modgirt_rvar, variable = "Omega")
+    n_time <- dim(bar_theta_rvar$bar_theta)[1]
+    ## Apply rotations
+    beta_rvar$beta <- beta_rvar$beta %**% G
+    for (t in seq_len(n_time)) {
+        bar_theta_rvar$bar_theta[t, , ] <- 
+            bar_theta_rvar$bar_theta[t, , , drop = TRUE] %**% G
+    }
+    sigma_theta_rvar$Sigma_theta <-
+        t(G) %**% sigma_theta_rvar$Sigma_theta %**% G
+    omega_rvar$Omega <- t(G) %**% omega_rvar$Omega %**% G
+    modgirt_rvar_rot <- draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = beta_rvar$beta,
+        bar_theta = bar_theta_rvar$bar_theta,
+        Sigma_theta = sigma_theta_rvar$Sigma_theta,
+        Omega = omega_rvar$Omega)
+    return(modgirt_rvar_rot)
+}
+
