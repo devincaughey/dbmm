@@ -316,7 +316,7 @@ summarize_mixfac <- function (x, summary_functions) {
     return(out)
 }
 
-#' Order factors in a model based on sums of squared loadings
+#' order factors in a model based on sums of squared loadings
 #'
 #' This function takes a model based on posterior draws and orders the factors
 #' based on their estimated sums of squares. Factors with larger sums of squares
@@ -345,6 +345,49 @@ sort_mixfac <- function(x) {
                        lp__ = x$lp__
                    )
     return(out)
+}
+
+#' Set Signs
+#'
+#' This function sets the signs of the parameters of a MIXFAC model based on 
+#' user-defined signs.
+#'
+#' @param x The model object containing the parameters.
+#' @param signs A vector of signs to be applied to the parameters. 
+#' Scalar values are allowed and will be recycled. Default is 1.
+#'
+#' @return A modified model object with the signs of the parameters updated.
+#'
+#' @details This function sets the signs of the parameters in the model object
+#' \code{x} based on the user-defined signs provided in the 
+#' \code{signs} argument. The function applies the sign flips to the parameters 
+#' and returns a modified model object with the updated signs.
+#'
+#' @import posterior
+#'
+#' @export
+sign_mixfac <- function(x, signs = 1) {
+    check_arg_type(arg = x, typename = "mixfac_comb")
+    n_time <- dim(x$eta)[1]
+    n_factor <- dim(x$eta)[3]
+    stopifnot(length(signs == 1) || length(signs) == n_factor)
+    init_signs <- sign(colMeans(E(x$lambda)))
+    sign_flips <- ifelse(init_signs == signs, 1, -1)
+    sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
+    for (t in seq_len(n_time)) {
+        x$eta[t, , drop = TRUE] <-
+            x$eta[t, , drop = TRUE] %**% sm
+    }
+    posterior::draws_rvars(
+        eta = x$eta,
+        lambda = x$lambda %**% sm,
+        alpha = x$alpha,
+        kappa = x$kappa,
+        sigma_alpha_evol = x$sigma_alpha_evol,
+        sigma_metric = x$sigma_metric,
+        Omega = t(sm) %**% x$Omega %**% sm
+        lp__ = x$lp__
+    )
 }
 
 
@@ -504,7 +547,7 @@ sort_modgirt <- function(modgirt_rvar) {
 
 #' Set Signs
 #'
-#' This function sets the signs of the parameters in a model based on 
+#' This function sets the signs of the parameters of a MODGIRT model based on 
 #' user-defined signs.
 #'
 #' @param modgirt_rvar The model object containing the parameters.
@@ -524,7 +567,7 @@ sort_modgirt <- function(modgirt_rvar) {
 sign_modgirt <- function(modgirt_rvar, signs = 1) {
     n_time <- dim(modgirt_rvar$bar_theta)[1]
     n_factor <- dim(modgirt_rvar$bar_theta)[3]
-    stopifnot(length(signs == 1) || length(signs) == D)
+    stopifnot(length(signs == 1) || length(signs) == n_factor)
     init_signs <- sign(colMeans(E(modgirt_rvar$beta)))
     sign_flips <- ifelse(init_signs == signs, 1, -1)
     sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
@@ -541,3 +584,4 @@ sign_modgirt <- function(modgirt_rvar, signs = 1) {
         Omega = t(sm) %**% modgirt_rvar$Omega %**% sm
     )
 }
+
