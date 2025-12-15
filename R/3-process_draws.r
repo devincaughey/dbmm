@@ -443,3 +443,61 @@ rotate_modgirt <- function(modgirt_rvar, rotmat) {
     return(modgirt_rvar_rot)
 }
 
+#' Order factors in a model based on sums of squared loadings
+#'
+#' This function takes a model based on posterior draws and orders the factors
+#' based on their estimated sums of squares. Factors with larger sums of squares
+#' will be placed first in the sort model.
+#'
+#' @param modgirt_rvar A `draws_rvar` object from a MODGIRT model
+#'
+#' @return A `draws_rvar` object with factors ordered by explanatory power
+#'
+#' @export
+sort_modgirt <- function(modgirt_rvar) {
+    ss <- posterior::rvar_apply(modgirt_rvar$beta, 2, function(x) {
+        posterior::rvar_sum(x^2)
+    })
+    fo <- order(-posterior::E(ss))
+    sorted_rvar <- posterior::draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = modgirt_rvar$beta[, fo],
+        bar_theta = modgirt_rvar$bar_theta[, , fo],
+        Sigma_theta = modgirt_rvar$Sigma_theta[fo, fo],
+        Omega = modgirt_rvar$Omega[fo, fo]
+    )
+    return(sorted_rvar)
+}
+
+
+#' Order factors in a model based on sums of squared loadings
+#'
+#' This function takes a model based on posterior draws and orders the factors
+#' based on their estimated sums of squares. Factors with larger sums of squares
+#' will be placed first in the sort model.
+#'
+#' @param mixfac_rvar A `draws_rvar` object from a mixed-factor model
+#'
+#' @return A `draws_rvar` object with factors ordered by explanatory power
+#'
+#' @export
+sort_mixfac <- function(x) {
+    check_arg_type(arg = x, typename = "mixfac_comb")
+    ss <- posterior::rvar_apply(mixfac_rvar$lambda, 2, function(x) {
+        posterior::rvar_sum(x^2)
+    })
+    fo <- order(-posterior::E(ss))
+    out <-
+        posterior::draws_rvars(
+                       eta = x$eta[, , fo],
+                       lambda = x$lambda[, fo],
+                       alpha = x$alpha,
+                       kappa = x$kappa,
+                       sigma_alpha_evol = x$sigma_alpha_evol,
+                       sigma_metric = x$sigma_metric,
+                       Omega = x$Omega[fo, fo],
+                       lp__ = x$lp__
+                   )
+    return(out)
+}
