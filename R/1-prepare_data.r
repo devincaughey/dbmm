@@ -18,7 +18,7 @@
 #'  (beta_nonzero), and the matrix of signed loadings (beta_sign).
 #'
 #' @export
-shape_data_modgirt <- function(long_data,
+shape_modgirt <- function(long_data,
                                unit_var,
                                time_var,
                                item_var,
@@ -107,7 +107,7 @@ shape_data_modgirt <- function(long_data,
 #' @importFrom rlang .data
 #'
 #' @export
-shape_data_mixfac <- function(long_data,
+shape_mixfac <- function(long_data,
                               unit_var,
                               time_var,
                               item_var,
