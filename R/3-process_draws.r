@@ -385,7 +385,7 @@ sign_mixfac <- function(x, signs = 1) {
         kappa = x$kappa,
         sigma_alpha_evol = x$sigma_alpha_evol,
         sigma_metric = x$sigma_metric,
-        Omega = t(sm) %**% x$Omega %**% sm
+        Omega = t(sm) %**% x$Omega %**% sm,
         lp__ = x$lp__
     )
 }
