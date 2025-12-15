@@ -1,4 +1,77 @@
 
+#' Fit a multidimensional ordinal group-level IRT model using Stan
+#'
+#' This function fits a MODGIRT model using Stan.
+#' It takes in the following arguments:
+#'
+#' @param stan_data The data for the model.
+#' @param chains The number of chains to use (default is 4).
+#' @param return_data A logical value indicating whether to return the input
+#' data along with the model fit (default is TRUE).
+#' @param n_factor The number of factors in the model.
+#' @param force_recompile A logical value indicating whether to force
+#' recompilation of the Stan model (default is FALSE).
+#' @param signed_loadings The signed loadings matrix.
+#' @param nonzero_loadings The nonzero loadings matrix.
+#' @param link The link function to use (default is "probit").
+#' @param seed The random seed for reproducibility.
+#' @param ... Additional arguments to be passed to the Stan sampling function.
+#'
+#' @return A list containing the model fit and optionally the input data.
+#'
+#' @export
+fit_modgirt <- function(
+    stan_data,
+    chains = 4,
+    return_data = TRUE,
+    n_factor = 1,
+    force_recompile = FALSE,
+    signed_loadings,
+    nonzero_loadings,
+    link = "probit",
+    seed = NULL,
+    ...
+) {
+    n_item <- stan_data$Q
+    if (missing(signed_loadings)) {
+        signed_loadings <- matrix(
+            data = 0,
+            nrow = n_item,
+            ncol = n_factor,
+            dimnames = list(dimnames(stan_data$SSSS)$ITEM, seq_len(n_factor))
+        )
+    }
+    if (missing(nonzero_loadings)) {
+        nonzero_loadings <- matrix(
+            data = 1,
+            nrow = n_item,
+            ncol = n_factor,
+            dimnames = list(dimnames(stan_data$SSSS)$ITEM, seq_len(n_factor))
+        )
+    }
+    stopifnot(isTRUE(n_factor == ncol(signed_loadings)))
+    stopifnot(isTRUE(n_factor == ncol(nonzero_loadings)))
+    stan_data$D <- n_factor
+    stan_data$beta_nonzero <- nonzero_loadings
+    stan_data$beta_sign <- signed_loadings
+    file <- system.file(
+        paste0("stan/modgirt_", link, ".stan"),
+        package = "dbmm"
+    )
+    m0 <- cmdstan_model(stan_file = file)
+    m1 <- m0$compile(force_recompile = force_recompile)
+    modgirt_fit <- m1$sample(stan_data, chains = chains, seed = seed, ...)
+    ## Prepare output
+    attr(modgirt_fit, "unit_labels") <- attr(stan_data, "unit_labels")
+    attr(modgirt_fit, "time_labels") <- attr(stan_data, "time_labels")
+    attr(modgirt_fit, "item_labels") <- attr(stan_data, "item_labels")
+    out <- list(fit = modgirt_fit)
+    if (return_data) {
+        out$stan_data <- stan_data
+    }
+    return(out)
+}
+
 #' Fit a dynamic mixed factor model using Stan.
 #'
 #' @param shaped_data (list) Data formatted for Stan, typically created by `shape()`.
