@@ -66,8 +66,8 @@ identify_mixfac <- function(x, method = "varimax", identify_with_type) {
     ## Subset to lambda draws (rvar)
     lambda_rvar <-
         posterior::subset_draws(draws_rvar, variable = "^lambda", regex = TRUE)
-    draws_of_lambda <- lambda_rvar %>%
-        lapply(draws_of, with_chains = TRUE) %>%
+    draws_of_lambda <- lambda_rvar |>
+        lapply(draws_of, with_chains = TRUE) |>
         abind::abind(along = 3)
     ## Dimensions (chains / iterations / factors)
     n_chain <- posterior::nchains(draws_rvar)
@@ -280,12 +280,12 @@ summarize_mixfac <- function (x, summary_functions) {
         )
     }
     sfun <- function (y) {
-        y %>%
+        y |>
             mutate(
                 across(value, summary_functions),
-            ) %>%
-            select(-value) %>%
-            rename_with(~str_remove(., "value_")) %>%
+            ) |>
+            select(-value) |>
+            rename_with(~str_remove(., "value_")) |>
             as_tibble()
     }
     is_rvar <- sapply(x, inherits, "rvar")
@@ -297,8 +297,8 @@ summarize_mixfac <- function (x, summary_functions) {
                 out_rvar[[i]] <- NA
             } else {
                 out_rvar[[i]] <-
-                    x[is_rvar][[i]] %>%
-                    summarise_draws() %>%
+                    x[is_rvar][[i]] |>
+                    summarise_draws() |>
                     mutate(
                         variable = str_replace(
                             variable,
