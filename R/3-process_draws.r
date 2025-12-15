@@ -316,6 +316,38 @@ summarize_mixfac <- function (x, summary_functions) {
     return(out)
 }
 
+#' Order factors in a model based on sums of squared loadings
+#'
+#' This function takes a model based on posterior draws and orders the factors
+#' based on their estimated sums of squares. Factors with larger sums of squares
+#' will be placed first in the sort model.
+#'
+#' @param mixfac_rvar A `draws_rvar` object from a mixed-factor model
+#'
+#' @return A `draws_rvar` object with factors ordered by explanatory power
+#'
+#' @export
+sort_mixfac <- function(x) {
+    check_arg_type(arg = x, typename = "mixfac_comb")
+    ss <- posterior::rvar_apply(mixfac_rvar$lambda, 2, function(x) {
+        posterior::rvar_sum(x^2)
+    })
+    fo <- order(-posterior::E(ss))
+    out <-
+        posterior::draws_rvars(
+                       eta = x$eta[, , fo],
+                       lambda = x$lambda[, fo],
+                       alpha = x$alpha,
+                       kappa = x$kappa,
+                       sigma_alpha_evol = x$sigma_alpha_evol,
+                       sigma_metric = x$sigma_metric,
+                       Omega = x$Omega[fo, fo],
+                       lp__ = x$lp__
+                   )
+    return(out)
+}
+
+
 #' Identify MODGIRT draws
 #'
 #' This function identifies the MODGIRT model by postprocessing the draws from
@@ -470,34 +502,42 @@ sort_modgirt <- function(modgirt_rvar) {
     return(sorted_rvar)
 }
 
-
-#' Order factors in a model based on sums of squared loadings
+#' Set Signs
 #'
-#' This function takes a model based on posterior draws and orders the factors
-#' based on their estimated sums of squares. Factors with larger sums of squares
-#' will be placed first in the sort model.
+#' This function sets the signs of the parameters in a model based on 
+#' user-defined signs.
 #'
-#' @param mixfac_rvar A `draws_rvar` object from a mixed-factor model
+#' @param modgirt_rvar The model object containing the parameters.
+#' @param signs A vector of signs to be applied to the parameters. 
+#' Scalar values are allowed and will be recycled. Default is 1.
 #'
-#' @return A `draws_rvar` object with factors ordered by explanatory power
+#' @return A modified model object with the signs of the parameters updated.
+#'
+#' @details This function sets the signs of the parameters in the model object
+#' \code{modgirt_rvar} based on the user-defined signs provided in the 
+#' \code{signs} argument. The function applies the sign flips to the parameters 
+#' and returns a modified model object with the updated signs.
+#'
+#' @import posterior
 #'
 #' @export
-sort_mixfac <- function(x) {
-    check_arg_type(arg = x, typename = "mixfac_comb")
-    ss <- posterior::rvar_apply(mixfac_rvar$lambda, 2, function(x) {
-        posterior::rvar_sum(x^2)
-    })
-    fo <- order(-posterior::E(ss))
-    out <-
-        posterior::draws_rvars(
-                       eta = x$eta[, , fo],
-                       lambda = x$lambda[, fo],
-                       alpha = x$alpha,
-                       kappa = x$kappa,
-                       sigma_alpha_evol = x$sigma_alpha_evol,
-                       sigma_metric = x$sigma_metric,
-                       Omega = x$Omega[fo, fo],
-                       lp__ = x$lp__
-                   )
-    return(out)
+sign_modgirt <- function(modgirt_rvar, signs = 1) {
+    n_time <- dim(modgirt_rvar$bar_theta)[1]
+    n_factor <- dim(modgirt_rvar$bar_theta)[3]
+    stopifnot(length(signs == 1) || length(signs) == D)
+    init_signs <- sign(colMeans(E(modgirt_rvar$beta)))
+    sign_flips <- ifelse(init_signs == signs, 1, -1)
+    sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
+    for (t in seq_len(n_time)) {
+        modgirt_rvar$bar_theta[t, , drop = TRUE] <-
+            modgirt_rvar$bar_theta[t, , drop = TRUE] %**% sm
+    }
+    posterior::draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = modgirt_rvar$beta %**% sm,
+        bar_theta = modgirt_rvar$bar_theta,
+        Sigma_theta = t(sm) %**% modgirt_rvar$Sigma_theta %**% sm,
+        Omega = t(sm) %**% modgirt_rvar$Omega %**% sm
+    )
 }
