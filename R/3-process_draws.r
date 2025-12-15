@@ -315,3 +315,79 @@ summarize_mixfac <- function (x, summary_functions) {
     out <- c(out_rvar, out_df)
     return(out)
 }
+
+#' Identify MODGIRT draws
+#'
+#' This function identifies the MODGIRT model by postprocessing the draws from
+#' the posterior distribution.
+#'
+#' @param x A fitted MODGIRT model object or `draws_rvars` object
+#'
+#' @return A list containing the identified MODGIRT model parameters.
+#'
+#' @import posterior
+#'
+#' @export
+identify_modgirt <- function(x, method = "varimax") {
+    ## Store draws in `rvars` object
+    if (posterior::is_draws_rvars(x)) {
+        modgirt_rvar <- x
+    } else {
+        modgirt_rvar <- posterior::as_draws_rvars(x$fit$draws())
+    }
+    beta_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "beta")
+    draws_of_beta <- posterior::draws_of(beta_rvar$beta, with_chains = TRUE)
+    bar_theta_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "bar_theta")
+    n_chain <- posterior::nchains(modgirt_rvar)
+    n_iter <- posterior::niterations(modgirt_rvar)
+    n_factor <- ncol(beta_rvar$beta)
+    ## Create draw-specific varimax rotations
+    if (n_factor > 1) {
+        vm_rvar <- make_vm_rvar(draws_of_beta, n_iter, n_chain, n_factor,
+                                method = method)
+    } else {
+        vm_rvar <- matrix(1)
+    }
+    ## Apply varimax rotations to `beta`
+    beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, vm_rvar)
+    ## Create draw-specific signed permutations
+    beta_matrix <- posterior::as_draws_matrix(t(beta_rvar$beta))
+    lambda_matrix <- rename_loading_matrix(beta_matrix)
+    rsp_out <- factor.switching::rsp_exact(lambda_matrix, rotate = FALSE)
+    sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
+    ## Apply signed permutations to `beta`
+    beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, sp_rvar)
+    ## Make single RSP matrix
+    vm_sp_rvar <- posterior::`%**%`(vm_rvar, sp_rvar)
+    ## Apply rotations to `bar_theta`
+    for (t in seq_len(dim(bar_theta_rvar$bar_theta)[1])) {
+        bar_theta_rvar$bar_theta[t, , ] <- posterior::`%**%`(
+            as.matrix(bar_theta_rvar$bar_theta[t, , , drop = TRUE]),
+            vm_sp_rvar
+        )
+    }
+    sigma_theta_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "Sigma_theta")
+    omega_rvar <-
+        posterior::subset_draws(modgirt_rvar, variable = "Omega")
+    sigma_theta_rvar$Sigma_theta <-
+        t(vm_sp_rvar) %**% sigma_theta_rvar$Sigma_theta %**% vm_sp_rvar
+    omega_rvar$Omega <-
+        t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
+    modgirt_rvar_id <- posterior::draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = beta_rvar$beta,
+        bar_theta = bar_theta_rvar$bar_theta,
+        Sigma_theta = sigma_theta_rvar$Sigma_theta,
+        Omega = omega_rvar$Omega
+    )
+    out_ls <- list(
+        modgirt_rvar = modgirt_rvar_id,
+        vm_rvar = vm_rvar,
+        sp_rvar = sp_rvar
+    )
+    return(out_ls)
+}
