@@ -105,6 +105,8 @@ fit_modgirt <- function(
 #'     the same priors in every time period? Defaults to `TRUE`. If `FALSE`, the
 #'     scores in each period will be given priors centered on their value in the
 #'     previous period, thus smoothing the estimates across periods.
+#' @param white_eta (logical) Should units' factor scores (`eta`) be whitened
+#'     for identification?  Defaults to `TRUE`.
 #' @param lambda_zeros (multiple options) Should some item loadings (`lambda`)
 #'     be fixed at 0, and if so which ones? Rotational invariance (label
 #'     switching) across latent factors can be avoided by setting, for each
@@ -173,6 +175,7 @@ fit_mixfac <- function(shaped_data,
                        n_dim = 1,
                        constant_alpha = FALSE,
                        separate_eta = TRUE,
+                       whiten_eta = TRUE,
                        lambda_zeros = NULL,
                        df_sigma_metric = 4,
                        df_sigma_alpha_evol = 4,
@@ -208,6 +211,7 @@ fit_mixfac <- function(shaped_data,
     shaped_data$parallelize <- as.integer(parallelize_within_chains)
     shaped_data$constant_alpha <- as.integer(constant_alpha)
     shaped_data$separate_eta <- as.integer(separate_eta)
+    shaped_data$whiten_eta <- as.integer(whiten_eta)
     shaped_data$D <- n_dim
     shaped_data$df_sigma_metric <- df_sigma_metric
     shaped_data$df_sigma_alpha_evol <- df_sigma_alpha_evol
