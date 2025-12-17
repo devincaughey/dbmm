@@ -130,6 +130,7 @@ data {
   int<lower=0,upper=1> parallelize;    /* parallelize within chains? */
   int<lower=0,upper=1> constant_alpha; /* keep alphas constant? */
   int<lower=0,upper=1> separate_eta;   /* estimate eta separately by period */
+  int<lower=0,upper=1> whiten_eta;     /* whiten eta */
   int<lower=1> D;                      /* number of latent dimensions */
   int<lower=1> J;                      /* number of units */
   int<lower=1> T;                      /* number of time periods */
@@ -219,7 +220,11 @@ transformed parameters {
   matrix[D, D] chol_Omega = cholesky_decompose(Omega);
   for (t in 1:T) {
     if (t == 1) {
-      eta[t, 1:J, 1:D] = to_array_2d(whiten(to_matrix(z_eta[t, 1:J, 1:D])));
+      if (whiten_eta) {
+	eta[t, 1:J, 1:D] = to_array_2d(whiten(to_matrix(z_eta[t, 1:J, 1:D])));
+      } else {
+	eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
+      }
       alpha_metric[t] = z_alpha_metric[t];
       alpha_binary[t] = z_alpha_binary[t];
       alpha_trichot[t, ] = rep_array(0.0, I_trichot);
