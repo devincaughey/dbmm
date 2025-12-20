@@ -88,3 +88,26 @@ vgQ.maxvar1 <- function(L, ...) {
   Gq <- -2 * (L %*% v) %*% t(v)
   list(f = f, Gq = Gq, Method = "maxvar1")
 }
+whiten_matrix <- function(DM, eps = 0) {
+  ## DM must be de-meaned (observations × variables)
+  if (!is.matrix(DM)) DM <- as.matrix(DM)
+  n <- nrow(DM)
+  p <- ncol(DM)
+  
+  if (n <= 1) stop("DM must have at least 2 rows")
+
+  ## sample covariance
+  SS <- crossprod(DM) / (n - 1)
+
+  ## optional jitter
+  if (eps > 0) SS <- SS + diag(eps, p)
+
+  ## precision = inverse covariance
+  PP <- solve(SS)
+
+  ## whitening matrix
+  WW <- t(chol(PP))
+
+  WW
+}
+rvar_whiten_matrix <- rfun(whiten_matrix)
