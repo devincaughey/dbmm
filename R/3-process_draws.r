@@ -15,8 +15,7 @@
 #' @import cmdstanr
 #'
 #' @export
-extract_mixfac_draws <- function(x, drop = "^z_|^chol", check = TRUE)
-{
+extract_mixfac_draws <- function(x, drop = "^z_|^chol|^r_|^L_", check = TRUE) {
 
     if (check) {
         check_arg_type(arg = x, typename = "mixfac_fit")
@@ -27,7 +26,7 @@ extract_mixfac_draws <- function(x, drop = "^z_|^chol", check = TRUE)
     if (isTRUE(drop)) {
         draws <- posterior::subset_draws(
                                 x = draws,
-                                variable = "^z_|^chol",
+                                variable = "^z_|^chol|^r_|^L_",
                                 regex = TRUE,
                                 exclude = TRUE
                             )
@@ -56,7 +55,8 @@ extract_mixfac_draws <- function(x, drop = "^z_|^chol", check = TRUE)
 
 #' Exported function
 #' @export
-identify_mixfac <- function(x, method = "varimax", identify_with_type) {
+identify_mixfac <- function(x, method = "varimax", whiten = TRUE,
+                            ref_t = "last", identify_with_type) {
     ## Accept either a draws_rvars object or a fitted object / draws_df
     if (posterior::is_draws_rvars(x)) {
         draws_rvar <- x
@@ -73,20 +73,56 @@ identify_mixfac <- function(x, method = "varimax", identify_with_type) {
     n_chain <- posterior::nchains(draws_rvar)
     n_iter <- posterior::niterations(draws_rvar)
     n_factor <- dim(draws_of_lambda)[4]
+    n_time <- dim(x$eta)[1]
+    if (ref_t == "last") ref_t <- n_time
     ## Choose which loading variable to use based on item_type
-    if (missing(identify_with_type)) {
+    if (inherits(x, "mixfac_comb")) {
+        identify_with_type <- "lambda"
+    } else if (missing(identify_with_type)) {
         identify_with_type <-
             names(lambda_rvar)[which.max(sapply(lambda_rvar, length))][1]
         identify_with_type <- sub("^lambda_", "", identify_with_type)
     }
     varname <- switch(
         identify_with_type,
+        lambda = "lambda",
         binary = "lambda_binary",
         trichot = "lambda_trichot",
         ordinal = "lambda_ordinal",
         metric = "lambda_metric",
-        stop("Invalid `identify_with_type` argument; must be 'binary', 'trichot', 'ordinal' or 'metric'")
+        stop("Invalid `identify_with_type` argument; must be 'lambda', 'binary', 'trichot', 'ordinal' or 'metric'")
     )
+    omega_rvar <- posterior::subset_draws(draws_rvar, variable = "Omega")
+    if (whiten) {
+        eta_raw <- x$eta
+        ## Demean
+        cmeans_rvar <- rvar_apply(eta_raw[ref_t, , ], 3, rvar_mean)
+        eta_0 <- eta_raw
+        for (t in seq_len(dim(eta_raw)[1])) {
+            for (j in seq_len(dim(eta_raw)[2])) {
+                for (d in seq_len(dim(eta_raw)[3])) {
+                    eta_0[t, j, d] <- eta_raw[t, j, d] - cmeans_rvar[d]
+                }
+            }
+        }
+        eta_w <- eta_0
+        WW_rvar <- rvar_whiten_matrix(eta_0[ref_t, , ,  drop = TRUE])
+        for (t in seq_len(dim(eta_0)[1])) {
+            if (n_factor == 1) {
+                eta_0_mat <- t(t(eta_0[t, , , drop = TRUE]))
+                eta_w[t, , ] <- t(posterior::`%**%`(eta_0_mat, WW_rvar))
+            } else {
+                eta_w[t, , ] <-
+                    posterior::`%**%`(eta_0[t, , , drop = TRUE], WW_rvar)
+            }
+        }
+        draws_rvar$eta <- eta_w
+        for (k in seq_along(lambda_rvar)) {
+            lambda_rvar[[k]] <- posterior::`%**%`(lambda_rvar[[k]], WW_rvar)
+        }
+        omega_rvar$Omega <- t(WW_rvar) %**% omega_rvar$Omega %**% WW_rvar
+        ## TODO: kappa and alpha_metric/binary (difference in eta * lambda)
+    }
     ## Make varimax matrices
     if (n_factor > 1) {
         vm_rvar <- make_vm_rvar(
@@ -100,12 +136,15 @@ identify_mixfac <- function(x, method = "varimax", identify_with_type) {
         vm_rvar <- matrix(1)
     }
     ## Apply varimax rotations to lambdas
-    for (t in seq_along(lambda_rvar)) {
-        lambda_rvar[[t]] <- posterior::`%**%`(lambda_rvar[[t]], vm_rvar)        
+    for (k in seq_along(lambda_rvar)) {
+        lambda_rvar[[k]] <- posterior::`%**%`(lambda_rvar[[k]], vm_rvar)        
     }
     ## Compute signed-permutation matrices (factor-switching alignment)
-    ## Convert rotated lambdas to a draws-matrix in the format expected by :
-    lambda_matrix <- posterior::as_draws_matrix(t(lambda_rvar[[varname]]))
+    ## Convert rotated lambdas to a draws-matrix in the format expected by
+    ## rsp_exact()
+    lambda_without_names <- lambda_rvar[[varname]]
+    dimnames(lambda_without_names) <- NULL
+    lambda_matrix <- posterior::as_draws_matrix(t(lambda_without_names))
     lambda_matrix <- rename_loading_matrix(lambda_matrix)
     ## factor.switching::rsp_exact expects rows ordered by (chain then iteration),
     ## and returns a list with sign_vectors and permute_vectors
@@ -114,7 +153,11 @@ identify_mixfac <- function(x, method = "varimax", identify_with_type) {
     sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
     ## Apply signed permutations to lambdas
     for (t in seq_along(lambda_rvar)) {
-        lambda_rvar[[t]] <- posterior::`%**%`(lambda_rvar[[t]], sp_rvar)        
+        lambda_rvar[[t]] <- posterior::`%**%`(lambda_rvar[[t]], sp_rvar)
+        dimnames(lambda_rvar[[t]]) <- list(
+            item = dimnames(lambda_rvar[[t]])[[1]],
+            factor = seq_len(dim(lambda_rvar[[t]])[2])
+        )
     }
     ## RSP matrices
     vm_sp_rvar <- posterior::`%**%`(vm_rvar, sp_rvar)
@@ -126,25 +169,43 @@ identify_mixfac <- function(x, method = "varimax", identify_with_type) {
             vm_sp_rvar
         )
     }
-    omega_rvar <- posterior::subset_draws(draws_rvar, variable = "Omega")
     omega_rvar$Omega <- t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
-    out <- posterior::draws_rvars(
-                          eta = eta_rvar$eta,
-                          lambda_binary = lambda_rvar$lambda_binary,
-                          lambda_trichot = lambda_rvar$lambda_trichot,
-                          lambda_ordinal = lambda_rvar$lambda_ordinal,
-                          lambda_metric = lambda_rvar$lambda_metric,
-                          alpha_binary = draws_rvar$alpha_binary,
-                          alpha_trichot = draws_rvar$alpha_trichot,
-                          alpha_ordinal = draws_rvar$alpha_ordinal,
-                          alpha_metric = draws_rvar$alpha_metric,
-                          kappa_trichot = draws_rvar$kappa_trichot,
-                          kappa_ordinal = draws_rvar$kappa_ordinal,
-                          sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
-                          sigma_metric = draws_rvar$sigma_metric,
-                          Omega = omega_rvar$Omega,
-                          lp__ = draws_rvar$lp__
-                      )
+    if (inherits(x, "mixfac_comb")) {
+        out <- posterior::draws_rvars(
+                              eta = eta_rvar$eta,
+                              lambda = lambda_rvar$lambda,
+                              alpha = draws_rvar$alpha,
+                              kappa_trichot = draws_rvar$kappa_trichot,
+                              kappa_ordinal = draws_rvar$kappa_ordinal,
+                              sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
+                              sigma_metric = draws_rvar$sigma_metric,
+                              Omega = omega_rvar$Omega,
+                              lp__ = draws_rvar$lp__
+                          )
+    } else {
+        out <- posterior::draws_rvars(
+                              eta = eta_rvar$eta,
+                              lambda_binary = lambda_rvar$lambda_binary,
+                              lambda_trichot = lambda_rvar$lambda_trichot,
+                              lambda_ordinal = lambda_rvar$lambda_ordinal,
+                              lambda_metric = lambda_rvar$lambda_metric,
+                              alpha_binary = draws_rvar$alpha_binary,
+                              alpha_trichot = draws_rvar$alpha_trichot,
+                              alpha_ordinal = draws_rvar$alpha_ordinal,
+                              alpha_metric = draws_rvar$alpha_metric,
+                              kappa_trichot = draws_rvar$kappa_trichot,
+                              kappa_ordinal = draws_rvar$kappa_ordinal,
+                              sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
+                              sigma_metric = draws_rvar$sigma_metric,
+                              Omega = omega_rvar$Omega,
+                              lp__ = draws_rvar$lp__
+                          )
+    }
+    if (whiten) {
+        warning("Note: Post-estimation identification of intercepts and thresholds is not yet implemented, so these variables are omitted from the output.")
+        out <- out |>
+            subset_draws("^kappa|^alpha_[mb]", regex = TRUE, exclude = TRUE)
+    }
     attr(out, "unit_labels") <- attr(x, "unit_labels")
     attr(out, "time_labels") <- attr(x, "time_labels")
     attr(out, "binary_item_labels") <- attr(x, "binary_item_labels")
@@ -155,6 +216,9 @@ identify_mixfac <- function(x, method = "varimax", identify_with_type) {
     attr(out, "signed-permutation matrix") <- sp_rvar
 
     class(out) <- c("mixfac_id", class(out))
+    if (inherits(x, "mixfac_comb")) {
+        class(out) <- c("mixfac_comb", class(out))
+    }
 
     return(out)
 }
@@ -162,7 +226,7 @@ identify_mixfac <- function(x, method = "varimax", identify_with_type) {
 
 #' Exported function
 #' @export
-label_mixfac <- function (x, make_long = TRUE, check = TRUE) {
+label_mixfac <- function (x, make_long = FALSE, check = TRUE) {
     stopifnot(is_draws_rvars(x))
     n_factor <- dim(x$eta)[[3]]
     if (length(attr(x, "binary_item_labels")) > 0) {
@@ -246,18 +310,59 @@ label_mixfac <- function (x, make_long = TRUE, check = TRUE) {
 combine_types_mixfac <- function (x) {
     ## lambda
     lambda_idx <- grep("^lambda_", names(x))
-    lambda <- dplyr::bind_rows(x[lambda_idx], .id = "item_type")
-    lambda$item_type <- sub("^lambda_", "", lambda$item_type)
+    if (all(sapply(x[lambda_idx], is.data.frame))) {
+        lambda <- dplyr::bind_rows(x[lambda_idx], .id = "item_type")
+        lambda$item_type <- sub("^lambda_", "", lambda$item_type)
+    } else {
+        for (k in seq_along(x[lambda_idx])) {
+            type_k <- sub("^lambda_", "", names(x[lambda_idx])[k])
+            dimnames(x[lambda_idx][[k]])[["item"]] <-
+                paste0(type_k, ": ", dimnames(x[lambda_idx][[k]])[["item"]])
+        }
+        lambda <- do.call(rbind, x[lambda_idx])
+    }
+    ## alpha
     alpha_idx <- grep("^alpha_", names(x))
-    alpha <- dplyr::bind_rows(x[alpha_idx], .id = "item_type")
-    alpha$item_type <- sub("^alpha_", "", alpha$item_type)
+    if (all(sapply(x[alpha_idx], is.data.frame))) {
+        alpha <- dplyr::bind_rows(x[alpha_idx], .id = "item_type")
+        alpha$item_type <- sub("^alpha_", "", alpha$item_type)
+    } else {
+        for (k in seq_along(x[alpha_idx])) {
+            type_k <- sub("^alpha_", "", names(x[alpha_idx])[k])
+            dimnames(x[alpha_idx][[k]])[["item"]] <-
+                paste0(type_k, ": ", dimnames(x[alpha_idx][[k]])[["item"]])
+        }
+        alpha <- do.call(cbind, x[alpha_idx])
+    }
+    ## kappa
     kappa_idx <- grep("^kappa_", names(x))
-    kappa <- dplyr::bind_rows(x[kappa_idx], .id = "item_type")
-    kappa$item_type <- sub("^kappa_", "", kappa$item_type)
-    out <- c(
-        list(lambda = lambda, alpha = alpha, kappa = kappa),
-        x[-c(lambda_idx, alpha_idx, kappa_idx)]
-    )
+    if (all(sapply(x[kappa_idx], is.data.frame))) {
+        kappa <- dplyr::bind_rows(x[kappa_idx], .id = "item_type")
+        kappa$item_type <- sub("^kappa_", "", kappa$item_type)
+        out <- c(
+            list(lambda = lambda, alpha = alpha, kappa = kappa),
+            x[-c(lambda_idx, alpha_idx, kappa_idx)]
+        )
+    } else {
+        out <- posterior::draws_rvars(
+                              eta = x$eta,
+                              lambda = lambda,
+                              alpha = alpha,
+                              kappa_trichot = x$kappa_trichot,
+                              kappa_ordinal = x$kappa_ordinal,
+                              sigma_alpha_evol = x$sigma_alpha_evol,
+                              sigma_metric = x$sigma_metric,
+                              Omega = x$Omega,
+                              lp__ = x$lp__
+                          )
+        attr(out, "unit_labels") <- attr(x, "unit_labels")
+        attr(out, "time_labels") <- attr(x, "time_labels")
+        attr(out, "binary_item_labels") <- attr(x, "binary_item_labels")
+        attr(out, "trichotomous_item_labels") <-
+            attr(x, "trichotomous_item_labels")
+        attr(out, "ordinal_item_labels") <- attr(x, "ordinal_item_labels")
+        attr(out, "metric_item_labels") <- attr(x, "metric_item_labels")
+    }
     class(out) <- c("mixfac_comb", class(out))
     return(out)
 }
@@ -327,23 +432,32 @@ summarize_mixfac <- function (x, summary_functions) {
 #' @return A `draws_rvar` object with factors ordered by explanatory power
 #'
 #' @export
-sort_mixfac <- function(x) {
-    check_arg_type(arg = x, typename = "mixfac_comb")
-    ss <- posterior::rvar_apply(mixfac_rvar$lambda, 2, function(x) {
+sort_mixfac <- function(x, check = TRUE) {
+    if (check) {
+        check_arg_type(arg = x, typename = "mixfac_comb")
+    }
+    ss <- posterior::rvar_apply(x$lambda, 2, function(x) {
         posterior::rvar_sum(x^2)
     })
     fo <- order(-posterior::E(ss))
+    eta <- x$eta[, , fo]
+    dimnames(eta)[[3]] <- seq_along(fo)
+    lambda <- x$lambda[, fo]
+    dimnames(lambda)[[2]] <- seq_along(fo)
+    Omega <- x$Omega[fo, fo]
+    dimnames(Omega)[[1]] <- dimnames(Omega)[[2]] <- seq_along(fo)
     out <-
         posterior::draws_rvars(
-                       eta = x$eta[, , fo],
-                       lambda = x$lambda[, fo],
+                       eta = eta,
+                       lambda = lambda,
                        alpha = x$alpha,
                        kappa = x$kappa,
                        sigma_alpha_evol = x$sigma_alpha_evol,
                        sigma_metric = x$sigma_metric,
-                       Omega = x$Omega[fo, fo],
+                       Omega = Omega,
                        lp__ = x$lp__
                    )
+    class(out) <- c("mixfac_sorted", class(x))
     return(out)
 }
 
