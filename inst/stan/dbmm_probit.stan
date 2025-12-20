@@ -1,32 +1,41 @@
 functions {
   vector p2l_vector (vector x) { // coverts vector from probit to logit scale
-    vector[num_elements(x)] y;
-    for (i in 1:num_elements(x)) {
-      y[i] = 0.07056 * pow(x[i], 3) + 1.5976 * x[i];
-    }
+    return x .* (1.5976 + 0.07056 * x .* x);
+  }
+
+  array[] real p2l_array(array[] real x) {
+    int N = num_elements(x);
+    vector[N] xv = to_vector(x);
+    vector[N] yv = xv .* (1.5976 + 0.07056 * xv .* xv);
+    array[N] real y;
+    for (i in 1:N) y[i] = yv[i];
     return y;
   }
-  array[] real p2l_array (array[] real x) { // coverts array from probit to logit scale
-    array[num_elements(x)] real y;
-    for (i in 1:num_elements(x)) {
-      y[i] = 0.07056 * pow(x[i], 3) + 1.5976 * x[i];
-    }
-    return y;
+
+  /* Return whitening matrix for demeaned matrix DM */
+  matrix make_whiten_matrix(matrix DM) {
+    int K = cols(DM);
+    real eps = 1e-8;
+    matrix[K, K] SS = crossprod(DM) ./ (rows(DM) - 1.0);
+    // small nugget for numerical stability
+    SS += eps * diag_matrix(rep_vector(1.0, K));
+    matrix[K, K] L = cholesky_decompose(SS);     // SS = L * L'
+    // inv(L): solve L * X = I
+    matrix[K, K] invL = mdivide_left_tri_low(L, diag_matrix(rep_vector(1.0, K)));
+    matrix[K, K] WW = invL';                      // WW = inv(L)'
+    return WW;
   }
-  /* De-mean and 'whiten' (cov = I) XX */
+
+  // whiten: demean columns of XX then multiply by whitening matrix (DM * WW)
   matrix whiten(matrix XX) {
-    matrix[rows(XX), cols(XX)] DM;
-    matrix[cols(XX), cols(XX)] SS;
-    matrix[cols(XX), cols(XX)] PP;
-    matrix[cols(XX), cols(XX)] WW;
-    for (d in 1:cols(XX)) {
-      DM[:, d] = XX[:, d] - mean(XX[:, d]); // de-mean each column
-    }
-    SS = crossprod(DM) ./ (rows(XX) - 1.0); // covariance of XX
-    PP = inverse_spd(SS);                   // precision of XX
-    WW = cholesky_decompose(PP);            // Cholesky decomposition
-    return DM * WW;                         // de-meaned and whitened XX
+    int R = rows(XX);
+    int C = cols(XX);
+    matrix[R, C] DM;
+    for (c in 1:C) DM[:, c] = XX[:, c] - mean(XX[:, c]);
+    matrix[C, C] WW = make_whiten_matrix(DM);
+    return DM * WW;
   }
+
   real bprobit_partial_sum_lpmf(array[] int yy_b_slice,
                                int start,
                                int end,
@@ -52,6 +61,7 @@ functions {
     }
     return bernoulli_logit_lupmf(yy_b_slice | p2l_vector(nu_slice));
   }
+
   real oprobit_partial_sum_lpmf(array[] int yy_o_slice,
                                int start,
                                int end,
@@ -80,6 +90,7 @@ functions {
     }
     return ordered_logistic_lupmf(yy_o_slice | p2l_vector(nu_slice), kappa_slice);
   }
+
   real normal_partial_sum_lpdf(array[] real yy_m_slice,
                                int start,
                                int end,
@@ -107,6 +118,7 @@ functions {
     }
     return normal_lupdf(yy_m_slice | nu_slice, sigma_slice);
   }
+
   int num_matches(array[] int x, int a) {
     int n = 0;
     for (i in 1:size(x))
@@ -114,6 +126,7 @@ functions {
         n += 1;
     return n;
   }
+
   array[] int which_equal(array[] int x, int a) {
     array[num_matches(x, a)] int match_positions;
     int pos = 1;
@@ -185,45 +198,60 @@ data {
 transformed data {
 }
 parameters {
-  array[T, J, D] real z_eta;                     /* latent factors (raw) */
-  array[T, I_binary] real z_alpha_binary;        /* intercepts (raw) */
+  array[T, J, D] real z_eta;                     /* latent factors (deviate) */
+  array[T, I_binary] real z_alpha_binary;        /* intercepts (deviate) */
   matrix[I_binary, D] z_lambda_binary;           /* binary loadings */
-  array[T, I_trichot] real z_alpha_trichot;      /* intercepts (raw) */
+  array[T, I_trichot] real z_alpha_trichot;      /* intercepts (deviate) */
   array[I_trichot] ordered[2] kappa_trichot;	 /* trichot. thresholds */
   matrix[I_trichot, D] z_lambda_trichot;         /* trichot. loadings */
-  array[T, I_ordinal] real z_alpha_ordinal;      /* intercepts (raw) */
+  array[T, I_ordinal] real z_alpha_ordinal;      /* intercepts (deviate) */
   array[I_ordinal] ordered[K_ordinal - 1] kappa_ordinal; /* ordinal thresholds */
   matrix[I_ordinal, D] z_lambda_ordinal;         /* ordinal loadings */
   real<lower=0> sigma_alpha_evol;                /* evolution SD of alpha */
-  array[T, I_metric] real z_alpha_metric;        /* intercepts (raw) */
+  array[T, I_metric] real z_alpha_metric;        /* intercepts (deviate) */
   matrix[I_metric, D] z_lambda_metric;           /* metric loadings */
   vector<lower=0>[I_metric] sigma_metric;        /* metric residual sd */
   vector<lower=0>[D] sigma_eta_evol;             /* evolution SD of eta */
-  corr_matrix[D] corr_eta_evol;   // cross-dimension correlation of transition model */
+  cholesky_factor_corr[D] Lcorr_eta; // cholesky factor of correlation of transition model
 }
 transformed parameters {
-  array[T, J, D] real eta;                /* latent factors (whitened) */
-  array[T, I_binary] real alpha_binary;   /* binary intercepts */
-  array[T, I_ordinal] real alpha_ordinal; /* ordinal intercepts */
-  array[T, I_trichot] real alpha_trichot; /* trichot intercepts */
-  array[T, I_metric] real alpha_metric;   /* metric intercepts */
-  array[I_binary, D] real lambda_binary;  /* binary loadings */
+  array[T, J, D] real r_eta;		   /* latent factors (un-whitened) */
+  array[T, J, D] real eta;		   /* latent factors (final) */
+  array[T, I_binary] real alpha_binary;	   /* binary intercepts */
+  array[T, I_ordinal] real alpha_ordinal;  /* ordinal intercepts */
+  array[T, I_trichot] real alpha_trichot;  /* trichot intercepts */
+  array[T, I_metric] real alpha_metric;	   /* metric intercepts */
+  array[I_binary, D] real lambda_binary;   /* binary loadings */
   array[I_trichot, D] real lambda_trichot; /* trichot loadings */
   array[I_ordinal, D] real lambda_ordinal; /* ordinal loadings */
   array[I_metric, D] real lambda_metric;   /* metric loadings */
+
   lambda_binary = to_array_2d(z_lambda_binary .* nonzero_binary);
   lambda_trichot = to_array_2d(z_lambda_trichot .* nonzero_trichot);
   lambda_ordinal = to_array_2d(z_lambda_ordinal .* nonzero_ordinal);
   lambda_metric = to_array_2d(z_lambda_metric .* nonzero_metric);
-  cov_matrix[D] Omega; // transition variance-covariance
-  Omega = quad_form_diag(corr_eta_evol, sigma_eta_evol);
-  matrix[D, D] chol_Omega = cholesky_decompose(Omega);
+
+  // build cholesky factor for evolution: L_eta = diag(sigma) * Lcorr_eta
+  matrix[D, D] L_eta = diag_pre_multiply(sigma_eta_evol, Lcorr_eta);
+  /* WW will hold the whitening matrix computed from period t==1
+     so it can be reused later in generated quantities. */
+  matrix[D, D] WW;
   for (t in 1:T) {
     if (t == 1) {
-      if (whiten_eta) {
-	eta[t, 1:J, 1:D] = to_array_2d(whiten(to_matrix(z_eta[t, 1:J, 1:D])));
+      if (whiten_eta == 1) {
+        /* compute DM (zmat demeaned by its column means) and WW from period 1,
+           then whiten using DM * WW. This makes WW available in this scope. */
+        matrix[J, D] zmat = to_matrix(z_eta[t, 1:J, 1:D]);
+        matrix[J, D] DM;
+        for (d in 1:D) DM[:, d] = zmat[:, d] - mean(zmat[:, d]);
+        WW = make_whiten_matrix(DM);        // WW computed from period-1 DM
+        eta[t, 1:J, 1:D] = to_array_2d(DM * WW); // same result as whiten(zmat)
+        r_eta[t, 1:J, 1:D] = eta[t, 1:J, 1:D];
       } else {
-	eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
+        /* ensure WW is defined even when not whitening (identity no-op) */
+        WW = identity_matrix(D);
+        r_eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
+        eta[t, 1:J, 1:D] = r_eta[t, 1:J, 1:D];
       }
       alpha_metric[t] = z_alpha_metric[t];
       alpha_binary[t] = z_alpha_binary[t];
@@ -231,17 +259,20 @@ transformed parameters {
       alpha_ordinal[t, ] = rep_array(0.0, I_ordinal);
     } else {
       if (separate_eta == 1) {
-	eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
+        r_eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
+        eta[t, 1:J, 1:D] = r_eta[t, 1:J, 1:D];
       } else {
-	for (j in 1:J) {
-	  vector[D] eta_vec_tm1 = to_vector(eta[t-1, j, 1:D]);
-	  vector[D] z_eta_t = to_vector(z_eta[t, j, 1:D]);
-	  eta[t][j, 1:D] = to_array_1d(eta_vec_tm1 + chol_Omega * z_eta_t);
-	}
-      } 
+        for (j in 1:J) {
+          vector[D] r_eta_vec_tm1 = to_vector(r_eta[t-1, j, 1:D]);
+          vector[D] z_eta_t = to_vector(z_eta[t, j, 1:D]);
+          // use L_eta (diag_pre_multiply(sigma, Lcorr_eta)) as cholesky factor:
+          r_eta[t][j, 1:D] = to_array_1d(r_eta_vec_tm1 + L_eta * z_eta_t);
+          eta[t, j, 1:D] = r_eta[t, j, 1:D];
+        }
+      }
       if (constant_alpha == 1) {
         alpha_metric[t] = z_alpha_metric[1]; /* copy first period */
-        alpha_binary[t] = z_alpha_binary[1]; /* copy first period */
+        alpha_binary[t] = z_alpha_binary[1];
         for (i in 1:I_trichot) {
           alpha_trichot[t, i] = 0;
         }
@@ -265,7 +296,7 @@ transformed parameters {
           alpha_metric[t][i] = alpha_metric[t - 1][i] +
             z_alpha_metric[t][i] * sigma_alpha_evol;
         }
-      } 
+      }
     }
   }
 }
@@ -280,52 +311,52 @@ model {
     profile("linear_predictor") {
       // compute each nu once
       for (n in 1:N_binary) {
-	int tt = tt_binary[n];
-	int ii = ii_binary[n];
-	int jj = jj_binary[n];
-	nu_binary[n] = alpha_binary[tt, ii] +
-	  dot_product(lambda_binary[ii, 1:D], 
-		      eta[tt, jj, 1:D]);
+        int tt = tt_binary[n];
+        int ii = ii_binary[n];
+        int jj = jj_binary[n];
+        nu_binary[n] = alpha_binary[tt, ii] +
+          dot_product(lambda_binary[ii, 1:D],
+                      eta[tt, jj, 1:D]);
       }
       for (n in 1:N_trichot) {
-	int tt = tt_trichot[n];
-	int ii = ii_trichot[n];
-	int jj = jj_trichot[n];
-	nu_trichot[n] = alpha_trichot[tt, ii] +
-	  dot_product(lambda_trichot[ii, 1:D],
-		      eta[tt, jj, 1:D]);
+        int tt = tt_trichot[n];
+        int ii = ii_trichot[n];
+        int jj = jj_trichot[n];
+        nu_trichot[n] = alpha_trichot[tt, ii] +
+          dot_product(lambda_trichot[ii, 1:D],
+                      eta[tt, jj, 1:D]);
       }
       for (n in 1:N_ordinal) {
-	int tt = tt_ordinal[n];
-	int ii = ii_ordinal[n];
-	int jj = jj_ordinal[n];
-	nu_ordinal[n] = alpha_ordinal[tt, ii] +
-	  dot_product(lambda_ordinal[ii, 1:D],
-		      eta[tt, jj, 1:D]);
+        int tt = tt_ordinal[n];
+        int ii = ii_ordinal[n];
+        int jj = jj_ordinal[n];
+        nu_ordinal[n] = alpha_ordinal[tt, ii] +
+          dot_product(lambda_ordinal[ii, 1:D],
+                      eta[tt, jj, 1:D]);
       }
       for (n in 1:N_metric) {
-	int tt = tt_metric[n];
-	int ii = ii_metric[n];
-	int jj = jj_metric[n];
-	nu_metric[n] = alpha_metric[tt, ii] +
-	  dot_product(lambda_metric[ii, 1:D],
-		      eta[tt, jj, 1:D]);
+        int tt = tt_metric[n];
+        int ii = ii_metric[n];
+        int jj = jj_metric[n];
+        nu_metric[n] = alpha_metric[tt, ii] +
+          dot_product(lambda_metric[ii, 1:D],
+                      eta[tt, jj, 1:D]);
       }
     }
-     profile("likelihood") {
+    profile("likelihood") {
       target += bernoulli_logit_lupmf(yy_binary | p2l_vector(nu_binary));
       target += ordered_logistic_lupmf(yy_trichot | p2l_vector(nu_trichot),
-				       kappa_trichot[ii_trichot]);
+                                       kappa_trichot[ii_trichot]);
       target += ordered_logistic_lupmf(yy_ordinal | p2l_vector(nu_ordinal),
-				       kappa_ordinal[ii_ordinal]);
+                                       kappa_ordinal[ii_ordinal]);
       target += normal_lupdf(yy_metric | nu_metric,
-			     sigma_metric[ii_metric]);
+                             sigma_metric[ii_metric]);
     }
   }
   if (parallelize == 1) {
     profile("parallel") {
       int grainsize = 1;
-      target += reduce_sum(bprobit_partial_sum_lupmf,
+      target += reduce_sum(bprobit_partial_sum_lpmf,
                            to_array_1d(yy_binary),
                            grainsize,
                            alpha_binary,
@@ -334,7 +365,7 @@ model {
                            tt_binary,
                            ii_binary,
                            jj_binary);
-      target += reduce_sum(oprobit_partial_sum_lupmf,
+      target += reduce_sum(oprobit_partial_sum_lpmf,
                            to_array_1d(yy_trichot),
                            grainsize,
                            alpha_trichot,
@@ -342,9 +373,9 @@ model {
                            eta,
                            tt_trichot,
                            ii_trichot,
-                           jj_trichot,                   
+                           jj_trichot,
                            kappa_trichot);
-      target += reduce_sum(oprobit_partial_sum_lupmf,
+      target += reduce_sum(oprobit_partial_sum_lpmf,
                            to_array_1d(yy_ordinal),
                            grainsize,
                            alpha_ordinal,
@@ -352,9 +383,9 @@ model {
                            eta,
                            tt_ordinal,
                            ii_ordinal,
-                           jj_ordinal,                   
+                           jj_ordinal,
                            kappa_ordinal);
-      target += reduce_sum(normal_partial_sum_lupdf,
+      target += reduce_sum(normal_partial_sum_lpdf,
                            to_array_1d(yy_metric),
                            grainsize,
                            alpha_metric,
@@ -362,10 +393,11 @@ model {
                            eta,
                            tt_metric,
                            ii_metric,
-                           jj_metric,                    
+                           jj_metric,
                            to_array_1d(sigma_metric));
     }
   }
+
   // Priors //
   to_array_1d(z_eta) ~ std_normal();
   to_array_1d(z_alpha_binary) ~ std_normal();
@@ -382,15 +414,33 @@ model {
   to_array_1d(z_lambda_ordinal) ~ std_normal();
   to_array_1d(z_alpha_metric) ~ std_normal();
   to_array_1d(z_lambda_metric) ~ std_normal();
+
   sigma_metric ~ student_t(df_sigma_metric,
-			   mu_sigma_metric,
-			   sd_sigma_metric);
-  sigma_alpha_evol ~ student_t(df_sigma_alpha_evol,
-			       mu_sigma_alpha_evol,
-			       sd_sigma_alpha_evol);
-  sigma_eta_evol ~ cauchy(0, .1);
-  corr_eta_evol ~ lkj_corr(2);
+                           mu_sigma_metric,
+                           sd_sigma_metric);
+  if (constant_alpha == 0) {
+    sigma_alpha_evol ~ student_t(df_sigma_alpha_evol,
+				 mu_sigma_alpha_evol,
+				 sd_sigma_alpha_evol);
+  } else {
+    sigma_alpha_evol ~ std_normal();
+  }
+  if (T == 1 || separate_eta == 1) {
+    sigma_eta_evol ~ std_normal();
+    Lcorr_eta ~ lkj_corr_cholesky(20); // essentially identity
+  } else {
+    sigma_eta_evol ~ student_t(df_sigma_eta_evol,
+			       mu_sigma_eta_evol,
+			       sd_sigma_eta_evol);
+    Lcorr_eta ~ lkj_corr_cholesky(2);
+  }
 }
 generated quantities {
-  
+  cov_matrix[D] r_Omega; // transition variance-covariance (un-whitened)
+  cov_matrix[D] Omega;	 /* whitened */
+  r_Omega = multiply(L_eta, L_eta'); // = L_eta * L_eta'
+  // Reuse the same WW that was computed in transformed parameters (period 1).
+  // If whiten_eta==0 then transformed parameters set WW = identity_matrix(D).
+  Omega = quad_form(r_Omega, WW);
 }
+
