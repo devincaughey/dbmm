@@ -55,7 +55,7 @@ extract_mixfac_draws <- function(x, drop = "^z_|^chol|^r_|^L_", check = TRUE) {
 
 #' Exported function
 #' @export
-identify_mixfac <- function(x, method = "varimax", whiten = TRUE,
+identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
                             ref_t = "last", identify_with_type) {
     ## Accept either a draws_rvars object or a fitted object / draws_df
     if (posterior::is_draws_rvars(x)) {
