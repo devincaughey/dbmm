@@ -204,7 +204,7 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
     if (whiten) {
         warning("Note: Post-estimation identification of intercepts and thresholds is not yet implemented, so these variables are omitted from the output.")
         out <- out |>
-            subset_draws("^kappa|^alpha_[mb]", regex = TRUE, exclude = TRUE)
+            subset_draws("^kappa|^alpha_[mbt]", regex = TRUE, exclude = TRUE)
     }
     attr(out, "unit_labels") <- attr(x, "unit_labels")
     attr(out, "time_labels") <- attr(x, "time_labels")
@@ -230,38 +230,48 @@ label_mixfac <- function (x, make_long = FALSE, check = TRUE) {
     stopifnot(is_draws_rvars(x))
     n_factor <- dim(x$eta)[[3]]
     if (length(attr(x, "binary_item_labels")) > 0) {
-        dimnames(x$alpha_binary) <- list(
-            period = attr(x, "time_labels"),
-            item = attr(x, "binary_item_labels")
-        )
+        if (grepl("alpha_binary", names(x))) {
+            dimnames(x$alpha_binary) <- list(
+                period = attr(x, "time_labels"),
+                item = attr(x, "binary_item_labels")
+            )
+        }
         dimnames(x$lambda_binary) <- list(
             item = attr(x, "binary_item_labels"),
             factor = 1:n_factor
         )
     }
     if (length(attr(x, "trichotomous_item_labels")) > 0) {
-        dimnames(x$alpha_trichot) <- list(
-            period = attr(x, "time_labels"),
-            item = attr(x, "trichotomous_item_labels")
-        )
-        dimnames(x$kappa_trichot) <- list(
-            item = attr(x, "trichotomous_item_labels"),
-            threshold = 1:dim(x$kappa_trichot)[2]
-        )
+        if (grepl("alpha_trichot", names(x))) {
+            dimnames(x$alpha_trichot) <- list(
+                period = attr(x, "time_labels"),
+                item = attr(x, "trichotomous_item_labels")
+            )
+        }
+        if (grepl("kappa_trichot", names(x))) {
+            dimnames(x$kappa_trichot) <- list(
+                item = attr(x, "trichotomous_item_labels"),
+                threshold = 1:dim(x$kappa_trichot)[2]
+            )
+        }
         dimnames(x$lambda_trichot) <- list(
             item = attr(x, "trichotomous_item_labels"),
             factor = 1:n_factor
         )
     }
     if (length(attr(x, "ordinal_item_labels")) > 0) {
-        dimnames(x$alpha_ordinal) <- list(
-            period = attr(x, "time_labels"),
-            item = attr(x, "ordinal_item_labels")
-        )
-        dimnames(x$kappa_ordinal) <- list(
-            item = attr(x, "ordinal_item_labels"),
-            threshold = 1:dim(x$kappa_ordinal)[2]
-        )
+        if (grepl("alpha_ordinal", names(x))) {
+            dimnames(x$alpha_ordinal) <- list(
+                period = attr(x, "time_labels"),
+                item = attr(x, "ordinal_item_labels")
+            )
+        }
+        if (grepl("kappa_ordinal", names(x))) {
+            dimnames(x$kappa_ordinal) <- list(
+                item = attr(x, "ordinal_item_labels"),
+                threshold = 1:dim(x$kappa_ordinal)[2]
+            )
+        }
         dimnames(x$lambda_ordinal) <- list(
             item = attr(x, "ordinal_item_labels"),
             factor = 1:n_factor
