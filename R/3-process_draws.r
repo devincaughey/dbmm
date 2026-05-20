@@ -230,7 +230,7 @@ label_mixfac <- function (x, make_long = FALSE, check = TRUE) {
     stopifnot(is_draws_rvars(x))
     n_factor <- dim(x$eta)[[3]]
     if (length(attr(x, "binary_item_labels")) > 0) {
-        if (grepl("alpha_binary", names(x))) {
+        if (any(grepl("alpha_binary", names(x)))) {
             dimnames(x$alpha_binary) <- list(
                 period = attr(x, "time_labels"),
                 item = attr(x, "binary_item_labels")
@@ -242,13 +242,13 @@ label_mixfac <- function (x, make_long = FALSE, check = TRUE) {
         )
     }
     if (length(attr(x, "trichotomous_item_labels")) > 0) {
-        if (grepl("alpha_trichot", names(x))) {
+        if (any(grepl("alpha_trichot", names(x)))) {
             dimnames(x$alpha_trichot) <- list(
                 period = attr(x, "time_labels"),
                 item = attr(x, "trichotomous_item_labels")
             )
         }
-        if (grepl("kappa_trichot", names(x))) {
+        if (any(grepl("kappa_trichot", names(x)))) {
             dimnames(x$kappa_trichot) <- list(
                 item = attr(x, "trichotomous_item_labels"),
                 threshold = 1:dim(x$kappa_trichot)[2]
@@ -260,13 +260,13 @@ label_mixfac <- function (x, make_long = FALSE, check = TRUE) {
         )
     }
     if (length(attr(x, "ordinal_item_labels")) > 0) {
-        if (grepl("alpha_ordinal", names(x))) {
+        if (any(grepl("alpha_ordinal", names(x)))) {
             dimnames(x$alpha_ordinal) <- list(
                 period = attr(x, "time_labels"),
                 item = attr(x, "ordinal_item_labels")
             )
         }
-        if (grepl("kappa_ordinal", names(x))) {
+        if (any(grepl("kappa_ordinal", names(x)))) {
             dimnames(x$kappa_ordinal) <- list(
                 item = attr(x, "ordinal_item_labels"),
                 threshold = 1:dim(x$kappa_ordinal)[2]
