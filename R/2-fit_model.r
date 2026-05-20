@@ -72,6 +72,26 @@ fit_modgirt <- function(
     return(out)
 }
 
+attach_mixfac_attributes <- function(fit, shaped_data) {
+  if (missing(fit)) stop("`fit` is required.")
+  if (missing(shaped_data)) stop("`shaped_data` is required.")
+
+  attr_names <- c(
+    "unit_labels",
+    "time_labels",
+    "binary_item_labels",
+    "trichotomous_item_labels",
+    "ordinal_item_labels",
+    "metric_item_labels"
+  )
+
+  for (nm in attr_names) {
+    attr(fit, nm) <- attr(shaped_data, nm)
+  }
+
+  fit
+}
+
 #' Fit a dynamic mixed factor model using Stan.
 #'
 #' @param shaped_data (list) Data formatted for Stan, typically created by `shape()`.
@@ -316,20 +336,9 @@ fit_mixfac <- function(shaped_data,
                             ...)
 
     ## Prepare output
-    attr(fit, "unit_labels") <- attr(shaped_data, "unit_labels")
-    attr(fit, "time_labels") <- attr(shaped_data, "time_labels")
-    attr(fit, "binary_item_labels") <- attr(shaped_data, "binary_item_labels")
-    attr(fit, "trichotomous_item_labels") <-
-        attr(shaped_data, "trichotomous_item_labels")
-    attr(fit, "ordinal_item_labels") <- attr(shaped_data, "ordinal_item_labels")
-    attr(fit, "metric_item_labels") <- attr(shaped_data, "metric_item_labels")
+    fit <- attach_mixfac_attributes(fit, shaped_data)
     out <- list(fit = fit)
-
-    if (return_data) {
-        out$shaped_data <- shaped_data
-    }
-
+    if (return_data) out$shaped_data <- shaped_data
     class(out) <- c("mixfac_fit", class(out))
-
     return(out)
 }
