@@ -4,7 +4,7 @@
 \alias{label_mixfac}
 \title{Exported function}
 \usage{
-label_mixfac(x, make_long = TRUE, check = TRUE)
+label_mixfac(x, make_long = FALSE, check = TRUE)
 }
 \description{
 Exported function

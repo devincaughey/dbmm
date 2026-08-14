@@ -4,7 +4,7 @@
 \alias{extract_mixfac_draws}
 \title{Extract draws from fitted model}
 \usage{
-extract_mixfac_draws(x, drop = "^z_|^chol", check = TRUE)
+extract_mixfac_draws(x, drop = "^z_|^chol|^r_|^L_", check = TRUE)
 }
 \arguments{
 \item{x}{(\code{dbmm_fitted} object) A fitted model produced by \code{fit()}.}

@@ -4,7 +4,13 @@
 \alias{identify_mixfac}
 \title{Exported function}
 \usage{
-identify_mixfac(x, method = "varimax", identify_with_type)
+identify_mixfac(
+  x,
+  method = "varimax",
+  whiten = FALSE,
+  ref_t = "last",
+  identify_with_type
+)
 }
 \description{
 Exported function

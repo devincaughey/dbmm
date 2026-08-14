@@ -15,6 +15,7 @@ fit_mixfac(
   n_dim = 1,
   constant_alpha = FALSE,
   separate_eta = TRUE,
+  whiten_eta = TRUE,
   lambda_zeros = NULL,
   df_sigma_metric = 4,
   df_sigma_alpha_evol = 4,
@@ -127,6 +128,9 @@ state of Stan’s pseudo-random number generator. Defaults to \code{123}.}
 ordinal outcomes. One of \code{"probit"} (the default) and \code{"logit"}.}
 
 \item{...}{Additional arguments to \code{cmdstanr::sample()}.}
+
+\item{white_eta}{(logical) Should units' factor scores (\code{eta}) be whitened
+for identification?  Defaults to \code{TRUE}.}
 }
 \value{
 A dbmm object containing

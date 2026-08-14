@@ -4,7 +4,7 @@
 \alias{sort_mixfac}
 \title{order factors in a model based on sums of squared loadings}
 \usage{
-sort_mixfac(x)
+sort_mixfac(x, check = TRUE)
 }
 \arguments{
 \item{mixfac_rvar}{A \code{draws_rvar} object from a mixed-factor model}
