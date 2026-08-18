@@ -24,6 +24,12 @@ data {
   array[Q, D] int beta_nonzero; // loading point restrictions
   array[Q, D] int beta_sign; // loading sign restrictions
 }
+transformed data {
+  /* The transition covariance Omega is identified only if T > 1. When T == 1
+     there is no transition, so Omega is fixed to the identity rather than
+     estimated (see transformed parameters). */
+  int<lower=0, upper=1> est_Omega = T > 1;
+}
 parameters {
   array[Q] ordered[K - 1] z_alpha; // thresholds (difficulties)
   array[Q, D] real beta_free; // unconstrained discriminations
@@ -31,8 +37,9 @@ parameters {
   array[T, G, D] real z_bar_theta;
   vector<lower=0>[D] sd_theta; // within-group SD of theta
   corr_matrix[D] corr_theta;   // within-group correlation of theta across dimensions
-  vector<lower=0>[D] sd_bar_theta_evol; // evolution SD of bar_theta
-  corr_matrix[D] corr_bar_theta_evol;   // cross-dimension correlation of transition model */
+  /* Zero-length (hence not estimated) when T == 1 */
+  array[est_Omega] vector<lower=0>[D] sd_bar_theta_evol; // evolution SD of bar_theta
+  array[est_Omega] corr_matrix[D] corr_bar_theta_evol;   // cross-dimension correlation of transition model
 }
 transformed parameters {
   array[T, Q] vector[K - 1] alpha; // thresholds (difficulty)
@@ -41,9 +48,16 @@ transformed parameters {
   array[T] matrix[G, D] bar_theta; // group ideal point means
   cov_matrix[D] Sigma_theta; // within-group variance-covariance
   cov_matrix[D] Omega; // transition variance-covariance
+  matrix[D, D] chol_Omega;
   Sigma_theta = quad_form_diag(corr_theta, sd_theta);
-  Omega = quad_form_diag(corr_bar_theta_evol, sd_bar_theta_evol);
-  matrix[D, D] chol_Omega = cholesky_decompose(Omega);
+  if (est_Omega) {
+    Omega = quad_form_diag(corr_bar_theta_evol[1], sd_bar_theta_evol[1]);
+    chol_Omega = cholesky_decompose(Omega);
+  } else {
+    /* Single period: no transition to inform Omega, so fix it to I_D */
+    Omega = identity_matrix(D);
+    chol_Omega = identity_matrix(D);
+  }
   for (q in 1 : Q) {
     for (d in 1 : D) {
       if (beta_sign[q, d] == 0) {
@@ -85,8 +99,10 @@ model {
   }
   sd_theta ~ cauchy(0, 1);
   corr_theta ~ lkj_corr(2);
-  sd_bar_theta_evol ~ cauchy(0, .1);
-  corr_bar_theta_evol ~ lkj_corr(2);
+  if (est_Omega) {
+    sd_bar_theta_evol[1] ~ cauchy(0, .1);
+    corr_bar_theta_evol[1] ~ lkj_corr(2);
+  }
   /* Likelihood */
   if (K > 1) {
     /* ordinal outcomes */
