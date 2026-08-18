@@ -446,8 +446,8 @@ sort_mixfac <- function(x, check = TRUE) {
     if (check) {
         check_arg_type(arg = x, typename = "mixfac_comb")
     }
-    ss <- posterior::rvar_apply(x$lambda, 2, function(x) {
-        posterior::rvar_sum(x^2)
+    ss <- posterior::rvar_apply(x$lambda, 2, function (y) {
+        posterior::rvar_sum(y^2)
     })
     fo <- order(-posterior::E(ss))
     eta <- x$eta[, , fo]
@@ -694,18 +694,29 @@ sign_modgirt <- function(modgirt_rvar, signs = 1) {
     stopifnot(length(signs == 1) || length(signs) == n_factor)
     init_signs <- sign(colMeans(E(modgirt_rvar$beta)))
     sign_flips <- ifelse(init_signs == signs, 1, -1)
-    sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
-    for (t in seq_len(n_time)) {
-        modgirt_rvar$bar_theta[t, , drop = TRUE] <-
-            modgirt_rvar$bar_theta[t, , drop = TRUE] %**% sm
+    if (n_factor == 1) {
+        posterior::draws_rvars(
+                       lp__ = modgirt_rvar$lp__,
+                       alpha = modgirt_rvar$alpha,
+                       beta = modgirt_rvar$beta * sign_flips,
+                       bar_theta = modgirt_rvar$bar_theta * sign_flips,
+                       Sigma_theta = modgirt_rvar$Sigma_theta,
+                       Omega = modgirt_rvar$Omega
+                   )
+    } else {
+        sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
+        for (t in seq_len(n_time)) {
+            modgirt_rvar$bar_theta[t, , drop = TRUE] <-
+                modgirt_rvar$bar_theta[t, , drop = TRUE] %**% sm
+        }
+        posterior::draws_rvars(
+                       lp__ = modgirt_rvar$lp__,
+                       alpha = modgirt_rvar$alpha,
+                       beta = modgirt_rvar$beta %**% sm,
+                       bar_theta = modgirt_rvar$bar_theta,
+                       Sigma_theta = t(sm) %**% modgirt_rvar$Sigma_theta %**% sm,
+                       Omega = t(sm) %**% modgirt_rvar$Omega %**% sm
+                   )
     }
-    posterior::draws_rvars(
-        lp__ = modgirt_rvar$lp__,
-        alpha = modgirt_rvar$alpha,
-        beta = modgirt_rvar$beta %**% sm,
-        bar_theta = modgirt_rvar$bar_theta,
-        Sigma_theta = t(sm) %**% modgirt_rvar$Sigma_theta %**% sm,
-        Omega = t(sm) %**% modgirt_rvar$Omega %**% sm
-    )
 }
 
