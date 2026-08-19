@@ -196,6 +196,11 @@ data {
   real<lower=0> sd_sigma_eta_evol;
 }
 transformed data {
+  /* The evolution covariance is identified only if an actual random walk in
+     eta is used: T > 1 and periods are not estimated separately. Otherwise
+     sigma_eta_evol / Lcorr_eta would be sampled from their priors alone, so
+     they are given zero length and Omega is fixed to I_D. */
+  int<lower=0, upper=1> est_Omega = (T > 1) && (separate_eta == 0);
 }
 parameters {
   array[T, J, D] real z_eta;                     /* latent factors (deviate) */
@@ -211,8 +216,8 @@ parameters {
   array[T, I_metric] real z_alpha_metric;        /* intercepts (deviate) */
   matrix[I_metric, D] z_lambda_metric;           /* metric loadings */
   vector<lower=0>[I_metric] sigma_metric;        /* metric residual sd */
-  vector<lower=0>[D] sigma_eta_evol;             /* evolution SD of eta */
-  cholesky_factor_corr[D] Lcorr_eta; // cholesky factor of correlation of transition model
+  array[est_Omega] vector<lower=0>[D] sigma_eta_evol; /* evolution SD of eta */
+  array[est_Omega] cholesky_factor_corr[D] Lcorr_eta; /* evolution corr. (chol.) */
 }
 transformed parameters {
   array[T, J, D] real r_eta;		   /* latent factors (un-whitened) */
@@ -232,9 +237,13 @@ transformed parameters {
   lambda_metric = to_array_2d(z_lambda_metric .* nonzero_metric);
 
   // build cholesky factor for evolution: L_eta = diag(sigma) * Lcorr_eta
-  matrix[D, D] L_eta = diag_pre_multiply(sigma_eta_evol, Lcorr_eta);
-  /* WW will hold the whitening matrix computed from period t==1
-     so it can be reused later in generated quantities. */
+  matrix[D, D] L_eta;
+  if (est_Omega) {
+    L_eta = diag_pre_multiply(sigma_eta_evol[1], Lcorr_eta[1]);
+  } else {
+    /* No random walk in eta; L_eta is reported as I_D but never used below. */
+    L_eta = identity_matrix(D);
+  }
   matrix[D, D] WW;
   for (t in 1:T) {
     if (t == 1) {
@@ -425,22 +434,17 @@ model {
   } else {
     sigma_alpha_evol ~ std_normal();
   }
-  if (T == 1 || separate_eta == 1) {
-    sigma_eta_evol ~ std_normal();
-    Lcorr_eta ~ lkj_corr_cholesky(20); // essentially identity
-  } else {
-    sigma_eta_evol ~ student_t(df_sigma_eta_evol,
-			       mu_sigma_eta_evol,
-			       sd_sigma_eta_evol);
-    Lcorr_eta ~ lkj_corr_cholesky(2);
+  if (est_Omega) {
+    sigma_eta_evol[1] ~ student_t(df_sigma_eta_evol,
+                                  mu_sigma_eta_evol,
+                                  sd_sigma_eta_evol);
+    Lcorr_eta[1] ~ lkj_corr_cholesky(2);
   }
 }
 generated quantities {
-  cov_matrix[D] r_Omega; // transition variance-covariance (un-whitened)
-  cov_matrix[D] Omega;	 /* whitened */
-  r_Omega = multiply(L_eta, L_eta'); // = L_eta * L_eta'
-  // Reuse the same WW that was computed in transformed parameters (period 1).
-  // If whiten_eta==0 then transformed parameters set WW = identity_matrix(D).
-  Omega = quad_form(r_Omega, WW);
+  /* In this parameterization the random walk is built directly on the
+     whitened period-1 configuration, so the innovation covariance in the
+     eta space *is* L_eta L_eta'. No WW rotation is applied. */
+  cov_matrix[D] Omega = multiply_lower_tri_self_transpose(L_eta);
 }
 
