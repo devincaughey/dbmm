@@ -111,3 +111,25 @@ whiten_matrix <- function(DM, eps = 0) {
   WW
 }
 rvar_whiten_matrix <- rfun(whiten_matrix)
+
+
+#' Build a draws_rvars object, dropping absent variables
+#'
+#' Wrapper around [posterior::draws_rvars()] that silently drops `NULL` and
+#' zero-length arguments. Needed because some Stan variables are absent from
+#' the draws under certain flag settings (e.g. `sigma_alpha_evol` when
+#' `constant_alpha == 1`, `sigma_eta_evol` when `T == 1`), and because item
+#' types may be empty (e.g. `kappa_trichot` when `I_trichot == 0`).
+#'
+#' @param ... Named arguments passed to [posterior::draws_rvars()].
+#'
+#' @return A `draws_rvars` object containing only the non-empty arguments.
+#'
+#' @import posterior
+#'
+#' @keywords internal
+as_draws_rvars_safe <- function(...) {
+    args <- list(...)
+    keep <- vapply(args, function(v) !is.null(v) && length(v) > 0, logical(1))
+    do.call(posterior::draws_rvars, args[keep])
+}

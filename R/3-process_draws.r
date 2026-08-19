@@ -15,7 +15,9 @@
 #' @import cmdstanr
 #'
 #' @export
-extract_mixfac_draws <- function(x, drop = "^z_|^chol|^r_|^L_", check = TRUE) {
+.mixfac_drop_default <- "^z_|^chol|^r_|^L_|^Lcorr|^WW$|^sigma_eta_evol"
+
+extract_mixfac_draws <- function(x, drop = .mixfac_drop_default, check = TRUE) {
 
     if (check) {
         check_arg_type(arg = x, typename = "mixfac_fit")
@@ -26,7 +28,7 @@ extract_mixfac_draws <- function(x, drop = "^z_|^chol|^r_|^L_", check = TRUE) {
     if (isTRUE(drop)) {
         draws <- posterior::subset_draws(
                                 x = draws,
-                                variable = "^z_|^chol|^r_|^L_",
+                                variable = .mixfac_drop_default,
                                 regex = TRUE,
                                 exclude = TRUE
                             )
@@ -171,35 +173,35 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
     }
     omega_rvar$Omega <- t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
     if (inherits(x, "mixfac_comb")) {
-        out <- posterior::draws_rvars(
-                              eta = eta_rvar$eta,
-                              lambda = lambda_rvar$lambda,
-                              alpha = draws_rvar$alpha,
-                              kappa_trichot = draws_rvar$kappa_trichot,
-                              kappa_ordinal = draws_rvar$kappa_ordinal,
-                              sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
-                              sigma_metric = draws_rvar$sigma_metric,
-                              Omega = omega_rvar$Omega,
-                              lp__ = draws_rvar$lp__
-                          )
+        out <- as_draws_rvars_safe(
+            eta = eta_rvar$eta,
+            lambda = lambda_rvar$lambda,
+            alpha = draws_rvar$alpha,
+            kappa_trichot = draws_rvar$kappa_trichot,
+            kappa_ordinal = draws_rvar$kappa_ordinal,
+            sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
+            sigma_metric = draws_rvar$sigma_metric,
+            Omega = omega_rvar$Omega,
+            lp__ = draws_rvar$lp__
+        )
     } else {
-        out <- posterior::draws_rvars(
-                              eta = eta_rvar$eta,
-                              lambda_binary = lambda_rvar$lambda_binary,
-                              lambda_trichot = lambda_rvar$lambda_trichot,
-                              lambda_ordinal = lambda_rvar$lambda_ordinal,
-                              lambda_metric = lambda_rvar$lambda_metric,
-                              alpha_binary = draws_rvar$alpha_binary,
-                              alpha_trichot = draws_rvar$alpha_trichot,
-                              alpha_ordinal = draws_rvar$alpha_ordinal,
-                              alpha_metric = draws_rvar$alpha_metric,
-                              kappa_trichot = draws_rvar$kappa_trichot,
-                              kappa_ordinal = draws_rvar$kappa_ordinal,
-                              sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
-                              sigma_metric = draws_rvar$sigma_metric,
-                              Omega = omega_rvar$Omega,
-                              lp__ = draws_rvar$lp__
-                          )
+        out <- as_draws_rvars_safe(
+            eta = eta_rvar$eta,
+            lambda_binary = lambda_rvar$lambda_binary,
+            lambda_trichot = lambda_rvar$lambda_trichot,
+            lambda_ordinal = lambda_rvar$lambda_ordinal,
+            lambda_metric = lambda_rvar$lambda_metric,
+            alpha_binary = draws_rvar$alpha_binary,
+            alpha_trichot = draws_rvar$alpha_trichot,
+            alpha_ordinal = draws_rvar$alpha_ordinal,
+            alpha_metric = draws_rvar$alpha_metric,
+            kappa_trichot = draws_rvar$kappa_trichot,
+            kappa_ordinal = draws_rvar$kappa_ordinal,
+            sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
+            sigma_metric = draws_rvar$sigma_metric,
+            Omega = omega_rvar$Omega,
+            lp__ = draws_rvar$lp__
+        )
     }
     if (whiten) {
         warning("Note: Post-estimation identification of intercepts and thresholds is not yet implemented, so these variables are omitted from the output.")
@@ -354,17 +356,17 @@ combine_types_mixfac <- function (x) {
             x[-c(lambda_idx, alpha_idx, kappa_idx)]
         )
     } else {
-        out <- posterior::draws_rvars(
-                              eta = x$eta,
-                              lambda = lambda,
-                              alpha = alpha,
-                              kappa_trichot = x$kappa_trichot,
-                              kappa_ordinal = x$kappa_ordinal,
-                              sigma_alpha_evol = x$sigma_alpha_evol,
-                              sigma_metric = x$sigma_metric,
-                              Omega = x$Omega,
-                              lp__ = x$lp__
-                          )
+        out <- as_draws_rvars_safe(
+            eta = x$eta,
+            lambda = lambda,
+            alpha = alpha,
+            kappa_trichot = x$kappa_trichot,
+            kappa_ordinal = x$kappa_ordinal,
+            sigma_alpha_evol = x$sigma_alpha_evol,
+            sigma_metric = x$sigma_metric,
+            Omega = x$Omega,
+            lp__ = x$lp__
+        )
         attr(out, "unit_labels") <- attr(x, "unit_labels")
         attr(out, "time_labels") <- attr(x, "time_labels")
         attr(out, "binary_item_labels") <- attr(x, "binary_item_labels")
@@ -456,17 +458,16 @@ sort_mixfac <- function(x, check = TRUE) {
     dimnames(lambda)[[2]] <- seq_along(fo)
     Omega <- x$Omega[fo, fo]
     dimnames(Omega)[[1]] <- dimnames(Omega)[[2]] <- seq_along(fo)
-    out <-
-        posterior::draws_rvars(
-                       eta = eta,
-                       lambda = lambda,
-                       alpha = x$alpha,
-                       kappa = x$kappa,
-                       sigma_alpha_evol = x$sigma_alpha_evol,
-                       sigma_metric = x$sigma_metric,
-                       Omega = Omega,
-                       lp__ = x$lp__
-                   )
+    out <- as_draws_rvars_safe(
+        eta = eta,
+        lambda = lambda,
+        alpha = x$alpha,
+        kappa = x$kappa,
+        sigma_alpha_evol = x$sigma_alpha_evol,
+        sigma_metric = x$sigma_metric,
+        Omega = Omega,
+        lp__ = x$lp__
+    )
     class(out) <- c("mixfac_sorted", class(x))
     return(out)
 }
@@ -502,7 +503,7 @@ sign_mixfac <- function(x, signs = 1) {
         x$eta[t, , drop = TRUE] <-
             x$eta[t, , drop = TRUE] %**% sm
     }
-    posterior::draws_rvars(
+    as_draws_rvars_safe(
         eta = x$eta,
         lambda = x$lambda %**% sm,
         alpha = x$alpha,
@@ -632,7 +633,7 @@ rotate_modgirt <- function(modgirt_rvar, rotmat) {
     sigma_theta_rvar$Sigma_theta <-
         t(G) %**% sigma_theta_rvar$Sigma_theta %**% G
     omega_rvar$Omega <- t(G) %**% omega_rvar$Omega %**% G
-    modgirt_rvar_rot <- draws_rvars(
+    modgirt_rvar_rot <- posterior::draws_rvars(
         lp__ = modgirt_rvar$lp__,
         alpha = modgirt_rvar$alpha,
         beta = beta_rvar$beta,

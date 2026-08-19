@@ -201,19 +201,29 @@ transformed data {
      sigma_eta_evol / Lcorr_eta would be sampled from their priors alone, so
      they are given zero length and Omega is fixed to I_D. */
   int<lower=0, upper=1> est_Omega = (T > 1) && (separate_eta == 0);
+  /* Likewise, the intercept evolution SD enters the model only if the
+     intercepts actually follow a random walk. */
+  int<lower=0, upper=1> est_sigma_alpha = (T > 1) && (constant_alpha == 0);
+  /* Periods of free intercept deviates. With constant_alpha == 1, later
+     periods copy period 1, so only one period of deviates is needed. */
+  int<lower=1> T_alpha = constant_alpha == 1 ? 1 : T;
+  /* Trichotomous and ordinal intercepts are pinned to 0 (their ordered
+     thresholds absorb the item level), so they need deviates only when the
+     intercepts are allowed to drift. */
+  int<lower=0> T_alpha_k = constant_alpha == 1 ? 0 : T;
 }
 parameters {
   array[T, J, D] real z_eta;                     /* latent factors (deviate) */
-  array[T, I_binary] real z_alpha_binary;        /* intercepts (deviate) */
+  array[T_alpha, I_binary] real z_alpha_binary;	/* intercepts (deviate) */
   matrix[I_binary, D] z_lambda_binary;           /* binary loadings */
-  array[T, I_trichot] real z_alpha_trichot;      /* intercepts (deviate) */
+  array[T_alpha_k, I_trichot] real z_alpha_trichot; /* intercepts (deviate) */
   array[I_trichot] ordered[2] kappa_trichot;	 /* trichot. thresholds */
   matrix[I_trichot, D] z_lambda_trichot;         /* trichot. loadings */
-  array[T, I_ordinal] real z_alpha_ordinal;      /* intercepts (deviate) */
+  array[T_alpha_k, I_ordinal] real z_alpha_ordinal; /* intercepts (deviate) */
   array[I_ordinal] ordered[K_ordinal - 1] kappa_ordinal; /* ordinal thresholds */
   matrix[I_ordinal, D] z_lambda_ordinal;         /* ordinal loadings */
-  real<lower=0> sigma_alpha_evol;                /* evolution SD of alpha */
-  array[T, I_metric] real z_alpha_metric;        /* intercepts (deviate) */
+  array[est_sigma_alpha] real<lower=0> sigma_alpha_evol; /* evolution SD of alpha */
+  array[T_alpha, I_metric] real z_alpha_metric;    /* intercepts (deviate) */
   matrix[I_metric, D] z_lambda_metric;           /* metric loadings */
   vector<lower=0>[I_metric] sigma_metric;        /* metric residual sd */
   array[est_Omega] vector<lower=0>[D] sigma_eta_evol; /* evolution SD of eta */
@@ -262,8 +272,8 @@ transformed parameters {
         r_eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
         eta[t, 1:J, 1:D] = r_eta[t, 1:J, 1:D];
       }
-      alpha_metric[t] = z_alpha_metric[t];
-      alpha_binary[t] = z_alpha_binary[t];
+      alpha_metric[t] = z_alpha_metric[1];
+      alpha_binary[t] = z_alpha_binary[1];
       alpha_trichot[t, ] = rep_array(0.0, I_trichot);
       alpha_ordinal[t, ] = rep_array(0.0, I_ordinal);
     } else {
@@ -291,19 +301,19 @@ transformed parameters {
       } else {
         for (i in 1:I_binary) {
           alpha_binary[t][i] = alpha_binary[t - 1][i] +
-            z_alpha_binary[t][i] * sigma_alpha_evol;
+            z_alpha_binary[t][i] * sigma_alpha_evol[1];
         }
         for (i in 1:I_trichot) {
           alpha_trichot[t][i] = alpha_trichot[t - 1][i] +
-            z_alpha_trichot[t][i] * sigma_alpha_evol;
+            z_alpha_trichot[t][i] * sigma_alpha_evol[1];
         }
         for (i in 1:I_ordinal) {
           alpha_ordinal[t][i] = alpha_ordinal[t - 1][i] +
-            z_alpha_ordinal[t][i] * sigma_alpha_evol;
+            z_alpha_ordinal[t][i] * sigma_alpha_evol[1];
         }
         for (i in 1:I_metric) {
           alpha_metric[t][i] = alpha_metric[t - 1][i] +
-            z_alpha_metric[t][i] * sigma_alpha_evol;
+            z_alpha_metric[t][i] * sigma_alpha_evol[1];
         }
       }
     }
@@ -427,12 +437,10 @@ model {
   sigma_metric ~ student_t(df_sigma_metric,
                            mu_sigma_metric,
                            sd_sigma_metric);
-  if (constant_alpha == 0) {
-    sigma_alpha_evol ~ student_t(df_sigma_alpha_evol,
-				 mu_sigma_alpha_evol,
-				 sd_sigma_alpha_evol);
-  } else {
-    sigma_alpha_evol ~ std_normal();
+  if (est_sigma_alpha) {
+    sigma_alpha_evol[1] ~ student_t(df_sigma_alpha_evol,
+				    mu_sigma_alpha_evol,
+				    sd_sigma_alpha_evol);
   }
   if (est_Omega) {
     sigma_eta_evol[1] ~ student_t(df_sigma_eta_evol,
