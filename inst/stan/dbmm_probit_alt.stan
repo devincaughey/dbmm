@@ -456,8 +456,8 @@ model {
   }
 }
 generated quantities {
-  /* In this parameterization the random walk is built directly on the
-     whitened period-1 configuration, so the innovation covariance in the
-     eta space *is* L_eta L_eta'. No WW rotation is applied. */
-  cov_matrix[D] Omega = multiply_lower_tri_self_transpose(L_eta);
+  cov_matrix[D] Omega;
+  // Build Omega in the same transformed space we used for eta:
+  // If whiten_eta, WW was computed in transformed parameters from period T and stored there.
+  Omega = quad_form(r_Omega, WW);
 }
