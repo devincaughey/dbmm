@@ -2,7 +2,9 @@ functions {
   vector p2l_vector (vector x) { // coverts vector from probit to logit scale
     return x .* (1.5976 + 0.07056 * x .* x);
   }
-
+  real p2l (real x) { // converts scalar from probit to logit scale
+    return x * (1.5976 + 0.07056 * x * x);
+  }
   /* Return whitening matrix for demeaned matrix DM */
   matrix make_whiten_matrix(matrix DM) {
     int K = cols(DM);
@@ -16,7 +18,6 @@ functions {
     matrix[K, K] WW = invL';                      // WW = inv(L)'
     return WW;
   }
-
   // whiten: demean columns of XX then multiply by whitening matrix (DM * WW)
   matrix whiten(matrix XX) {
     int R = rows(XX);
@@ -109,6 +110,7 @@ data {
   int<lower=0,upper=1> constant_alpha; /* keep alphas constant? */
   int<lower=0,upper=1> separate_eta;   /* estimate eta separately by period */
   int<lower=0,upper=1> whiten_eta;     /* whiten eta */
+  int<lower=0,upper=1> gen_log_lik; /* compute per-observation log_lik? */
   int<lower=1> D;                      /* number of latent dimensions */
   int<lower=1> J;                      /* number of units */
   int<lower=1> T;                      /* number of time periods */
@@ -403,5 +405,47 @@ generated quantities {
      whitened period-1 configuration, so the innovation covariance in the
      eta space *is* L_eta L_eta'. No WW rotation is applied. */
   cov_matrix[D] Omega = multiply_lower_tri_self_transpose(L_eta);
+
+  /* Per-observation log likelihood, for loo/waic. Positions run in the
+     order the observations were supplied: all binary, then trichotomous,
+     then ordinal, then metric, each block ordered by period, item, unit
+     (see shape_mixfac()). Normalized _lpmf/_lpdf forms are used, unlike
+     the _lupmf/_lupdf forms in the model block, so that values are
+     comparable across models. */
+  vector[gen_log_lik ? N_binary + N_trichot + N_ordinal + N_metric : 0] log_lik;
+
+  if (gen_log_lik) {
+    int pos = 1;
+    for (n in 1 : N_binary) {
+      real nu = alpha_binary[tt_binary[n], ii_binary[n]]
+        + dot_product(lambda_binary[ii_binary[n], 1:D],
+                      eta[tt_binary[n], jj_binary[n], 1:D]);
+      log_lik[pos] = bernoulli_logit_lpmf(yy_binary[n] | p2l(nu));
+      pos += 1;
+    }
+    for (n in 1 : N_trichot) {
+      real nu = alpha_trichot[tt_trichot[n], ii_trichot[n]]
+        + dot_product(lambda_trichot[ii_trichot[n], 1:D],
+                      eta[tt_trichot[n], jj_trichot[n], 1:D]);
+      log_lik[pos] = ordered_logistic_lpmf(yy_trichot[n] | p2l(nu),
+                                           kappa_trichot[ii_trichot[n]]);
+      pos += 1;
+    }
+    for (n in 1 : N_ordinal) {
+      real nu = alpha_ordinal[tt_ordinal[n], ii_ordinal[n]]
+        + dot_product(lambda_ordinal[ii_ordinal[n], 1:D],
+                      eta[tt_ordinal[n], jj_ordinal[n], 1:D]);
+      log_lik[pos] = ordered_logistic_lpmf(yy_ordinal[n] | p2l(nu),
+                                           kappa_ordinal[ii_ordinal[n]]);
+      pos += 1;
+    }
+    for (n in 1 : N_metric) {
+      real nu = alpha_metric[tt_metric[n], ii_metric[n]]
+        + dot_product(lambda_metric[ii_metric[n], 1:D],
+                      eta[tt_metric[n], jj_metric[n], 1:D]);
+      log_lik[pos] = normal_lpdf(yy_metric[n] | nu, sigma_metric[ii_metric[n]]);
+      pos += 1;
+    }
+  }
 }
 

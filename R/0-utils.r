@@ -133,3 +133,37 @@ as_draws_rvars_safe <- function(...) {
     keep <- vapply(args, function(v) !is.null(v) && length(v) > 0, logical(1))
     do.call(posterior::draws_rvars, args[keep])
 }
+
+#' Map positions of `log_lik` to observations
+#'
+#' @param shaped_data A `mixfac_data` object from [shape_mixfac()].
+#'
+#' @return A data frame with one row per element of `log_lik`, giving the
+#'     item type, item, unit, period, and response value.
+#'
+#' @export
+log_lik_index <- function(shaped_data) {
+    check_arg_type(arg = shaped_data, typename = "mixfac_data")
+    types <- c("binary", "trichot", "ordinal", "metric")
+    label_attrs <- c("binary_item_labels", "trichotomous_item_labels",
+                     "ordinal_item_labels", "metric_item_labels")
+    out <- vector("list", length(types))
+    for (k in seq_along(types)) {
+        n <- shaped_data[[paste0("N_", types[k])]]
+        if (is.null(n) || n == 0) next
+        out[[k]] <- data.frame(
+            item_type = types[k],
+            item = attr(shaped_data, label_attrs[k])[
+                shaped_data[[paste0("ii_", types[k])]]],
+            unit = attr(shaped_data, "unit_labels")[
+                shaped_data[[paste0("jj_", types[k])]]],
+            period = attr(shaped_data, "time_labels")[
+                shaped_data[[paste0("tt_", types[k])]]],
+            value = shaped_data[[paste0("yy_", types[k])]],
+            stringsAsFactors = FALSE
+        )
+    }
+    out <- do.call(rbind, Filter(Negate(is.null), out))
+    out$position <- seq_len(nrow(out))
+    out
+}
