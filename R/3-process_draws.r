@@ -627,7 +627,7 @@ sign_mixfac <- function(x, signs = 1) {
     check_arg_type(arg = x, typename = "mixfac_comb")
     n_time <- dim(x$eta)[1]
     n_factor <- dim(x$eta)[3]
-    stopifnot(length(signs == 1) || length(signs) == n_factor)
+    stopifnot(length(signs) == 1 || length(signs) == n_factor)
     init_signs <- sign(colMeans(E(x$lambda)))
     sign_flips <- ifelse(init_signs == signs, 1, -1)
     sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
@@ -826,7 +826,7 @@ sort_modgirt <- function(modgirt_rvar) {
 sign_modgirt <- function(modgirt_rvar, signs = 1) {
     n_time <- dim(modgirt_rvar$bar_theta)[1]
     n_factor <- dim(modgirt_rvar$bar_theta)[3]
-    stopifnot(length(signs == 1) || length(signs) == n_factor)
+    stopifnot(length(signs) == 1 || length(signs) == n_factor)
     init_signs <- sign(colMeans(E(modgirt_rvar$beta)))
     sign_flips <- ifelse(init_signs == signs, 1, -1)
     if (n_factor == 1) {
