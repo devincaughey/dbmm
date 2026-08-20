@@ -2,3 +2,7 @@
 .DS_Store
 .Rhistory
 inst/stan/dbmm_probit
+inst/stan/dbmm_probit
+inst/stan/dbmm_logit
+inst/stan/*.hpp
+inst/stan/*.o
