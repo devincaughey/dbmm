@@ -16,6 +16,7 @@ fit_mixfac(
   constant_alpha = FALSE,
   separate_eta = TRUE,
   whiten_eta = TRUE,
+  gen_log_lik = FALSE,
   lambda_zeros = NULL,
   df_sigma_metric = 4,
   df_sigma_alpha_evol = 4,
@@ -75,6 +76,12 @@ previous period, thus smoothing the estimates across periods.}
 
 \item{whiten_eta}{(logical) Should units' factor scores (\code{eta}) be whitened
 for identification?  Defaults to \code{TRUE}.}
+
+\item{gen_log_lik}{(logical) Should the per-observation log likelihood be
+computed and returned, for use with the \pkg{loo} package? Defaults to
+\code{FALSE}, since \code{log_lik} has one element per observation per draw and
+can dominate the size of the output. See \code{log_lik_index()} for the
+mapping from positions of \code{log_lik} to observations.}
 
 \item{lambda_zeros}{(multiple options) Should some item loadings (\code{lambda})
 be fixed at 0, and if so which ones? Rotational invariance (label

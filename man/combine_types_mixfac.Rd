@@ -2,10 +2,21 @@
 % Please edit documentation in R/3-process_draws.r
 \name{combine_types_mixfac}
 \alias{combine_types_mixfac}
-\title{Exported function}
+\title{Combine item-type-specific parameters into single variables}
 \usage{
 combine_types_mixfac(x)
 }
+\arguments{
+\item{x}{A \code{mixfac_id} or \code{mixfac_lab} object. Item labels are normally
+assigned by \code{\link[=label_mixfac]{label_mixfac()}} before calling this function; if they are
+absent, item indices are used instead.}
+}
+\value{
+A \code{mixfac_comb} object of the same format as \code{x}.
+}
 \description{
-Exported function
+Stacks the type-specific loading and intercept variables (\code{lambda_binary},
+\code{lambda_trichot}, ...) into single \code{lambda} and \code{alpha} variables, prefixing
+item names with their type. Accepts either a \code{draws_rvars} object or the
+long-format list produced by \code{label_mixfac(make_long = TRUE)}.
 }

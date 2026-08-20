@@ -1,3 +1,5 @@
+.mixfac_drop_default <- "^z_|^chol|^r_|^L_|^Lcorr|^WW$|^sigma_eta_evol"
+
 #' Extract draws from fitted model
 #'
 #' @param x (`dbmm_fitted` object) A fitted model produced by `fit()`.
@@ -15,8 +17,6 @@
 #' @import cmdstanr
 #'
 #' @export
-.mixfac_drop_default <- "^z_|^chol|^r_|^L_|^Lcorr|^WW$|^sigma_eta_evol"
-
 extract_mixfac_draws <- function(x, drop = .mixfac_drop_default, check = TRUE) {
 
     if (check) {
@@ -394,8 +394,6 @@ label_mixfac <- function (x, make_long = FALSE, check = TRUE) {
 }
 
 
-#' Exported function
-#' @export
 #' Combine item-type-specific parameters into single variables
 #'
 #' Stacks the type-specific loading and intercept variables (`lambda_binary`,
@@ -738,8 +736,10 @@ identify_modgirt <- function(x, method = "varimax") {
 #' @return A `draws_rvar` object of rotated draws
 #'
 #' @examples
-#' rotmat <- varimax(E(modgirt_signed$beta))$rotmat
+#' \dontrun{
+#' rotmat <- varimax(posterior::E(modgirt_signed$beta))$rotmat
 #' modgirt_rotated <- rotate_modgirt(modgirt_signed, rotmat)
+#' }
 #' 
 #' @import posterior
 #'
