@@ -21,11 +21,11 @@ fit_mixfac(
   df_sigma_alpha_evol = 4,
   df_sigma_eta_evol = 4,
   mu_sigma_metric = 0.5,
-  mu_sigma_alpha_evol = 0.5,
-  mu_sigma_eta_evol = 0.5,
+  mu_sigma_alpha_evol = 0,
+  mu_sigma_eta_evol = 0,
   sd_sigma_metric = 0.5,
-  sd_sigma_alpha_evol = 0.5,
-  sd_sigma_eta_evol = 0.5,
+  sd_sigma_alpha_evol = 0.1,
+  sd_sigma_eta_evol = 0.1,
   seed = NULL,
   link = "probit",
   ...
@@ -73,6 +73,9 @@ the same priors in every time period? Defaults to \code{TRUE}. If \code{FALSE}, 
 scores in each period will be given priors centered on their value in the
 previous period, thus smoothing the estimates across periods.}
 
+\item{whiten_eta}{(logical) Should units' factor scores (\code{eta}) be whitened
+for identification?  Defaults to \code{TRUE}.}
+
 \item{lambda_zeros}{(multiple options) Should some item loadings (\code{lambda})
 be fixed at 0, and if so which ones? Rotational invariance (label
 switching) across latent factors can be avoided by setting, for each
@@ -98,28 +101,28 @@ Student's t prior for \code{sigma_eta_evol}, the standard deviation of the
 dynamic prior for \code{eta}. Defaults to \code{4}.}
 
 \item{mu_sigma_metric}{(real) Mean of the (half) Student's t prior for
-\code{sigma_alpha_evol}, the residual standard deviations of the metric
+\code{sigma_metric}, the residual standard deviations of the metric
 items. Defaults to \code{0.5}.}
 
-\item{mu_sigma_alpha_evol}{(real) Mean of the (half) Student's t prior for
-\code{sigma_alpha_evol}, the standard deviation of the dynamic prior for
-\code{alpha}. Defaults to \code{0.1}.}
+\item{mu_sigma_alpha_evol}{(non-negative real) Location of the half
+Student's t prior for \code{sigma_alpha_evol}, the standard deviation of the
+dynamic prior for \code{alpha}. Defaults to \code{0}, which shrinks the intercept
+evolution toward zero (i.e., toward time-constant intercepts).}
 
-\item{mu_sigma_eta_evol}{(real) Mean of the (half) Student's t prior for
-\code{sigma_eta_evol}, the standard deviation of the dynamic prior for
-\code{eta}. Defaults to \code{0.1}.}
+\item{mu_sigma_eta_evol}{(non-negative real) Location of the half Student's
+t prior for \code{sigma_eta_evol}, the standard deviation of the dynamic
+prior for \code{eta}. Defaults to \code{0}, which shrinks the factor evolution
+toward zero (i.e., toward time-constant factor scores).}
 
 \item{sd_sigma_metric}{(positive real) Standard deviation of the (half)
-Student's t prior for \code{sigma_alpha_evol}, the residual standard
+Student's t prior for \code{sigma_metric}, the residual standard
 deviations of the metric items. Defaults to \code{0.5}.}
 
-\item{sd_sigma_alpha_evol}{(positive real) Standard deviation of the
-Student's t prior for \code{sigma_alpha_evol}, the standard deviation of the
-dynamic prior for \code{alpha}. Defaults to \code{0.1}.}
+\item{sd_sigma_alpha_evol}{(positive real) Scale of the half Student's t
+prior for \code{sigma_alpha_evol}. Defaults to \code{0.1}.}
 
-\item{sd_sigma_eta_evol}{(positive real) Standard deviation of the (half)
-Student's t prior for \code{sigma_alpha_evol}, the residual standard
-deviations of the metric items. Defaults to \code{0.1}.}
+\item{sd_sigma_eta_evol}{(positive real) Scale of the half Student's t prior
+for \code{sigma_eta_evol}. Defaults to \code{0.1}.}
 
 \item{seed}{(positive integer) An integer vector of length one indicating the
 state of Stan’s pseudo-random number generator. Defaults to \code{123}.}
@@ -128,9 +131,6 @@ state of Stan’s pseudo-random number generator. Defaults to \code{123}.}
 ordinal outcomes. One of \code{"probit"} (the default) and \code{"logit"}.}
 
 \item{...}{Additional arguments to \code{cmdstanr::sample()}.}
-
-\item{white_eta}{(logical) Should units' factor scores (\code{eta}) be whitened
-for identification?  Defaults to \code{TRUE}.}
 }
 \value{
 A dbmm object containing
