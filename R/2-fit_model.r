@@ -58,6 +58,9 @@ fit_modgirt <- function(
         paste0("stan/modgirt_", link, ".stan"),
         package = "dbmm"
     )
+    if (!nzchar(file)) {
+        stop("No Stan file found for `link = \"", link, "\"`.")
+    }    
     m0 <- cmdstan_model(stan_file = file)
     m1 <- m0$compile(force_recompile = force_recompile)
     modgirt_fit <- m1$sample(stan_data, chains = chains, seed = seed, ...)
@@ -179,7 +182,7 @@ make_mixfac_out <- function(fit, shaped_data, return_data = TRUE) {
 #' @param seed (positive integer) An integer vector of length one indicating the
 #'     state of Stan’s pseudo-random number generator. Defaults to `123`.
 #' @param link (string) Which link function should be used for binary and
-#'     ordinal outcomes. One of `"probit"` (the default) and `"logit"`.
+#'     ordinal outcomes. Currently only `"probit"` is supported.
 #' @param ... Additional arguments to `cmdstanr::sample()`.
 #'
 #' @return A dbmm object containing
@@ -334,8 +337,13 @@ fit_mixfac <- function(shaped_data,
     shaped_data$nonzero_metric <- nonzero_metric
 
     ## Compile model
-    file <- system.file(paste0("stan/dbmm_", link, ".stan"), package = "dbmm")
-
+    if (!identical(link, "probit")) {
+        stop("Only `link = \"probit\"` is currently supported for mixfac models.")
+    }
+    file <- system.file(paste0("stan/mixfac_", link, ".stan"), package = "dbmm")
+    if (!nzchar(file)) {
+        stop("No Stan file found for `link = \"", link, "\"`.")
+    }
     m0 <- cmdstan_model(stan_file = file)
 
     cpp_opts <- list(stan_threads = as.logical(shaped_data$parallelize))
