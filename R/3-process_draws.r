@@ -65,19 +65,21 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
     } else {
         draws_rvar <- posterior::as_draws_rvars(x$fit$draws())
     }
+
     ## Subset to lambda draws (rvar)
     lambda_rvar <-
         posterior::subset_draws(draws_rvar, variable = "^lambda", regex = TRUE)
-    draws_of_lambda <- lambda_rvar |>
-        lapply(draws_of, with_chains = TRUE) |>
-        abind::abind(along = 3)
-    ## Dimensions (chains / iterations / factors)
+
+    ## Dimensions
     n_chain <- posterior::nchains(draws_rvar)
     n_iter <- posterior::niterations(draws_rvar)
-    n_factor <- dim(draws_of_lambda)[4]
-    n_time <- dim(x$eta)[1]
-    if (ref_t == "last") ref_t <- n_time
-    ## Choose which loading variable to use based on item_type
+    n_time <- dim(draws_rvar$eta)[1]
+    n_unit <- dim(draws_rvar$eta)[2]
+    n_factor <- dim(draws_rvar$eta)[3]
+
+    if (identical(ref_t, "last")) ref_t <- n_time
+
+    ## Choose which loading variable to use for rsp alignment
     if (inherits(x, "mixfac_comb")) {
         identify_with_type <- "lambda"
     } else if (missing(identify_with_type)) {
@@ -92,40 +94,118 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
         trichot = "lambda_trichot",
         ordinal = "lambda_ordinal",
         metric = "lambda_metric",
-        stop("Invalid `identify_with_type` argument; must be 'lambda', 'binary', 'trichot', 'ordinal' or 'metric'")
+        stop("Invalid `identify_with_type`; must be 'lambda', 'binary', 'trichot', 'ordinal', or 'metric'.")
     )
+
     omega_rvar <- posterior::subset_draws(draws_rvar, variable = "Omega")
+
+    ## ---------- Optional whitening ----------
+    ## eta_norm   = (eta - m) %*% WW
+    ## lambda_norm = lambda %*% inv(WW)'
+    ## alpha_norm  = alpha + lambda %*% m        (original basis)
+    ## Omega_norm  = WW' %*% Omega %*% WW
+    ## kappa is unchanged. Together these leave every linear predictor
+    ## nu = alpha + lambda %*% eta exactly invariant. The varimax and
+    ## signed-permutation rotations applied afterwards are orthogonal, so
+    ## they preserve lambda %*% eta and require no further adjustment.
     if (whiten) {
-        eta_raw <- x$eta
-        ## Demean
-        cmeans_rvar <- rvar_apply(eta_raw[ref_t, , ], 3, rvar_mean)
-        eta_0 <- eta_raw
-        for (t in seq_len(dim(eta_raw)[1])) {
-            for (j in seq_len(dim(eta_raw)[2])) {
-                for (d in seq_len(dim(eta_raw)[3])) {
-                    eta_0[t, j, d] <- eta_raw[t, j, d] - cmeans_rvar[d]
+        eta_raw <- draws_rvar$eta
+
+        ## Anchor matrix XX (J x D)
+        if (identical(ref_t, "mean")) {
+            XX <- posterior::rvar_apply(eta_raw, c(2, 3), posterior::rvar_mean)
+        } else {
+            if (!is.numeric(ref_t) || length(ref_t) != 1L ||
+                ref_t < 1 || ref_t > n_time) {
+                stop("`ref_t` must be 'last', 'mean', or an integer in 1:T.")
+            }
+            XX <- eta_raw[ref_t, , , drop = TRUE]
+            if (n_factor == 1) XX <- t(t(XX))
+        }
+
+        ## Anchor column means, and demeaned anchor
+        m_rvar <- posterior::rvar_apply(XX, 2, posterior::rvar_mean)
+        DM <- XX
+        for (d in seq_len(n_factor)) {
+            DM[, d] <- XX[, d] - m_rvar[d]
+        }
+
+        ## Whitening matrix, and its inverse-transpose for the loadings
+        ## (WW is triangular, not orthogonal, so inv(WW)' != WW)
+        WW_rvar <- rvar_whiten_matrix(DM)
+        rvar_solve <- posterior::rfun(solve)
+        Ginv_rvar <- t(rvar_solve(WW_rvar))
+
+        ## --- Transform eta ---
+        eta_w <- eta_raw
+        for (tt in seq_len(n_time)) {
+            E_t <- eta_raw[tt, , , drop = TRUE]
+            if (n_factor == 1) E_t <- t(t(E_t))
+            for (d in seq_len(n_factor)) {
+                E_t[, d] <- E_t[, d] - m_rvar[d]
+            }
+            eta_w[tt, , ] <- posterior::`%**%`(E_t, WW_rvar)
+        }
+        draws_rvar$eta <- eta_w
+
+        ## --- Shift intercepts, using the ORIGINAL loadings and anchor mean ---
+        ## Done on the draws arrays rather than with rvar slice assignment,
+        ## which recycles unpredictably across the draws dimension.
+        shift_alpha_exact <- function(alpha_mat, lambda_mat, m_vec) {
+            if (is.null(alpha_mat) || is.null(lambda_mat)) return(alpha_mat)
+            A <- posterior::draws_of(alpha_mat)    # [draws, T, I]
+            L <- posterior::draws_of(lambda_mat)   # [draws, I, D]
+            M <- posterior::draws_of(m_vec)        # [draws, D]
+            if (is.null(dim(M))) M <- matrix(M, ncol = 1L)
+            n_draw <- dim(A)[1]
+            n_it <- dim(A)[3]
+            ## S[s, i] = sum_d L[s, i, d] * M[s, d]
+            S <- matrix(0, nrow = n_draw, ncol = n_it)
+            for (d in seq_len(dim(L)[3])) {
+                Ld <- array(L[, , d], dim = dim(L)[1:2])
+                S <- S + Ld * M[, d]
+            }
+            for (tt in seq_len(dim(A)[2])) {
+                A[, tt, ] <- A[, tt, ] + S
+            }
+            out <- posterior::rvar(A, nchains = posterior::nchains(alpha_mat))
+            dimnames(out) <- dimnames(alpha_mat)
+            out
+        }
+
+        if (inherits(x, "mixfac_comb")) {
+            if (!is.null(draws_rvar$alpha)) {
+                draws_rvar$alpha <- shift_alpha_exact(
+                    draws_rvar$alpha, lambda_rvar$lambda, m_rvar
+                )
+            }
+        } else {
+            for (ty in c("binary", "trichot", "ordinal", "metric")) {
+                anm <- paste0("alpha_", ty)
+                lnm <- paste0("lambda_", ty)
+                if (!is.null(draws_rvar[[anm]]) && !is.null(lambda_rvar[[lnm]])) {
+                    draws_rvar[[anm]] <- shift_alpha_exact(
+                        draws_rvar[[anm]], lambda_rvar[[lnm]], m_rvar
+                    )
                 }
             }
         }
-        eta_w <- eta_0
-        WW_rvar <- rvar_whiten_matrix(eta_0[ref_t, , ,  drop = TRUE])
-        for (t in seq_len(dim(eta_0)[1])) {
-            if (n_factor == 1) {
-                eta_0_mat <- t(t(eta_0[t, , , drop = TRUE]))
-                eta_w[t, , ] <- t(posterior::`%**%`(eta_0_mat, WW_rvar))
-            } else {
-                eta_w[t, , ] <-
-                    posterior::`%**%`(eta_0[t, , , drop = TRUE], WW_rvar)
-            }
-        }
-        draws_rvar$eta <- eta_w
+
+        ## --- Transform loadings (must come AFTER the intercept shift) ---
         for (k in seq_along(lambda_rvar)) {
-            lambda_rvar[[k]] <- posterior::`%**%`(lambda_rvar[[k]], WW_rvar)
+            lambda_rvar[[k]] <- posterior::`%**%`(lambda_rvar[[k]], Ginv_rvar)
         }
+
+        ## --- Transform the innovation covariance ---
         omega_rvar$Omega <- t(WW_rvar) %**% omega_rvar$Omega %**% WW_rvar
-        ## TODO: kappa and alpha_metric/binary (difference in eta * lambda)
     }
-    ## Make varimax matrices
+
+    ## Recompute draws_of_lambda AFTER optional whitening
+    draws_of_lambda <- lambda_rvar |>
+        lapply(posterior::draws_of, with_chains = TRUE) |>
+        abind::abind(along = 3)
+
+    ## ---------- Varimax ----------
     if (n_factor > 1) {
         vm_rvar <- make_vm_rvar(
             draws_of_lambda,
@@ -137,41 +217,42 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
     } else {
         vm_rvar <- matrix(1)
     }
-    ## Apply varimax rotations to lambdas
+
     for (k in seq_along(lambda_rvar)) {
-        lambda_rvar[[k]] <- posterior::`%**%`(lambda_rvar[[k]], vm_rvar)        
+        lambda_rvar[[k]] <- posterior::`%**%`(lambda_rvar[[k]], vm_rvar)
     }
-    ## Compute signed-permutation matrices (factor-switching alignment)
-    ## Convert rotated lambdas to a draws-matrix in the format expected by
-    ## rsp_exact()
+
+    ## ---------- Signed permutation alignment ----------
     lambda_without_names <- lambda_rvar[[varname]]
     dimnames(lambda_without_names) <- NULL
     lambda_matrix <- posterior::as_draws_matrix(t(lambda_without_names))
     lambda_matrix <- rename_loading_matrix(lambda_matrix)
-    ## factor.switching::rsp_exact expects rows ordered by (chain then iteration),
-    ## and returns a list with sign_vectors and permute_vectors
     rsp_out <- factor.switching::rsp_exact(lambda_matrix, rotate = FALSE)
-    ## Create sp_rvar (signed-permutation rvar) and apply to lambdas
     sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
-    ## Apply signed permutations to lambdas
-    for (t in seq_along(lambda_rvar)) {
-        lambda_rvar[[t]] <- posterior::`%**%`(lambda_rvar[[t]], sp_rvar)
-        dimnames(lambda_rvar[[t]]) <- list(
-            item = dimnames(lambda_rvar[[t]])[[1]],
-            factor = seq_len(dim(lambda_rvar[[t]])[2])
+
+    for (k in seq_along(lambda_rvar)) {
+        lambda_rvar[[k]] <- posterior::`%**%`(lambda_rvar[[k]], sp_rvar)
+        dimnames(lambda_rvar[[k]]) <- list(
+            item = dimnames(lambda_rvar[[k]])[[1]],
+            factor = seq_len(dim(lambda_rvar[[k]])[2])
         )
     }
-    ## RSP matrices
+
     vm_sp_rvar <- posterior::`%**%`(vm_rvar, sp_rvar)
-    ## Apply rotations to `eta`
+
+    ## Rotate eta
     eta_rvar <- posterior::subset_draws(draws_rvar, variable = "eta")
-    for (t in seq_len(dim(eta_rvar$eta)[1])) {
-        eta_rvar$eta[t, , ] <- posterior::`%**%`(
-            as.matrix(eta_rvar$eta[t, , , drop = TRUE]),
+    for (tt in seq_len(dim(eta_rvar$eta)[1])) {
+        eta_rvar$eta[tt, , ] <- posterior::`%**%`(
+            as.matrix(eta_rvar$eta[tt, , , drop = TRUE]),
             vm_sp_rvar
         )
     }
+
+    ## Rotate Omega
     omega_rvar$Omega <- t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
+
+    ## ---------- Output ----------
     if (inherits(x, "mixfac_comb")) {
         out <- as_draws_rvars_safe(
             eta = eta_rvar$eta,
@@ -203,11 +284,7 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
             lp__ = draws_rvar$lp__
         )
     }
-    if (whiten) {
-        warning("Note: Post-estimation identification of intercepts and thresholds is not yet implemented, so these variables are omitted from the output.")
-        out <- out |>
-            subset_draws("^kappa|^alpha_[mbt]", regex = TRUE, exclude = TRUE)
-    }
+
     attr(out, "unit_labels") <- attr(x, "unit_labels")
     attr(out, "time_labels") <- attr(x, "time_labels")
     attr(out, "binary_item_labels") <- attr(x, "binary_item_labels")
@@ -319,6 +396,20 @@ label_mixfac <- function (x, make_long = FALSE, check = TRUE) {
 
 #' Exported function
 #' @export
+#' Combine item-type-specific parameters into single variables
+#'
+#' Stacks the type-specific loading and intercept variables (`lambda_binary`,
+#' `lambda_trichot`, ...) into single `lambda` and `alpha` variables, prefixing
+#' item names with their type. Accepts either a `draws_rvars` object or the
+#' long-format list produced by `label_mixfac(make_long = TRUE)`.
+#'
+#' @param x A `mixfac_id` or `mixfac_lab` object. Item labels are normally
+#'     assigned by [label_mixfac()] before calling this function; if they are
+#'     absent, item indices are used instead.
+#'
+#' @return A `mixfac_comb` object of the same format as `x`.
+#'
+#' @export
 combine_types_mixfac <- function (x) {
     ## Decide the format once. label_mixfac(make_long = TRUE) yields data
     ## frames; otherwise elements are rvars. Testing per-variable with
@@ -330,6 +421,36 @@ combine_types_mixfac <- function (x) {
     alpha_idx  <- grep("^alpha_",  names(x))
     kappa_idx  <- grep("^kappa_",  names(x))
 
+    if (length(lambda_idx) == 0) {
+        stop("No `lambda_*` variables found in `x`. ",
+             "Has `combine_types_mixfac()` already been applied?")
+    }
+
+    ## Prefix item names with the item type. paste0() with a NULL argument
+    ## returns a length-1 string rather than character(0), so an unlabelled
+    ## object would otherwise get a single name assigned to a dimension of
+    ## extent I. `item_dim` is 1 for lambda_* (item, factor) and 2 for
+    ## alpha_* (period, item).
+    prefix_items <- function (v, type, item_dim) {
+        dn <- dimnames(v)
+        if (is.null(dn)) {
+            dn <- vector("list", length(dim(v)))
+        }
+        nms <- dn[[item_dim]]
+        if (is.null(nms)) {
+            nms <- seq_len(dim(v)[item_dim])
+        }
+        dn[[item_dim]] <- paste0(type, ": ", nms)
+        if (is.null(names(dn))) {
+            names(dn) <- rep("", length(dn))
+        }
+        if (!nzchar(names(dn)[item_dim])) {
+            names(dn)[item_dim] <- "item"
+        }
+        dimnames(v) <- dn
+        v
+    }
+
     ## lambda
     if (is_long) {
         lambda <- dplyr::bind_rows(x[lambda_idx], .id = "item_type")
@@ -337,8 +458,8 @@ combine_types_mixfac <- function (x) {
     } else {
         for (k in seq_along(lambda_idx)) {
             type_k <- sub("^lambda_", "", names(x)[lambda_idx[k]])
-            dimnames(x[[lambda_idx[k]]])[["item"]] <-
-                paste0(type_k, ": ", dimnames(x[[lambda_idx[k]]])[["item"]])
+            x[[lambda_idx[k]]] <-
+                prefix_items(x[[lambda_idx[k]]], type_k, item_dim = 1)
         }
         lambda <- do.call(rbind, x[lambda_idx])
     }
@@ -350,8 +471,8 @@ combine_types_mixfac <- function (x) {
     } else {
         for (k in seq_along(alpha_idx)) {
             type_k <- sub("^alpha_", "", names(x)[alpha_idx[k]])
-            dimnames(x[[alpha_idx[k]]])[["item"]] <-
-                paste0(type_k, ": ", dimnames(x[[alpha_idx[k]]])[["item"]])
+            x[[alpha_idx[k]]] <-
+                prefix_items(x[[alpha_idx[k]]], type_k, item_dim = 2)
         }
         alpha <- do.call(cbind, x[alpha_idx])
     }
