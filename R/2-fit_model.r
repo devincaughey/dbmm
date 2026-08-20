@@ -130,7 +130,7 @@ make_mixfac_out <- function(fit, shaped_data, return_data = TRUE) {
 #'     the same priors in every time period? Defaults to `TRUE`. If `FALSE`, the
 #'     scores in each period will be given priors centered on their value in the
 #'     previous period, thus smoothing the estimates across periods.
-#' @param white_eta (logical) Should units' factor scores (`eta`) be whitened
+#' @param whiten_eta (logical) Should units' factor scores (`eta`) be whitened
 #'     for identification?  Defaults to `TRUE`.
 #' @param lambda_zeros (multiple options) Should some item loadings (`lambda`)
 #'     be fixed at 0, and if so which ones? Rotational invariance (label
@@ -154,23 +154,23 @@ make_mixfac_out <- function(fit, shaped_data, return_data = TRUE) {
 #'     Student's t prior for `sigma_eta_evol`, the standard deviation of the
 #'     dynamic prior for `eta`. Defaults to `4`.
 #' @param mu_sigma_metric (real) Mean of the (half) Student's t prior for
-#'     `sigma_alpha_evol`, the residual standard deviations of the metric
+#'     `sigma_metric`, the residual standard deviations of the metric
 #'     items. Defaults to `0.5`.
-#' @param mu_sigma_alpha_evol (real) Mean of the (half) Student's t prior for
-#'     `sigma_alpha_evol`, the standard deviation of the dynamic prior for
-#'     `alpha`. Defaults to `0.1`.
-#' @param mu_sigma_eta_evol (real) Mean of the (half) Student's t prior for
-#'     `sigma_eta_evol`, the standard deviation of the dynamic prior for
-#'     `eta`. Defaults to `0.1`.
 #' @param sd_sigma_metric (positive real) Standard deviation of the (half)
-#'     Student's t prior for `sigma_alpha_evol`, the residual standard
+#'     Student's t prior for `sigma_metric`, the residual standard
 #'     deviations of the metric items. Defaults to `0.5`.
-#' @param sd_sigma_alpha_evol (positive real) Standard deviation of the
+#' @param mu_sigma_alpha_evol (non-negative real) Location of the half
 #'     Student's t prior for `sigma_alpha_evol`, the standard deviation of the
-#'     dynamic prior for `alpha`. Defaults to `0.1`.
-#' @param sd_sigma_eta_evol (positive real) Standard deviation of the (half)
-#'     Student's t prior for `sigma_alpha_evol`, the residual standard
-#'     deviations of the metric items. Defaults to `0.1`.
+#'     dynamic prior for `alpha`. Defaults to `0`, which shrinks the intercept
+#'     evolution toward zero (i.e., toward time-constant intercepts).
+#' @param mu_sigma_eta_evol (non-negative real) Location of the half Student's
+#'     t prior for `sigma_eta_evol`, the standard deviation of the dynamic
+#'     prior for `eta`. Defaults to `0`, which shrinks the factor evolution
+#'     toward zero (i.e., toward time-constant factor scores).
+#' @param sd_sigma_alpha_evol (positive real) Scale of the half Student's t
+#'     prior for `sigma_alpha_evol`. Defaults to `0.1`.
+#' @param sd_sigma_eta_evol (positive real) Scale of the half Student's t prior
+#'     for `sigma_eta_evol`. Defaults to `0.1`.
 #' @param seed (positive integer) An integer vector of length one indicating the
 #'     state of Stan’s pseudo-random number generator. Defaults to `123`.
 #' @param link (string) Which link function should be used for binary and
@@ -206,11 +206,11 @@ fit_mixfac <- function(shaped_data,
                        df_sigma_alpha_evol = 4,
                        df_sigma_eta_evol = 4,
                        mu_sigma_metric = 0.5,
-                       mu_sigma_alpha_evol = 0.5,
-                       mu_sigma_eta_evol = 0.5,
+                       mu_sigma_alpha_evol = 0,  
+                       mu_sigma_eta_evol = 0,    
                        sd_sigma_metric = 0.5,
-                       sd_sigma_alpha_evol = 0.5,
-                       sd_sigma_eta_evol = 0.5,
+                       sd_sigma_alpha_evol = 0.1,
+                       sd_sigma_eta_evol = 0.1,
                        seed = NULL,
                        link = "probit",
                        ...) {
