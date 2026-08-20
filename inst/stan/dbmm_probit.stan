@@ -230,7 +230,6 @@ parameters {
   array[est_Omega] cholesky_factor_corr[D] Lcorr_eta; /* evolution corr. (chol.) */
 }
 transformed parameters {
-  array[T, J, D] real r_eta;		   /* latent factors (un-whitened) */
   array[T, J, D] real eta;		   /* latent factors (final) */
   array[T, I_binary] real alpha_binary;	   /* binary intercepts */
   array[T, I_ordinal] real alpha_ordinal;  /* ordinal intercepts */
@@ -254,23 +253,14 @@ transformed parameters {
     /* No random walk in eta; L_eta is reported as I_D but never used below. */
     L_eta = identity_matrix(D);
   }
-  matrix[D, D] WW;
-  for (t in 1:T) {
+for (t in 1:T) {
     if (t == 1) {
       if (whiten_eta == 1) {
-        /* compute DM (zmat demeaned by its column means) and WW from period 1,
-           then whiten using DM * WW. This makes WW available in this scope. */
-        matrix[J, D] zmat = to_matrix(z_eta[t, 1:J, 1:D]);
-        matrix[J, D] DM;
-        for (d in 1:D) DM[:, d] = zmat[:, d] - mean(zmat[:, d]);
-        WW = make_whiten_matrix(DM);        // WW computed from period-1 DM
-        eta[t, 1:J, 1:D] = to_array_2d(DM * WW); // same result as whiten(zmat)
-        r_eta[t, 1:J, 1:D] = eta[t, 1:J, 1:D];
+        /* Period-1 factors are de-meaned and whitened, fixing the location,
+           scale, and rotation of the latent space. */
+        eta[t, 1:J, 1:D] = to_array_2d(whiten(to_matrix(z_eta[t, 1:J, 1:D])));
       } else {
-        /* ensure WW is defined even when not whitening (identity no-op) */
-        WW = identity_matrix(D);
-        r_eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
-        eta[t, 1:J, 1:D] = r_eta[t, 1:J, 1:D];
+        eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
       }
       alpha_metric[t] = z_alpha_metric[1];
       alpha_binary[t] = z_alpha_binary[1];
@@ -278,15 +268,13 @@ transformed parameters {
       alpha_ordinal[t, ] = rep_array(0.0, I_ordinal);
     } else {
       if (separate_eta == 1) {
-        r_eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
-        eta[t, 1:J, 1:D] = r_eta[t, 1:J, 1:D];
+        eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
       } else {
+        /* Random walk, built directly on the period-1 configuration. */
         for (j in 1:J) {
-          vector[D] r_eta_vec_tm1 = to_vector(r_eta[t-1, j, 1:D]);
-          vector[D] z_eta_t = to_vector(z_eta[t, j, 1:D]);
-          // use L_eta (diag_pre_multiply(sigma, Lcorr_eta)) as cholesky factor:
-          r_eta[t][j, 1:D] = to_array_1d(r_eta_vec_tm1 + L_eta * z_eta_t);
-          eta[t, j, 1:D] = r_eta[t, j, 1:D];
+          eta[t, j, 1:D] =
+            to_array_1d(to_vector(eta[t - 1, j, 1:D])
+                        + L_eta * to_vector(z_eta[t, j, 1:D]));
         }
       }
       if (constant_alpha == 1) {
