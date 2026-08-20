@@ -3,15 +3,6 @@ functions {
     return x .* (1.5976 + 0.07056 * x .* x);
   }
 
-  array[] real p2l_array(array[] real x) {
-    int N = num_elements(x);
-    vector[N] xv = to_vector(x);
-    vector[N] yv = xv .* (1.5976 + 0.07056 * xv .* xv);
-    array[N] real y;
-    for (i in 1:N) y[i] = yv[i];
-    return y;
-  }
-
   /* Return whitening matrix for demeaned matrix DM */
   matrix make_whiten_matrix(matrix DM) {
     int K = cols(DM);
@@ -45,8 +36,6 @@ functions {
                                array[] int tt_b,
                                array[] int ii_b,
                                array[] int jj_b) {
-    int T = dims(eta)[1];
-    int J = dims(eta)[2];
     int D = dims(eta)[3];
     int N_slice = end - start + 1;
     array[N_slice] int tt_slice = tt_b[start:end];
@@ -72,8 +61,6 @@ functions {
                                array[] int ii_o,
                                array[] int jj_o,
                                array[] vector kappa) {
-    int T = dims(eta)[1];
-    int J = dims(eta)[2];
     int D = dims(eta)[3];
     int K = size(kappa[1]);
     int N_slice = end - start + 1;
@@ -101,8 +88,6 @@ functions {
                                array[] int ii_m,
                                array[] int jj_m,
                                array[] real sigma) {
-    int T = dims(eta)[1];
-    int J = dims(eta)[2];
     int D = dims(eta)[3];
     int N_slice = end - start + 1;
     array[N_slice] int tt_slice = tt_m[start:end];
@@ -117,26 +102,6 @@ functions {
       nu_slice[n] = a_n + l_n * e_n;
     }
     return normal_lupdf(yy_m_slice | nu_slice, sigma_slice);
-  }
-
-  int num_matches(array[] int x, int a) {
-    int n = 0;
-    for (i in 1:size(x))
-      if (x[i] == a)
-        n += 1;
-    return n;
-  }
-
-  array[] int which_equal(array[] int x, int a) {
-    array[num_matches(x, a)] int match_positions;
-    int pos = 1;
-    for (i in 1:size(x)) {
-      if (x[i] == a) {
-        match_positions[pos] = i;
-        pos += 1;
-      }
-    }
-    return match_positions;
   }
 }
 data {
@@ -154,7 +119,6 @@ data {
   array[N_binary] int<lower=1> ii_binary;         /* item indicator */
   array[N_binary] int<lower=1> jj_binary;         /* unit indicator */
   array[N_binary] int<lower=1> tt_binary;         /* time indicator */
-  array[T, 2] int<lower=0> tob_b;		  /* time ranges */
   matrix[I_binary, D] nonzero_binary;		  /* nonzero loadings */
   // Trichotomous data //
   int<lower=0> N_trichot;                   /* number of observations */
@@ -163,7 +127,6 @@ data {
   array[N_trichot] int<lower=1> ii_trichot; /* item indicator */
   array[N_trichot] int<lower=1> jj_trichot; /* unit indicator */
   array[N_trichot] int<lower=1> tt_trichot; /* period indicator */
-  array[T, 2] int<lower=0> tob_t;	    /* time ranges */
   matrix[I_trichot, D] nonzero_trichot;     /* nonzero loadings */
   // Ordinal data //
   int<lower=0> N_ordinal;                   /* number of observations */
@@ -173,7 +136,6 @@ data {
   array[N_ordinal] int<lower=1> ii_ordinal; /* item indicator */
   array[N_ordinal] int<lower=1> jj_ordinal; /* unit indicator */
   array[N_ordinal] int<lower=1> tt_ordinal; /* period indicator */
-  array[T, 2] int<lower=0> tob_o;	    /* time ranges */
   matrix[I_ordinal, D] nonzero_ordinal;     /* nonzero loadings */
   // Metric data //
   int<lower=0> N_metric;                    /* number of observations */
@@ -182,7 +144,6 @@ data {
   array[N_metric] int<lower=1> ii_metric;   /* item indicator */
   array[N_metric] int<lower=1> jj_metric;   /* unit indicator */
   array[N_metric] int<lower=1> tt_metric;   /* period indicator */
-  array[T, 2] int<lower=0> tob_m;	    /* time ranges */
   matrix[I_metric, D] nonzero_metric;       /* nonzero loadings */
   // Priors //
   real<lower=0> df_sigma_metric;
