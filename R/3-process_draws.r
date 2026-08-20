@@ -320,41 +320,53 @@ label_mixfac <- function (x, make_long = FALSE, check = TRUE) {
 #' Exported function
 #' @export
 combine_types_mixfac <- function (x) {
-    ## lambda
+    ## Decide the format once. label_mixfac(make_long = TRUE) yields data
+    ## frames; otherwise elements are rvars. Testing per-variable with
+    ## all(sapply(...)) is unreliable: a type absent from the fit gives an
+    ## empty selection, for which all() is vacuously TRUE.
+    is_long <- any(vapply(x, is.data.frame, logical(1)))
+
     lambda_idx <- grep("^lambda_", names(x))
-    if (all(sapply(x[lambda_idx], is.data.frame))) {
+    alpha_idx  <- grep("^alpha_",  names(x))
+    kappa_idx  <- grep("^kappa_",  names(x))
+
+    ## lambda
+    if (is_long) {
         lambda <- dplyr::bind_rows(x[lambda_idx], .id = "item_type")
         lambda$item_type <- sub("^lambda_", "", lambda$item_type)
     } else {
-        for (k in seq_along(x[lambda_idx])) {
-            type_k <- sub("^lambda_", "", names(x[lambda_idx])[k])
-            dimnames(x[lambda_idx][[k]])[["item"]] <-
-                paste0(type_k, ": ", dimnames(x[lambda_idx][[k]])[["item"]])
+        for (k in seq_along(lambda_idx)) {
+            type_k <- sub("^lambda_", "", names(x)[lambda_idx[k]])
+            dimnames(x[[lambda_idx[k]]])[["item"]] <-
+                paste0(type_k, ": ", dimnames(x[[lambda_idx[k]]])[["item"]])
         }
         lambda <- do.call(rbind, x[lambda_idx])
     }
+
     ## alpha
-    alpha_idx <- grep("^alpha_", names(x))
-    if (all(sapply(x[alpha_idx], is.data.frame))) {
+    if (is_long) {
         alpha <- dplyr::bind_rows(x[alpha_idx], .id = "item_type")
         alpha$item_type <- sub("^alpha_", "", alpha$item_type)
     } else {
-        for (k in seq_along(x[alpha_idx])) {
-            type_k <- sub("^alpha_", "", names(x[alpha_idx])[k])
-            dimnames(x[alpha_idx][[k]])[["item"]] <-
-                paste0(type_k, ": ", dimnames(x[alpha_idx][[k]])[["item"]])
+        for (k in seq_along(alpha_idx)) {
+            type_k <- sub("^alpha_", "", names(x)[alpha_idx[k]])
+            dimnames(x[[alpha_idx[k]]])[["item"]] <-
+                paste0(type_k, ": ", dimnames(x[[alpha_idx[k]]])[["item"]])
         }
         alpha <- do.call(cbind, x[alpha_idx])
     }
-    ## kappa
-    kappa_idx <- grep("^kappa_", names(x))
-    if (all(sapply(x[kappa_idx], is.data.frame))) {
-        kappa <- dplyr::bind_rows(x[kappa_idx], .id = "item_type")
-        kappa$item_type <- sub("^kappa_", "", kappa$item_type)
-        out <- c(
-            list(lambda = lambda, alpha = alpha, kappa = kappa),
-            x[-c(lambda_idx, alpha_idx, kappa_idx)]
-        )
+
+    ## kappa, and assembly
+    if (is_long) {
+        keep <- setdiff(seq_along(x), c(lambda_idx, alpha_idx, kappa_idx))
+        if (length(kappa_idx) > 0) {
+            kappa <- dplyr::bind_rows(x[kappa_idx], .id = "item_type")
+            kappa$item_type <- sub("^kappa_", "", kappa$item_type)
+            out <- c(list(lambda = lambda, alpha = alpha, kappa = kappa),
+                     x[keep])
+        } else {
+            out <- c(list(lambda = lambda, alpha = alpha), x[keep])
+        }
     } else {
         out <- as_draws_rvars_safe(
             eta = x$eta,
@@ -367,14 +379,15 @@ combine_types_mixfac <- function (x) {
             Omega = x$Omega,
             lp__ = x$lp__
         )
-        attr(out, "unit_labels") <- attr(x, "unit_labels")
-        attr(out, "time_labels") <- attr(x, "time_labels")
-        attr(out, "binary_item_labels") <- attr(x, "binary_item_labels")
-        attr(out, "trichotomous_item_labels") <-
-            attr(x, "trichotomous_item_labels")
-        attr(out, "ordinal_item_labels") <- attr(x, "ordinal_item_labels")
-        attr(out, "metric_item_labels") <- attr(x, "metric_item_labels")
     }
+
+    ## Attributes: previously copied only in the rvar branch
+    for (nm in c("unit_labels", "time_labels", "binary_item_labels",
+                 "trichotomous_item_labels", "ordinal_item_labels",
+                 "metric_item_labels")) {
+        attr(out, nm) <- attr(x, nm)
+    }
+
     class(out) <- c("mixfac_comb", class(out))
     return(out)
 }
