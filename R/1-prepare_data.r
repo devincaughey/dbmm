@@ -147,17 +147,19 @@ shape_mixfac <- function(long_data,
         dplyr::summarise(.by = .data$item, n = length(unique(.data$value)))
 
     drop_items <- dplyr::filter(unique_df, .data$n < 2)$item
-    cat("\nDropping the following items due to lack of variation:\n")
-    cat(c("  *", paste(drop_items, collapse = "\n  * "), "\n"))
-    if (is.na(binary_items)) {
+    if (length(drop_items) > 0) {
+        cat("\nDropping the following items due to lack of variation:\n")
+        cat(c("  *", paste(drop_items, collapse = "\n  * "), "\n"))
+    }
+    if (length(binary_items) == 1L && is.na(binary_items)) {
         binary_items <- unique_df$item[unique_df$n == 2]
         binary_items <- sort(setdiff(binary_items, drop_items))
     }
-    if (is.na(trichotomous_items)) {
+    if (length(trichotomous_items) == 1L && is.na(trichotomous_items)) {
         trichotomous_items <- unique_df$item[unique_df$n == 3]
         trichotomous_items <- sort(setdiff(trichotomous_items, drop_items))
     }
-    if (is.na(ordinal_items)) {
+    if (length(ordinal_items) == 1L && is.na(ordinal_items)) {
         ordinal_items <- unique_df$item[unique_df$n <= max_cats]
         ordinal_items <- setdiff(
             ordinal_items,
@@ -187,14 +189,22 @@ shape_mixfac <- function(long_data,
         }
     }
 
-    cat("\nCategorizing the following items as binary:\n")
-    cat(c("  *", paste(binary_items, collapse = "\n  * "), "\n"))
-    cat("\nCategorizing the following items as trichotomous:\n")
-    cat(c("  *", paste(trichotomous_items, collapse = "\n  * "), "\n"))
-    cat("\nCategorizing the following items as ordinal:\n")
-    cat(c("  *", paste(ordinal_items, collapse = "\n  * "), "\n"))
-    cat("\nCategorizing the following items as metric:\n")
-    cat(c("  *", paste(metric_items, collapse = "\n  * "), "\n"))
+    if (length(binary_items) > 0) {
+        cat("\nCategorizing the following items as binary:\n")
+        cat(c("  *", paste(binary_items, collapse = "\n  * "), "\n"))
+    }
+    if (length(trichotomous_items) > 0) {
+        cat("\nCategorizing the following items as trichotomous:\n")
+        cat(c("  *", paste(trichotomous_items, collapse = "\n  * "), "\n"))
+    }
+    if (length(ordinal_items) > 0) {
+        cat("\nCategorizing the following items as ordinal:\n")
+        cat(c("  *", paste(ordinal_items, collapse = "\n  * "), "\n"))
+    }
+    if (length(metric_items) > 0) {
+        cat("\nCategorizing the following items as metric:\n")
+        cat(c("  *", paste(metric_items, collapse = "\n  * "), "\n"))
+    }
 
     binary_data <- use_data |>
         dplyr::filter(.data$item %in% binary_items) |>
@@ -237,27 +247,6 @@ shape_mixfac <- function(long_data,
             dplyr::ungroup()
     }
 
-    tob_b <- sapply(1:nlevels(use_data$TIME), function (t) {
-        x <- as.integer(binary_data$TIME) == t
-        if (any(x)) c(min(which(x)), max(which(x)))
-        else c(0, 0)
-    })
-    tob_t <- sapply(1:nlevels(use_data$TIME), function (t) {
-        x <- as.integer(trichotomous_data$TIME) == t
-        if (any(x)) c(min(which(x)), max(which(x)))
-        else c(0, 0)
-    })
-    tob_o <- sapply(1:nlevels(use_data$TIME), function (t) {
-        x <- as.integer(ordinal_data$TIME) == t
-        if (any(x)) c(min(which(x)), max(which(x)))
-        else c(0, 0)
-    })
-    tob_m <- sapply(1:nlevels(use_data$TIME), function (t) {
-        x <- as.integer(metric_data$TIME) == t
-        if (any(x)) c(min(which(x)), max(which(x)))
-        else c(0, 0)
-    })
-
     stan_data <- list(
         J = nlevels(use_data$UNIT),
         T = nlevels(use_data$TIME),
@@ -267,14 +256,12 @@ shape_mixfac <- function(long_data,
         ii_binary = as.integer(binary_data$ITEM),
         jj_binary = as.integer(binary_data$UNIT),
         tt_binary = as.integer(binary_data$TIME),
-        tob_b = t(tob_b),
         N_trichot = nrow(trichotomous_data),
         I_trichot = nlevels(trichotomous_data$ITEM),
         yy_trichot = as.integer(trichotomous_data$yy),
         ii_trichot = as.integer(trichotomous_data$ITEM),
         jj_trichot = as.integer(trichotomous_data$UNIT),
         tt_trichot = as.integer(trichotomous_data$TIME),
-        tob_t = t(tob_t),
         N_ordinal = nrow(ordinal_data),
         I_ordinal = nlevels(ordinal_data$ITEM),
         K_ordinal = if (nrow(ordinal_data) > 0) max(ordinal_data$yy) else 1L,
@@ -282,14 +269,12 @@ shape_mixfac <- function(long_data,
         ii_ordinal = as.integer(ordinal_data$ITEM),
         jj_ordinal = as.integer(ordinal_data$UNIT),
         tt_ordinal = as.integer(ordinal_data$TIME),
-        tob_o = t(tob_o),
         N_metric = nrow(metric_data),
         I_metric = nlevels(metric_data$ITEM),
         yy_metric = metric_data$yy,
         ii_metric = as.integer(metric_data$ITEM),
         jj_metric = as.integer(metric_data$UNIT),
-        tt_metric = as.integer(metric_data$TIME),
-        tob_m = t(tob_m)
+        tt_metric = as.integer(metric_data$TIME)
     )
     attr(stan_data, "unit_labels") <- levels(use_data$UNIT)
     attr(stan_data, "time_labels") <- levels(use_data$TIME)
