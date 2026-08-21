@@ -1,6 +1,12 @@
 Package: dbmm
-Title: Dynamic Bayesian Measurement models
-Description: Use cmdstan to fit dynamic measurement models, including dynamic group-level item response theory (DGIRT) and dynamic mixed factor analysis (DMFA) models
+Title: Dynamic Bayesian Measurement Models
+Description: Fits dynamic Bayesian measurement models using Stan via the
+    'cmdstanr' package. Two models are supported: a dynamic factor model for
+    indicators of mixed type (binary, ordinal, or metric), and a
+    multidimensional ordinal dynamic group-level item response theory
+    (MODGIRT) model. Both allow for multiple latent factors, and both provide
+    helpers for shaping data, imposing post-estimation identification
+    restrictions, and summarizing draws.
 Version: 0.0.1
 Authors@R:
   c(person("Devin", "Caughey", email = "devin.caughey@gmail.com", role = c("aut", "cre"),
@@ -11,29 +17,34 @@ Authors@R:
             comment = c(ORCID = "0009-0001-9243-2243")),
     person("Christopher", "Warshaw", email = "cwarshaw@gmail.com", role = c("aut"))
     )
-License: GPL (>= 3)
+License: GPL (>= 2)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Depends: R (>= 4.1.0)
 Imports:
+    abind,
     cli,
     cmdstanr,
-    coda,
     dplyr (>= 1.0.0),
     factor.switching,
-    ggplot2 (>= 3.4.0),
-    ggrepel,
+    GPArotation,
     magrittr (>= 2.0.0),
-    methods,
     parallel,
     posterior,
     rlang,
     seriation,
     stats,
     stringr (>= 1.5.0),
+    survey,
+    tibble,
     tidyr (>= 1.0.0)
 Suggests:
+    knitr,
+    rmarkdown,
     testthat (>= 3.0.0)
+Additional_repositories: https://mc-stan.org/r-packages/
+VignetteBuilder: knitr
 Config/testthat/edition: 3
 LazyData: TRUE
 Config/roxygen2/version: 8.1.0
+
