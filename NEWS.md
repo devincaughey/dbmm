@@ -81,18 +81,12 @@
   `WW`. `Omega` is now `L_eta L_eta'`. Values reported by earlier versions
   were wrong whenever `whiten_eta = TRUE` and `D > 1`.
 
-* **`identify_mixfac(whiten = TRUE)` produced draws that did not represent
-  the fitted model.** Loadings were rotated by the whitening matrix `WW`, the
-  same matrix applied to `eta`. That is valid only for orthogonal
-  transformations: the varimax and signed-permutation matrices satisfy
-  `inv(V)' = V`, but `WW` is Cholesky-based and triangular, so every linear
-  predictor was changed. Loadings are now transformed by `t(solve(WW))`, and
-  the location shift is absorbed into the item intercepts as
-  `alpha + lambda %*% m`. Every linear predictor is now invariant to
-  floating-point precision, so the ordered thresholds require no adjustment
-  either: the warning that intercept and threshold identification was
-  unimplemented, and the accompanying removal of `kappa_*` and `alpha_*` from
-  the output, are both gone.
+* `identify_mixfac()` read `n_time`, the whitening anchor, and the label
+  attributes from its `x` argument rather than from the draws and the fitted
+  object, so the documented fitted-object input path did not work: with
+  `whiten = TRUE` it errored, and otherwise it returned draws stripped of
+  their unit, time, and item labels, which `label_mixfac()` then applied as
+  `NULL` dimnames without complaint.
 
 * `identify_mixfac()` computed the varimax rotation from the pre-whitening
   loadings and applied it to the whitened ones, so the rotation was not the
@@ -194,6 +188,13 @@ unchanged.
 
 * Both fit functions now error informatively when no Stan file matches the
   requested `link`, rather than passing an empty path to **cmdstanr**.
+  
+## Reproducibility
+
+* `identify_mixfac()` is now deterministic. The varimax rotation used a
+  random start, so factor order and sign varied between calls on identical
+  draws. Note that factor orientation is only fully pinned down by following
+  `identify_mixfac()` with `sort_mixfac()` and `sign_mixfac()`.
 
 ## Documentation
 

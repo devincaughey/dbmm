@@ -280,6 +280,20 @@ test_that("summarize_mixfac() accepts a variable subset", {
     expect_named(summ, c("eta", "lambda"))
 })
 
+test_that("identify_mixfac() agrees whether given a fit or its draws", {
+    ## Varimax is identified only up to signed permutation of factors, and
+    ## GPFRSorth() uses a random start, so canonicalize before comparing.
+    fit <- test_fit()
+    canon <- function(o) sign_mixfac(sort_mixfac(
+        combine_types_mixfac(label_mixfac(o))))
+    id_a <- canon(identify_mixfac(fit, whiten = FALSE))
+    id_b <- canon(identify_mixfac(extract_mixfac_draws(fit), whiten = FALSE))
+    expect_equal(posterior::E(id_a$eta), posterior::E(id_b$eta),
+                 tolerance = 1e-6)
+    expect_equal(posterior::E(id_a$lambda), posterior::E(id_b$lambda),
+                 tolerance = 1e-6)
+})
+
 ## ------------------------------------------------------------ whitening ----
 
 test_that("whitening leaves every linear predictor invariant (P7)", {

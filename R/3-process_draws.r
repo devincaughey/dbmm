@@ -41,14 +41,7 @@ extract_mixfac_draws <- function(x, drop = .mixfac_drop_default, check = TRUE) {
                             )
     }
 
-    attr(draws, "unit_labels") <- attr(x$fit, "unit_labels")
-    attr(draws, "time_labels") <- attr(x$fit, "time_labels")
-    attr(draws, "binary_item_labels") <- attr(x$fit, "binary_item_labels")
-    attr(draws, "trichotomous_item_labels") <-
-        attr(x$fit, "trichotomous_item_labels")
-    attr(draws, "ordinal_item_labels") <- attr(x$fit, "ordinal_item_labels")
-    attr(draws, "metric_item_labels") <- attr(x$fit, "metric_item_labels")
-
+    draws <- copy_mixfac_attrs(draws, x$fit)
     class(draws) <- c("mixfac_draws", class(draws))
 
     return(draws)
@@ -59,11 +52,18 @@ extract_mixfac_draws <- function(x, drop = .mixfac_drop_default, check = TRUE) {
 #' @export
 identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
                             ref_t = "last", identify_with_type) {
-    ## Accept either a draws_rvars object or a fitted object / draws_df
+    ## Accept either a draws_rvars object or a fitted object. Label attributes
+    ## live on the cmdstanr fit rather than on the wrapper list, so the source
+    ## of the draws and the source of the labels differ in the latter case.
     if (posterior::is_draws_rvars(x)) {
         draws_rvar <- x
-    } else {
+        label_src <- x
+    } else if (!is.null(x$fit)) {
         draws_rvar <- posterior::as_draws_rvars(x$fit$draws())
+        label_src <- x$fit
+    } else {
+        stop("`x` must be a draws_rvars object or a fitted model object ",
+             "containing a `fit` element.")
     }
 
     ## Subset to lambda draws (rvar)
@@ -285,12 +285,7 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
         )
     }
 
-    attr(out, "unit_labels") <- attr(x, "unit_labels")
-    attr(out, "time_labels") <- attr(x, "time_labels")
-    attr(out, "binary_item_labels") <- attr(x, "binary_item_labels")
-    attr(out, "trichotomous_item_labels") <- attr(x, "trichotomous_item_labels")
-    attr(out, "ordinal_item_labels") <- attr(x, "ordinal_item_labels")
-    attr(out, "metric_item_labels") <- attr(x, "metric_item_labels")
+    out <- copy_mixfac_attrs(out, label_src)
     attr(out, "rotation matrix") <- vm_rvar
     attr(out, "signed-permutation matrix") <- sp_rvar
 
@@ -500,12 +495,7 @@ combine_types_mixfac <- function (x) {
         )
     }
 
-    ## Attributes: previously copied only in the rvar branch
-    for (nm in c("unit_labels", "time_labels", "binary_item_labels",
-                 "trichotomous_item_labels", "ordinal_item_labels",
-                 "metric_item_labels")) {
-        attr(out, nm) <- attr(x, nm)
-    }
+    out <- copy_mixfac_attrs(out, x)
 
     class(out) <- c("mixfac_comb", class(out))
     return(out)
