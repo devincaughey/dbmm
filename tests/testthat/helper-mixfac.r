@@ -68,12 +68,12 @@ test_shaped_data <- function(periods = 2020:2021) {
 ## Cache keyed on the flag settings that matter for the patches under test.
 .fit_cache <- new.env(parent = emptyenv())
 
-test_fit <- function(separate_eta = FALSE,
+test_fit <- function(smooth_eta = TRUE,
                      constant_alpha = TRUE,
                      gen_log_lik = FALSE,
                      n_dim = 2,
                      periods = 2020:2021) {
-    key <- paste(separate_eta, constant_alpha, gen_log_lik, n_dim,
+    key <- paste(smooth_eta, constant_alpha, gen_log_lik, n_dim,
                  min(periods), max(periods), sep = "_")
     if (!is.null(.fit_cache[[key]])) return(.fit_cache[[key]])
     skip_if_no_cmdstan()
@@ -83,7 +83,7 @@ test_fit <- function(separate_eta = FALSE,
         chains = 2,
         iter_warmup = 200,
         iter_sampling = 200,
-        separate_eta = separate_eta,
+        smooth_eta = smooth_eta,
         constant_alpha = constant_alpha,
         gen_log_lik = gen_log_lik,
         refresh = 0,

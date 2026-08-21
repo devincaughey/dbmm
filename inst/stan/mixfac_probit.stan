@@ -108,7 +108,7 @@ functions {
 data {
   int<lower=0,upper=1> parallelize;    /* parallelize within chains? */
   int<lower=0,upper=1> constant_alpha; /* keep alphas constant? */
-  int<lower=0,upper=1> separate_eta;   /* estimate eta separately by period */
+  int<lower=0,upper=1> smooth_eta;     /* smooth eta across periods? */
   int<lower=0,upper=1> whiten_eta;     /* whiten eta */
   int<lower=0,upper=1> gen_log_lik; /* compute per-observation log_lik? */
   int<lower=1> D;                      /* number of latent dimensions */
@@ -163,7 +163,7 @@ transformed data {
      eta is used: T > 1 and periods are not estimated separately. Otherwise
      sigma_eta_evol / Lcorr_eta would be sampled from their priors alone, so
      they are given zero length and Omega is fixed to I_D. */
-  int<lower=0, upper=1> est_Omega = (T > 1) && (separate_eta == 0);
+  int<lower=0, upper=1> est_Omega = (T > 1) && (smooth_eta == 1);
   /* Likewise, the intercept evolution SD enters the model only if the
      intercepts actually follow a random walk. */
   int<lower=0, upper=1> est_sigma_alpha = (T > 1) && (constant_alpha == 0);
@@ -230,7 +230,8 @@ for (t in 1:T) {
       alpha_trichot[t, ] = rep_array(0.0, I_trichot);
       alpha_ordinal[t, ] = rep_array(0.0, I_ordinal);
     } else {
-      if (separate_eta == 1) {
+      if (smooth_eta == 0) {
+	/* Periods are independent: no random walk in eta */
         eta[t, 1:J, 1:D] = z_eta[t, 1:J, 1:D];
       } else {
         /* Random walk, built directly on the period-1 configuration. */

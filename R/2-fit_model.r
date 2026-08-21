@@ -129,10 +129,16 @@ make_mixfac_out <- function(fit, shaped_data, return_data = TRUE) {
 #'     constant across time periods? If `FALSE` (the default), the thresholds
 #'     for a given item will be allowed to shift by a constant amount (governed
 #'     by `alpha`) in each time period.
-#' @param separate_eta (logical) Should units' factor scores (`eta`) be assigned
-#'     the same priors in every time period? Defaults to `TRUE`. If `FALSE`, the
-#'     scores in each period will be given priors centered on their value in the
-#'     previous period, thus smoothing the estimates across periods.
+#' @param smooth_eta (logical) Should units' factor scores (`eta`) be smoothed
+#'     across time periods? Defaults to `TRUE`, in which case the scores in
+#'     each period are given priors centred on their values in the previous
+#'     period, with evolution standard deviation `sigma_eta_evol`. If `FALSE`,
+#'     each period's scores are estimated independently, no random walk is
+#'     fitted, and `sigma_eta_evol`, `Lcorr_eta`, and a free `Omega` are not
+#'     estimated.
+#' @param separate_eta (logical) Deprecated. Use `smooth_eta` instead, noting
+#'     that the sense is reversed: `separate_eta = TRUE` corresponds to
+#'     `smooth_eta = FALSE`.
 #' @param whiten_eta (logical) Should units' factor scores (`eta`) be whitened
 #'     for identification?  Defaults to `TRUE`.
 #' @param gen_log_lik (logical) Should the per-observation log likelihood be
@@ -207,7 +213,7 @@ fit_mixfac <- function(shaped_data,
                        return_data = TRUE,
                        n_dim = 1,
                        constant_alpha = FALSE,
-                       separate_eta = TRUE,
+                       smooth_eta = TRUE,
                        whiten_eta = TRUE,
                        gen_log_lik = FALSE,
                        lambda_zeros = NULL,
@@ -222,9 +228,28 @@ fit_mixfac <- function(shaped_data,
                        sd_sigma_eta_evol = 0.1,
                        seed = NULL,
                        link = "probit",
+                       separate_eta = NULL,
                        ...) {
     check_arg_type(arg = shaped_data, typename = "mixfac_data")
 
+    ## Deprecated `separate_eta`, whose sense was the reverse of `smooth_eta`
+    if (!is.null(separate_eta)) {
+        if (!missing(smooth_eta)) {
+            cli::cli_abort(paste(
+                     "Supply either {.arg smooth_eta} or the deprecated",
+                     "{.arg separate_eta}, not both."
+                 ))
+        }
+        cli::cli_warn(paste(
+                 "{.arg separate_eta} is deprecated; use {.arg smooth_eta} instead.",
+                 "The sense is reversed: {.code separate_eta = TRUE} corresponds to",
+                 "{.code smooth_eta = FALSE}."
+             ))
+        smooth_eta <- !as.logical(separate_eta)
+    }
+
+    stopifnot(is.logical(smooth_eta), length(smooth_eta) == 1L,
+              !is.na(smooth_eta))
     if (parallelize_within_chains & !is.null(threads_per_chain)) {
         check_arg_type(arg = threads_per_chain, typename = "numeric")
         check_arg_type(arg = chains, typename = "numeric")
@@ -244,7 +269,7 @@ fit_mixfac <- function(shaped_data,
     ## Add model options to input shaped_data
     shaped_data$parallelize <- as.integer(parallelize_within_chains)
     shaped_data$constant_alpha <- as.integer(constant_alpha)
-    shaped_data$separate_eta <- as.integer(separate_eta)
+    shaped_data$smooth_eta <- as.integer(smooth_eta)
     shaped_data$whiten_eta <- as.integer(whiten_eta)
     shaped_data$gen_log_lik <- as.integer(gen_log_lik)
     shaped_data$D <- n_dim

@@ -96,24 +96,48 @@ test_that("fit_mixfac() returns a mixfac_fit object carrying labels", {
 })
 
 test_that("evolution parameters are estimated only when identified (P2)", {
-    ## separate_eta = FALSE, T > 1: random walk in eta, so Omega is estimated
-    d_rw <- extract_mixfac_draws(test_fit(separate_eta = FALSE),
-                                 drop = "^z_")
+    ## smooth_eta = TRUE, T > 1: random walk in eta, so Omega is estimated
+    d_rw <- extract_mixfac_draws(test_fit(smooth_eta = TRUE), drop = "^z_")
     expect_true("sigma_eta_evol" %in% names(d_rw))
     expect_true("Lcorr_eta" %in% names(d_rw))
     Om <- posterior::E(d_rw$Omega)
     expect_false(isTRUE(all.equal(Om, diag(nrow = nrow(Om)),
                                   check.attributes = FALSE)))
 
-    ## separate_eta = TRUE: no random walk, so they are absent and Omega = I
-    d_sep <- extract_mixfac_draws(test_fit(separate_eta = TRUE),
-                                  drop = "^z_")
+    ## smooth_eta = FALSE: no random walk, so they are absent and Omega = I
+    d_sep <- extract_mixfac_draws(test_fit(smooth_eta = FALSE), drop = "^z_")
     expect_false("sigma_eta_evol" %in% names(d_sep))
     expect_false("Lcorr_eta" %in% names(d_sep))
     Om_sep <- posterior::E(d_sep$Omega)
     expect_equal(Om_sep, diag(nrow = nrow(Om_sep)), ignore_attr = TRUE)
-    ## and it is fixed, not merely centred there
     expect_lt(max(posterior::sd(d_sep$Omega)), 1e-12)
+})
+
+test_that("smooth_eta defaults to TRUE", {
+    expect_true(formals(fit_mixfac)$smooth_eta)
+})
+
+test_that("deprecated separate_eta maps to the reverse of smooth_eta", {
+    skip_if_no_cmdstan()
+    sdat <- test_shaped_data()
+    expect_warning(
+        out <- suppressMessages(fit_mixfac(
+            sdat, n_dim = 1, chains = 1, iter_warmup = 50,
+            iter_sampling = 50, refresh = 0, seed = 1,
+            separate_eta = TRUE
+        )),
+        regexp = "deprecated"
+    )
+    ## separate_eta = TRUE means no smoothing, hence no evolution parameters
+    d <- extract_mixfac_draws(out, drop = "^z_")
+    expect_false("sigma_eta_evol" %in% names(d))
+})
+
+test_that("supplying both smooth_eta and separate_eta is an error", {
+    expect_error(
+        fit_mixfac(test_shaped_data(), smooth_eta = TRUE, separate_eta = FALSE),
+        regexp = "not both"
+    )
 })
 
 test_that("intercept deviates are estimated only when identified (P3)", {
@@ -427,3 +451,4 @@ test_that("sort and sign reject long-format input", {
     expect_error(sort_mixfac(lng), regexp = "rvar")
     expect_error(sign_mixfac(lng), regexp = "rvar")
 })
+
