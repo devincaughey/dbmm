@@ -167,3 +167,32 @@ log_lik_index <- function(shaped_data) {
     out$position <- seq_len(nrow(out))
     out
 }
+#' Copy mixfac label attributes from one object to another
+#'
+#' @keywords internal
+copy_mixfac_attrs <- function(to, from) {
+    for (nm in c("unit_labels", "time_labels", "binary_item_labels",
+                 "trichotomous_item_labels", "ordinal_item_labels",
+                 "metric_item_labels")) {
+        attr(to, nm) <- attr(from, nm)
+    }
+    to
+}
+
+#' Right-multiply each period's factor-score matrix by a D-by-D matrix
+#'
+#' `eta` is `[T, J, D]`. Indexing with `drop = TRUE` collapses the factor
+#' dimension when `D == 1`, so the slice is forced back to `J`-by-1.
+#'
+#' @keywords internal
+rotate_eta_rvar <- function(eta, mat) {
+    n_time <- dim(eta)[1]
+    n_factor <- dim(eta)[3]
+    out <- eta
+    for (t in seq_len(n_time)) {
+        E_t <- eta[t, , , drop = TRUE]
+        if (n_factor == 1) E_t <- t(t(E_t))
+        out[t, , ] <- posterior::`%**%`(E_t, mat)
+    }
+    out
+}

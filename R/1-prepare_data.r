@@ -133,8 +133,8 @@ shape_mixfac <- function(long_data,
     use_data$item <- use_data[[item_var]]
     use_data$value <- as.numeric(use_data[[value_var]])
     use_data <- dplyr::select(use_data,
-                              unit, UNIT, time,
-                              TIME, item, value)
+                              "unit", "UNIT", "time",
+                              "TIME", "item", "value")
     use_data <- tidyr::drop_na(use_data)
     stopifnot(!anyNA(use_data$unit))
     stopifnot(!anyNA(use_data$time))
@@ -144,7 +144,7 @@ shape_mixfac <- function(long_data,
     items <- sort(unique(use_data$item))
 
     unique_df <- use_data |>
-        dplyr::summarise(.by = .data$item, n = length(unique(.data$value)))
+        dplyr::summarise(.by = "item", n = length(unique(.data$value)))
 
     drop_items <- dplyr::filter(unique_df, .data$n < 2)$item
     if (length(drop_items) > 0) {

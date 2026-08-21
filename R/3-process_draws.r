@@ -565,86 +565,137 @@ summarize_mixfac <- function (x, summary_functions) {
     return(out)
 }
 
-#' order factors in a model based on sums of squared loadings
+#' Order factors by sums of squared loadings
 #'
-#' This function takes a model based on posterior draws and orders the factors
-#' based on their estimated sums of squares. Factors with larger sums of squares
-#' will be placed first in the sort model.
+#' Reorders the latent factors so that those accounting for more variance in
+#' the loadings come first. This is a reparameterization: every linear
+#' predictor, and hence the likelihood, is unchanged.
 #'
-#' @param mixfac_rvar A `draws_rvar` object from a mixed-factor model
+#' @param x A `mixfac_comb` object, as returned by [combine_types_mixfac()].
+#'     Must hold `rvar` draws, not the long format produced by
+#'     `label_mixfac(make_long = TRUE)`.
+#' @param check (logical) Check the class of `x`? Defaults to `TRUE`.
 #'
-#' @return A `draws_rvar` object with factors ordered by explanatory power
+#' @return A `mixfac_sorted` object with factors ordered by explanatory power.
+#'     The permutation applied is recorded in the `"factor order"` attribute.
+#'
+#' @import posterior
 #'
 #' @export
 sort_mixfac <- function(x, check = TRUE) {
     if (check) {
         check_arg_type(arg = x, typename = "mixfac_comb")
     }
+    if (!posterior::is_draws_rvars(x)) {
+        stop("`sort_mixfac()` requires rvar draws. It cannot be applied to ",
+             "the long-format output of `label_mixfac(make_long = TRUE)`.")
+    }
+    n_factor <- dim(x$eta)[3]
+
+    ## Sum of squared loadings per factor, descending
     ss <- posterior::rvar_apply(x$lambda, 2, function (y) {
         posterior::rvar_sum(y^2)
     })
     fo <- order(-posterior::E(ss))
-    eta <- x$eta[, , fo]
-    dimnames(eta)[[3]] <- seq_along(fo)
-    lambda <- x$lambda[, fo]
-    dimnames(lambda)[[2]] <- seq_along(fo)
-    Omega <- x$Omega[fo, fo]
-    dimnames(Omega)[[1]] <- dimnames(Omega)[[2]] <- seq_along(fo)
+
+    ## drop = FALSE throughout: with D == 1 these would otherwise collapse
+    eta <- x$eta[, , fo, drop = FALSE]
+    lambda <- x$lambda[, fo, drop = FALSE]
+    Omega <- x$Omega[fo, fo, drop = FALSE]
+
+    ## Factor labels are positional, so renumber rather than permute them
+    if (!is.null(dimnames(eta))) dimnames(eta)[[3]] <- seq_along(fo)
+    if (!is.null(dimnames(lambda))) dimnames(lambda)[[2]] <- seq_along(fo)
+    if (!is.null(dimnames(Omega))) {
+        dimnames(Omega)[[1]] <- dimnames(Omega)[[2]] <- seq_along(fo)
+    }
+
     out <- as_draws_rvars_safe(
         eta = eta,
         lambda = lambda,
         alpha = x$alpha,
-        kappa = x$kappa,
+        kappa_trichot = x$kappa_trichot,
+        kappa_ordinal = x$kappa_ordinal,
         sigma_alpha_evol = x$sigma_alpha_evol,
         sigma_metric = x$sigma_metric,
         Omega = Omega,
         lp__ = x$lp__
     )
-    class(out) <- c("mixfac_sorted", class(x))
+
+    out <- copy_mixfac_attrs(out, x)
+    attr(out, "rotation matrix") <- attr(x, "rotation matrix")
+    attr(out, "signed-permutation matrix") <-
+        attr(x, "signed-permutation matrix")
+    attr(out, "factor order") <- fo
+
+    class(out) <- unique(c("mixfac_sorted", class(x)))
     return(out)
 }
 
-#' Set Signs
+#' Set the sign of each latent factor
 #'
-#' This function sets the signs of the parameters of a MIXFAC model based on 
-#' user-defined signs.
+#' Flips the sign of each factor so that the mean loading on it has the
+#' requested sign. This is a reparameterization: every linear predictor, and
+#' hence the likelihood, is unchanged. Item intercepts and thresholds are
+#' unaffected, since the sign matrix is orthogonal.
 #'
-#' @param x The model object containing the parameters.
-#' @param signs A vector of signs to be applied to the parameters. 
-#' Scalar values are allowed and will be recycled. Default is 1.
+#' @param x A `mixfac_comb` object, as returned by [combine_types_mixfac()].
+#'     Must hold `rvar` draws.
+#' @param signs (numeric) Desired sign of the mean loading on each factor,
+#'     either a scalar (recycled) or one value per factor. Defaults to `1`.
+#' @param check (logical) Check the class of `x`? Defaults to `TRUE`.
 #'
-#' @return A modified model object with the signs of the parameters updated.
-#'
-#' @details This function sets the signs of the parameters in the model object
-#' \code{x} based on the user-defined signs provided in the 
-#' \code{signs} argument. The function applies the sign flips to the parameters 
-#' and returns a modified model object with the updated signs.
+#' @return A `mixfac_signed` object. The flips applied are recorded in the
+#'     `"sign flips"` attribute.
 #'
 #' @import posterior
 #'
 #' @export
-sign_mixfac <- function(x, signs = 1) {
-    check_arg_type(arg = x, typename = "mixfac_comb")
-    n_time <- dim(x$eta)[1]
+sign_mixfac <- function(x, signs = 1, check = TRUE) {
+    if (check) {
+        check_arg_type(arg = x, typename = "mixfac_comb")
+    }
+    if (!posterior::is_draws_rvars(x)) {
+        stop("`sign_mixfac()` requires rvar draws. It cannot be applied to ",
+             "the long-format output of `label_mixfac(make_long = TRUE)`.")
+    }
     n_factor <- dim(x$eta)[3]
     stopifnot(length(signs) == 1 || length(signs) == n_factor)
-    init_signs <- sign(colMeans(E(x$lambda)))
+    if (!all(signs %in% c(-1, 1))) {
+        stop("`signs` must contain only -1 and 1.")
+    }
+
+    init_signs <- sign(colMeans(posterior::E(x$lambda)))
     sign_flips <- ifelse(init_signs == signs, 1, -1)
     sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
-    for (t in seq_len(n_time)) {
-        x$eta[t, , drop = TRUE] <-
-            x$eta[t, , drop = TRUE] %**% sm
-    }
-    as_draws_rvars_safe(
-        eta = x$eta,
-        lambda = x$lambda %**% sm,
+
+    eta <- rotate_eta_rvar(x$eta, sm)
+    dimnames(eta) <- dimnames(x$eta)
+    lambda <- posterior::`%**%`(x$lambda, sm)
+    dimnames(lambda) <- dimnames(x$lambda)
+    Omega <- t(sm) %**% x$Omega %**% sm
+    dimnames(Omega) <- dimnames(x$Omega)
+
+    out <- as_draws_rvars_safe(
+        eta = eta,
+        lambda = lambda,
         alpha = x$alpha,
-        kappa = x$kappa,
+        kappa_trichot = x$kappa_trichot,
+        kappa_ordinal = x$kappa_ordinal,
         sigma_alpha_evol = x$sigma_alpha_evol,
         sigma_metric = x$sigma_metric,
-        Omega = t(sm) %**% x$Omega %**% sm,
+        Omega = Omega,
         lp__ = x$lp__
     )
+
+    out <- copy_mixfac_attrs(out, x)
+    attr(out, "rotation matrix") <- attr(x, "rotation matrix")
+    attr(out, "signed-permutation matrix") <-
+        attr(x, "signed-permutation matrix")
+    attr(out, "sign flips") <- sign_flips
+
+    class(out) <- unique(c("mixfac_signed", class(x)))
+    return(out)
 }
 
 
