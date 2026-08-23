@@ -35,7 +35,8 @@ Imports:
     stats,
     stringr (>= 1.5.0),
     survey,
-    tidyr (>= 1.0.0)
+    tidyr (>= 1.0.0),
+    utils
 Suggests:
     bayesplot,
     knitr,

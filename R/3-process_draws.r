@@ -65,10 +65,13 @@ extract_mixfac_draws <- function(x, drop = .mixfac_drop_default, check = TRUE) {
 #'     Defaults to `123`, making results reproducible. Ignored when
 #'     `random_starts = 0`, since the rotation is then deterministic. Set to
 #'     `NULL` to use the ambient random number stream.
+#' @param quiet (logical) Suppress the iteration log printed by
+#'     factor.switching::rsp_exact() Defaults to `TRUE`.
 #' @export
 identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
                             ref_t = "last", identify_with_type,
-                            random_starts = 0, seed = 123) {
+                            random_starts = 0, seed = 123,
+                            quiet = TRUE) {
     ## Accept either a draws_rvars object or a fitted object. Label attributes
     ## live on the cmdstanr fit rather than on the wrapper list, so the source
     ## of the draws and the source of the labels differ in the latter case.
@@ -247,7 +250,17 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
     dimnames(lambda_without_names) <- NULL
     lambda_matrix <- posterior::as_draws_matrix(t(lambda_without_names))
     lambda_matrix <- rename_loading_matrix(lambda_matrix)
-    rsp_out <- factor.switching::rsp_exact(lambda_matrix, rotate = FALSE)
+    if (quiet) {
+        invisible(
+            utils::capture.output(
+                       rsp_out <- factor.switching::rsp_exact(
+                                                        lambda_matrix,
+                                                        rotate = FALSE
+                                                    )
+                   ))
+    } else {
+        rsp_out <- factor.switching::rsp_exact(lambda_matrix, rotate = FALSE)
+    }
     sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
 
     for (k in seq_along(lambda_rvar)) {
@@ -755,13 +768,15 @@ label_modgirt <- function(x, check = TRUE) {
 #'     Defaults to `123`, making results reproducible. Ignored when
 #'     `random_starts = 0`, since the rotation is then deterministic. Set to
 #'     `NULL` to use the ambient random number stream.
+#' @param quiet (logical) Suppress the iteration log printed by
+#'     factor.switching::rsp_exact() Defaults to `TRUE`.
 #'
 #' @return A list containing the identified MODGIRT model parameters.
 #'
 #' @import posterior
 #'
 #' @export
-identify_modgirt <- function(x, method = "varimax", random_starts = 0, seed = 123) {
+identify_modgirt <- function(x, method = "varimax", random_starts = 0, seed = 123, quiet = TRUE) {
     ## Accept either a draws_rvars object or a fitted object. Label attributes
     ## live on the cmdstanr fit rather than on the wrapper list, so the source
     ## of the draws and the source of the labels differ in the latter case.
@@ -803,7 +818,17 @@ identify_modgirt <- function(x, method = "varimax", random_starts = 0, seed = 12
     ## Create draw-specific signed permutations
     beta_matrix <- posterior::as_draws_matrix(t(beta_rvar$beta))
     lambda_matrix <- rename_loading_matrix(beta_matrix)
-    rsp_out <- factor.switching::rsp_exact(lambda_matrix, rotate = FALSE)
+    if (quiet) {
+        invisible(
+            utils::capture.output(
+                       rsp_out <- factor.switching::rsp_exact(
+                                                        lambda_matrix,
+                                                        rotate = FALSE
+                                                    )
+                   ))
+    } else {
+        rsp_out <- factor.switching::rsp_exact(lambda_matrix, rotate = FALSE)
+    }
     sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
     ## Apply signed permutations to `beta`
     beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, sp_rvar)
