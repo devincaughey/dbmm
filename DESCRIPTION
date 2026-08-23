@@ -41,7 +41,8 @@ Suggests:
     knitr,
     loo,
     rmarkdown,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    withr
 Remotes:
     devincaughey/estsubpop
 Additional_repositories: https://mc-stan.org/r-packages/

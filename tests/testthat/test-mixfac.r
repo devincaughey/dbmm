@@ -88,7 +88,7 @@ test_that("fit_mixfac() rejects unsupported links", {
 })
 
 test_that("fit_mixfac() returns a mixfac_fit object carrying labels", {
-    out <- test_fit()
+    out <- test_mixfac_fit()
     expect_s3_class(out, "mixfac_fit")
     expect_true("fit" %in% names(out))
     expect_false(is.null(attr(out$fit, "unit_labels")))
@@ -97,7 +97,7 @@ test_that("fit_mixfac() returns a mixfac_fit object carrying labels", {
 
 test_that("evolution parameters are estimated only when identified (P2)", {
     ## smooth_eta = TRUE, T > 1: random walk in eta, so Omega is estimated
-    d_rw <- extract_mixfac_draws(test_fit(smooth_eta = TRUE), drop = "^z_")
+    d_rw <- extract_mixfac_draws(test_mixfac_fit(smooth_eta = TRUE), drop = "^z_")
     expect_true("sigma_eta_evol" %in% names(d_rw))
     expect_true("Lcorr_eta" %in% names(d_rw))
     Om <- posterior::E(d_rw$Omega)
@@ -105,7 +105,7 @@ test_that("evolution parameters are estimated only when identified (P2)", {
                                   check.attributes = FALSE)))
 
     ## smooth_eta = FALSE: no random walk, so they are absent and Omega = I
-    d_sep <- extract_mixfac_draws(test_fit(smooth_eta = FALSE), drop = "^z_")
+    d_sep <- extract_mixfac_draws(test_mixfac_fit(smooth_eta = FALSE), drop = "^z_")
     expect_false("sigma_eta_evol" %in% names(d_sep))
     expect_false("Lcorr_eta" %in% names(d_sep))
     Om_sep <- posterior::E(d_sep$Omega)
@@ -142,7 +142,7 @@ test_that("supplying both smooth_eta and separate_eta is an error", {
 
 test_that("intercept deviates are estimated only when identified (P3)", {
     ## constant_alpha = TRUE: no alpha random walk
-    d_const <- extract_mixfac_draws(test_fit(constant_alpha = TRUE),
+    d_const <- extract_mixfac_draws(test_mixfac_fit(constant_alpha = TRUE),
                                     drop = "^nothing$")
     expect_false("sigma_alpha_evol" %in% names(d_const))
     expect_false("z_alpha_trichot" %in% names(d_const))
@@ -159,14 +159,14 @@ test_that("intercept deviates are estimated only when identified (P3)", {
     expect_true(all(abs(posterior::E(d_const$alpha_ordinal)) < 1e-12))
 
     ## constant_alpha = FALSE: drift is estimated
-    d_drift <- extract_mixfac_draws(test_fit(constant_alpha = FALSE),
+    d_drift <- extract_mixfac_draws(test_mixfac_fit(constant_alpha = FALSE),
                                     drop = "^nothing$")
     expect_true("sigma_alpha_evol" %in% names(d_drift))
     expect_identical(dim(d_drift$z_alpha_binary), c(2L, 2L))
 })
 
 test_that("extract_mixfac_draws() drops internal variables by default", {
-    d <- extract_mixfac_draws(test_fit())
+    d <- extract_mixfac_draws(test_mixfac_fit())
     expect_false(any(grepl("^z_|^r_eta$|^WW$|^L_eta$|^Lcorr|^sigma_eta_evol",
                            names(d))))
     ## r_eta, WW, and r_Omega were removed from the Stan program in P1/P4
@@ -180,7 +180,7 @@ test_that("extract_mixfac_draws() drops internal variables by default", {
 
 test_that("draws have the dimensions implied by the data", {
     sdat <- test_shaped_data()
-    d <- extract_mixfac_draws(test_fit(n_dim = 2))
+    d <- extract_mixfac_draws(test_mixfac_fit(n_dim = 2))
     expect_identical(dim(d$eta), c(sdat$T, sdat$J, 2L))
     expect_identical(dim(d$lambda_binary), c(sdat$I_binary, 2L))
     expect_identical(dim(d$alpha_metric), c(sdat$T, sdat$I_metric))
@@ -192,7 +192,7 @@ test_that("draws have the dimensions implied by the data", {
 
 test_that("gen_log_lik = TRUE returns one log_lik element per observation (P6)", {
     sdat <- test_shaped_data()
-    d <- extract_mixfac_draws(test_fit(gen_log_lik = TRUE))
+    d <- extract_mixfac_draws(test_mixfac_fit(gen_log_lik = TRUE))
     expect_true("log_lik" %in% names(d))
     expect_length(d$log_lik, nrow(log_lik_index(sdat)))
     ll <- posterior::E(d$log_lik)
@@ -203,7 +203,7 @@ test_that("gen_log_lik = TRUE returns one log_lik element per observation (P6)",
 })
 
 test_that("gen_log_lik = FALSE omits log_lik", {
-    d <- extract_mixfac_draws(test_fit(gen_log_lik = FALSE))
+    d <- extract_mixfac_draws(test_mixfac_fit(gen_log_lik = FALSE))
     expect_false("log_lik" %in% names(d))
 })
 
@@ -212,7 +212,7 @@ test_that("gen_log_lik = FALSE omits log_lik", {
 test_that("the identify -> label -> combine pipeline runs and preserves labels", {
     ## ESS caps are expected: the test fixture has too few draws for stable
     ## ESS estimates.
-        d <- extract_mixfac_draws(test_fit())
+        d <- extract_mixfac_draws(test_mixfac_fit())
         id <- identify_mixfac(d, whiten = FALSE)
         expect_s3_class(id, "mixfac_id")
         expect_true(posterior::is_draws_rvars(id))
@@ -250,14 +250,14 @@ test_that("the identify -> label -> combine pipeline runs and preserves labels",
 test_that("identification leaves lp__ unchanged", {
     ## Rotation and whitening are reparameterizations, so the posterior of the
     ## log density must be untouched.
-    d <- extract_mixfac_draws(test_fit())
+    d <- extract_mixfac_draws(test_mixfac_fit())
     id <- identify_mixfac(d, whiten = FALSE)
     expect_equal(posterior::E(id$lp__), posterior::E(d$lp__))
 })
 
 test_that("combine_types_mixfac() works on unlabelled input", {
     ## Regression: paste0() on NULL dimnames produced a length-1 name vector
-    d <- extract_mixfac_draws(test_fit())
+    d <- extract_mixfac_draws(test_mixfac_fit())
     id <- identify_mixfac(d, whiten = FALSE)
     expect_no_error(cmb <- combine_types_mixfac(id))
     expect_true(posterior::is_draws_rvars(cmb))
@@ -265,13 +265,13 @@ test_that("combine_types_mixfac() works on unlabelled input", {
 })
 
 test_that("combine_types_mixfac() errors on already-combined input", {
-    d <- extract_mixfac_draws(test_fit())
+    d <- extract_mixfac_draws(test_mixfac_fit())
     cmb <- combine_types_mixfac(identify_mixfac(d, whiten = FALSE))
     expect_error(combine_types_mixfac(cmb), regexp = "lambda")
 })
 
 test_that("combine_types_mixfac() handles the long format", {
-    d <- extract_mixfac_draws(test_fit())
+    d <- extract_mixfac_draws(test_mixfac_fit())
     lng <- label_mixfac(identify_mixfac(d, whiten = FALSE), make_long = TRUE)
     cmb <- combine_types_mixfac(lng)
     expect_s3_class(cmb, "mixfac_comb")
@@ -281,7 +281,7 @@ test_that("combine_types_mixfac() handles the long format", {
 })
 
 test_that("summarize_mixfac() accepts a variable subset", {
-    d <- extract_mixfac_draws(test_fit())
+    d <- extract_mixfac_draws(test_mixfac_fit())
     cmb <- combine_types_mixfac(label_mixfac(identify_mixfac(d)))
     summ <- summarize_mixfac(cmb[c("eta", "lambda")])
     expect_named(summ, c("eta", "lambda"))
@@ -290,7 +290,7 @@ test_that("summarize_mixfac() accepts a variable subset", {
 test_that("identify_mixfac() agrees whether given a fit or its draws", {
     ## Varimax is identified only up to signed permutation of factors, and
     ## GPFRSorth() uses a random start, so canonicalize before comparing.
-    fit <- test_fit()
+    fit <- test_mixfac_fit()
     canon <- function(o) sign_mixfac(sort_mixfac(
         combine_types_mixfac(label_mixfac(o))))
     id_a <- canon(identify_mixfac(fit, whiten = FALSE))
@@ -303,7 +303,7 @@ test_that("identify_mixfac() agrees whether given a fit or its draws", {
 
 test_that("identify_mixfac() works when Omega is absent", {
     skip_on_cran()
-    d <- posterior::as_draws_rvars(test_fit()$fit$draws())
+    d <- posterior::as_draws_rvars(test_mixfac_fit()$fit$draws())
     d$Omega <- NULL
     id <- expect_no_error(identify_mixfac(d))
     expect_false("Omega" %in% posterior::variables(id))
@@ -312,7 +312,7 @@ test_that("identify_mixfac() works when Omega is absent", {
 ## ------------------------------------------------------------ whitening ----
 
 test_that("whitening leaves every linear predictor invariant (P7)", {
-    d <- extract_mixfac_draws(test_fit())
+    d <- extract_mixfac_draws(test_mixfac_fit())
     id_raw <- identify_mixfac(d, whiten = FALSE)
     id_wht <- identify_mixfac(d, whiten = TRUE, ref_t = "mean")
     ty <- richest_item_type(id_raw)
@@ -329,7 +329,7 @@ test_that("whitening leaves every linear predictor invariant (P7)", {
 
 test_that("whitening actually changes the intercepts and factor scores", {
     ## Guards against the invariance test passing because nothing happened
-    d <- extract_mixfac_draws(test_fit())
+    d <- extract_mixfac_draws(test_mixfac_fit())
     id_raw <- identify_mixfac(d, whiten = FALSE)
     id_wht <- identify_mixfac(d, whiten = TRUE, ref_t = "mean")
     ty <- richest_item_type(id_raw)
@@ -342,7 +342,7 @@ test_that("whitening actually changes the intercepts and factor scores", {
 })
 
 test_that("whitening centres the anchor and retains the thresholds", {
-    d <- extract_mixfac_draws(test_fit())
+    d <- extract_mixfac_draws(test_mixfac_fit())
     id <- identify_mixfac(d, whiten = TRUE, ref_t = "mean")
     XX <- posterior::rvar_apply(id$eta, c(2, 3), posterior::rvar_mean)
     m <- posterior::E(posterior::rvar_apply(XX, 2, posterior::rvar_mean))
@@ -357,7 +357,7 @@ test_that("whitening centres the anchor and retains the thresholds", {
 })
 
 test_that("whitening accepts other ref_t values", {
-    d <- extract_mixfac_draws(test_fit())
+    d <- extract_mixfac_draws(test_mixfac_fit())
     expect_no_error(identify_mixfac(d, whiten = TRUE, ref_t = "last"))
     expect_no_error(identify_mixfac(d, whiten = TRUE, ref_t = 1))
     expect_error(identify_mixfac(d, whiten = TRUE, ref_t = 99),
@@ -365,7 +365,7 @@ test_that("whitening accepts other ref_t values", {
 })
 
 test_that("whitening works with a single factor", {
-    d <- extract_mixfac_draws(test_fit(n_dim = 1))
+    d <- extract_mixfac_draws(test_mixfac_fit(n_dim = 1))
     expect_no_error(id <- identify_mixfac(d, whiten = TRUE, ref_t = "mean"))
     expect_identical(dim(id$eta)[3], 1L)
 })
@@ -473,7 +473,7 @@ test_that("sort and sign compose", {
 })
 
 test_that("sort and sign reject long-format input", {
-    d <- extract_mixfac_draws(test_fit())
+    d <- extract_mixfac_draws(test_mixfac_fit())
     lng <- combine_types_mixfac(
         label_mixfac(identify_mixfac(d), make_long = TRUE)
     )

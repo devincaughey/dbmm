@@ -68,7 +68,7 @@ test_shaped_data <- function(periods = 2020:2021) {
 ## Cache keyed on the flag settings that matter for the patches under test.
 .fit_cache <- new.env(parent = emptyenv())
 
-test_fit <- function(smooth_eta = TRUE,
+test_mixfac_fit <- function(smooth_eta = TRUE,
                      constant_alpha = TRUE,
                      gen_log_lik = FALSE,
                      n_dim = 2,
@@ -124,7 +124,7 @@ nu_cell_comb <- function(o, t = 1, j = 1, i = 1) {
 test_comb <- function(n_dim = 2) {
     key <- paste0("comb_", n_dim)
     if (!is.null(.fit_cache[[key]])) return(.fit_cache[[key]])
-    d <- extract_mixfac_draws(test_fit(n_dim = n_dim))
+    d <- extract_mixfac_draws(test_mixfac_fit(n_dim = n_dim))
     out <- combine_types_mixfac(label_mixfac(identify_mixfac(d)))
     .fit_cache[[key]] <- out
     out

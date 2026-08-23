@@ -279,7 +279,7 @@ R package `estsubpop`. It can be installed using
 
 ```{r visualize}
 # sort factors and make the average discrimination on each factor positive
-use_rvar <- sort_modgirt(modgirt_id$modgirt_rvar) |> sign_modgirt(1)
+use_rvar <- sort_modgirt(modgirt_id) |> sign_modgirt(1)
 
 # estimate population targets for post-stratification ------
 # using `estsubpop`

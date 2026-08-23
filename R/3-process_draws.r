@@ -710,6 +710,34 @@ sign_mixfac <- function(x, signs = 1, check = TRUE) {
 }
 
 
+#' Attach unit, period, and item labels to modgirt draws
+#'
+#' @param x A `draws_rvars` object, typically from [identify_modgirt()].
+#' @param check (logical) Check that `x` is a `draws_rvars` object?
+#' @return A `modgirt_lab` object.
+#' @export
+label_modgirt <- function(x, check = TRUE) {
+    if (check) stopifnot(posterior::is_draws_rvars(x))
+    n_factor <- dim(x$bar_theta)[3]
+    dimnames(x$bar_theta) <- list(
+        period = attr(x, "time_labels"),
+        unit = attr(x, "unit_labels"),
+        factor = seq_len(n_factor)
+    )
+    dimnames(x$beta) <- list(
+        item = attr(x, "item_labels"),
+        factor = seq_len(n_factor)
+    )
+    for (nm in c("Sigma_theta", "Omega")) {
+        if (!is.null(x[[nm]])) {
+            dimnames(x[[nm]]) <- list(factor = seq_len(n_factor),
+                                      factor = seq_len(n_factor))
+        }
+    }
+    class(x) <- unique(c("modgirt_lab", class(x)))
+    x
+}
+
 #' Identify MODGIRT draws
 #'
 #' This function identifies the MODGIRT model by postprocessing the draws from
@@ -734,6 +762,19 @@ sign_mixfac <- function(x, signs = 1, check = TRUE) {
 #'
 #' @export
 identify_modgirt <- function(x, method = "varimax", random_starts = 0, seed = 123) {
+    ## Accept either a draws_rvars object or a fitted object. Label attributes
+    ## live on the cmdstanr fit rather than on the wrapper list, so the source
+    ## of the draws and the source of the labels differ in the latter case.
+    if (posterior::is_draws_rvars(x)) {
+        draws_rvar <- x
+        label_src <- x
+    } else if (!is.null(x$fit)) {
+        draws_rvar <- posterior::as_draws_rvars(x$fit$draws())
+        label_src <- x$fit
+    } else {
+        stop("`x` must be a draws_rvars object or a fitted model object ",
+             "containing a `fit` element.")
+    }
     ## Store draws in `rvars` object
     if (posterior::is_draws_rvars(x)) {
         modgirt_rvar <- x
@@ -766,6 +807,10 @@ identify_modgirt <- function(x, method = "varimax", random_starts = 0, seed = 12
     sp_rvar <- make_sp_rvar(rsp_out, n_iter, n_chain, n_factor)
     ## Apply signed permutations to `beta`
     beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, sp_rvar)
+    dimnames(beta_rvar$beta) <- list(
+        item = attr(label_src, "item_labels"),
+        factor = seq_len(n_factor)
+    )
     ## Make single RSP matrix
     vm_sp_rvar <- posterior::`%**%`(vm_rvar, sp_rvar)
     ## Apply rotations to `bar_theta`
@@ -790,13 +835,20 @@ identify_modgirt <- function(x, method = "varimax", random_starts = 0, seed = 12
         bar_theta = bar_theta_rvar$bar_theta,
         Sigma_theta = sigma_theta_rvar$Sigma_theta,
         Omega = omega_rvar$Omega
+        )
+    out <- as_draws_rvars_safe(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = beta_rvar$beta,
+        bar_theta = bar_theta_rvar$bar_theta,
+        Sigma_theta = sigma_theta_rvar$Sigma_theta,
+        Omega = omega_rvar$Omega
     )
-    out_ls <- list(
-        modgirt_rvar = modgirt_rvar_id,
-        vm_rvar = vm_rvar,
-        sp_rvar = sp_rvar
-    )
-    return(out_ls)
+    out <- copy_dbmm_attrs(out, label_src)
+    attr(out, "rotation matrix") <- vm_rvar
+    attr(out, "signed-permutation matrix") <- sp_rvar
+    class(out) <- c("modgirt_id", class(out))
+    return(out)
 }
 
 
@@ -870,12 +922,27 @@ sort_modgirt <- function(modgirt_rvar) {
     sorted_rvar <- posterior::draws_rvars(
         lp__ = modgirt_rvar$lp__,
         alpha = modgirt_rvar$alpha,
-        beta = modgirt_rvar$beta[, fo],
-        bar_theta = modgirt_rvar$bar_theta[, , fo],
-        Sigma_theta = modgirt_rvar$Sigma_theta[fo, fo],
-        Omega = modgirt_rvar$Omega[fo, fo]
+        beta = modgirt_rvar$beta[, fo, drop = FALSE],
+        bar_theta = modgirt_rvar$bar_theta[, , fo, drop = FALSE],
+        Sigma_theta = modgirt_rvar$Sigma_theta[fo, fo, drop = FALSE],
+        Omega = modgirt_rvar$Omega[fo, fo, drop = FALSE]
     )
+
+    n_f <- length(fo)
+    sorted_rvar$beta <- renumber_factor_dimnames(sorted_rvar$beta, 2L, n_f)
+    sorted_rvar$bar_theta <- renumber_factor_dimnames(sorted_rvar$bar_theta, 3L, n_f)
+    sorted_rvar$Sigma_theta <- renumber_factor_dimnames(sorted_rvar$Sigma_theta, 1:2, n_f)
+    sorted_rvar$Omega <- renumber_factor_dimnames(sorted_rvar$Omega, 1:2, n_f)
+    sorted_rvar <- copy_dbmm_attrs(sorted_rvar, modgirt_rvar)
+
+    attr(sorted_rvar, "rotation matrix") <- attr(modgirt_rvar, "rotation matrix")
+    attr(sorted_rvar, "signed-permutation matrix") <-
+        attr(modgirt_rvar, "signed-permutation matrix")
+    attr(sorted_rvar, "factor order") <- fo
+    class(sorted_rvar) <- unique(c("modgirt_sorted", class(modgirt_rvar)))
+
     return(sorted_rvar)
+
 }
 
 #' Set Signs
@@ -904,31 +971,30 @@ sign_modgirt <- function(modgirt_rvar, signs = 1) {
     if (!all(signs %in% c(-1, 1))) {
         stop("`signs` must contain only -1 and 1.")
     }
-    init_signs <- sign(colMeans(E(modgirt_rvar$beta)))
+    init_signs <- sign(colMeans(posterior::E(modgirt_rvar$beta)))
     sign_flips <- ifelse(init_signs == signs, 1, -1)
-    if (n_factor == 1) {
-        posterior::draws_rvars(
-                       lp__ = modgirt_rvar$lp__,
-                       alpha = modgirt_rvar$alpha,
-                       beta = modgirt_rvar$beta * sign_flips,
-                       bar_theta = modgirt_rvar$bar_theta * sign_flips,
-                       Sigma_theta = modgirt_rvar$Sigma_theta,
-                       Omega = modgirt_rvar$Omega
-                   )
-    } else {
-        sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
-        for (t in seq_len(n_time)) {
-            modgirt_rvar$bar_theta[t, , ] <-
-                modgirt_rvar$bar_theta[t, , , drop = TRUE] %**% sm
-        }
-        posterior::draws_rvars(
-                       lp__ = modgirt_rvar$lp__,
-                       alpha = modgirt_rvar$alpha,
-                       beta = modgirt_rvar$beta %**% sm,
-                       bar_theta = modgirt_rvar$bar_theta,
-                       Sigma_theta = t(sm) %**% modgirt_rvar$Sigma_theta %**% sm,
-                       Omega = t(sm) %**% modgirt_rvar$Omega %**% sm
-                   )
-    }
+    sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
+
+    out <- posterior::draws_rvars(
+        lp__ = modgirt_rvar$lp__,
+        alpha = modgirt_rvar$alpha,
+        beta = posterior::`%**%`(modgirt_rvar$beta, sm),
+        bar_theta = rotate_eta_rvar(modgirt_rvar$bar_theta, sm),
+        Sigma_theta = t(sm) %**% modgirt_rvar$Sigma_theta %**% sm,
+        Omega = t(sm) %**% modgirt_rvar$Omega %**% sm
+    )
+    ## Preserve dimnames, which the matrix products drop
+    dimnames(out$beta) <- dimnames(modgirt_rvar$beta)
+    dimnames(out$bar_theta) <- dimnames(modgirt_rvar$bar_theta)
+    dimnames(out$Sigma_theta) <- dimnames(modgirt_rvar$Sigma_theta)
+    dimnames(out$Omega) <- dimnames(modgirt_rvar$Omega)
+
+    out <- copy_dbmm_attrs(out, modgirt_rvar)
+    attr(out, "rotation matrix") <- attr(modgirt_rvar, "rotation matrix")
+    attr(out, "signed-permutation matrix") <-
+        attr(modgirt_rvar, "signed-permutation matrix")
+    attr(out, "sign flips") <- sign_flips
+    class(out) <- unique(c("modgirt_signed", class(modgirt_rvar)))
+    out
 }
 

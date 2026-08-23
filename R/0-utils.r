@@ -206,17 +206,25 @@ log_lik_index <- function(shaped_data) {
     out$position <- seq_len(nrow(out))
     out
 }
-#' Copy mixfac label attributes from one object to another
+#' Copy dbmm label attributes from one object to another
+#'
+#' Absent attributes are skipped rather than assigned `NULL`, so that "never
+#' set" is distinguishable from "set to nothing".
 #'
 #' @keywords internal
-copy_mixfac_attrs <- function(to, from) {
-    for (nm in c("unit_labels", "time_labels", "binary_item_labels",
-                 "trichotomous_item_labels", "ordinal_item_labels",
-                 "metric_item_labels")) {
-        attr(to, nm) <- attr(from, nm)
+copy_dbmm_attrs <- function(to, from) {
+    nms <- c("unit_labels", "time_labels", "item_labels",
+             "binary_item_labels", "trichotomous_item_labels",
+             "ordinal_item_labels", "metric_item_labels")
+    for (nm in nms) {
+        a <- attr(from, nm)
+        if (!is.null(a)) attr(to, nm) <- a
     }
     to
 }
+
+#' @keywords internal
+copy_mixfac_attrs <- function(to, from) copy_dbmm_attrs(to, from)
 
 #' Right-multiply each period's factor-score matrix by a D-by-D matrix
 #'
@@ -273,4 +281,19 @@ with_seed <- function(seed, code) {
     }
     set.seed(as.integer(seed))
     code
+}
+
+#' Renumber factor dimnames after permuting factors
+#'
+#' Factor labels are positional, so a permutation should renumber them rather
+#' than carry the old labels along.
+#'
+#' @param x (rvar) A variable with one or more factor dimensions.
+#' @param dims (integer vector) Which dimensions index factors.
+#' @param n_factor (positive integer) Number of factors.
+#' @keywords internal
+renumber_factor_dimnames <- function(x, dims, n_factor) {
+    if (is.null(x) || is.null(dimnames(x))) return(x)
+    for (d in dims) dimnames(x)[[d]] <- seq_len(n_factor)
+    x
 }

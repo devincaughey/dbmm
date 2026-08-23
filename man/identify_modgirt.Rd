@@ -4,13 +4,24 @@
 \alias{identify_modgirt}
 \title{Identify MODGIRT draws}
 \usage{
-identify_modgirt(x, method = "varimax")
+identify_modgirt(x, method = "varimax", random_starts = 0, seed = 123)
 }
 \arguments{
 \item{x}{A fitted MODGIRT model object or \code{draws_rvars} object}
 
 \item{method}{(string) Rotation criterion passed to
 \code{\link[GPArotation:GPFRSorth]{GPArotation::GPFRSorth()}}. Defaults to \code{"varimax"}.}
+
+\item{random_starts}{(non-negative integer) Number of random starting
+rotations tried per draw. Defaults to \code{0}, which starts from the
+identity matrix and is deterministic. Values greater than \code{0} guard
+against local minima of the rotation criterion, at proportionate
+computational cost.}
+
+\item{seed}{(positive integer or \code{NULL}) Seed for the random starts.
+Defaults to \code{123}, making results reproducible. Ignored when
+\code{random_starts = 0}, since the rotation is then deterministic. Set to
+\code{NULL} to use the ambient random number stream.}
 }
 \value{
 A list containing the identified MODGIRT model parameters.
