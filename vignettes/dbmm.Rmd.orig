@@ -14,7 +14,7 @@ knitr::opts_chunk$set(
   comment = "#>",
   fig.width = 7,
   fig.height = 4.5,
-  fig.path = "figure/"
+  fig.path = ""
 )
 ```
 
@@ -55,6 +55,7 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(estsubpop)
   library(cmdstanr)
+  library(rstan)
 })
 ```
 
@@ -362,7 +363,7 @@ bar_theta_rvar |>
   ggdist::stat_lineribbon(
     aes(x = year, ydist = bar_theta, group = hhincqe),
     .width = .5,
-    size = 1,
+    linewidth = 1,
     alpha = 1 / 3,
     show.legend = FALSE,
   ) +

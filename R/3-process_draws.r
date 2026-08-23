@@ -718,13 +718,22 @@ sign_mixfac <- function(x, signs = 1, check = TRUE) {
 #' @param x A fitted MODGIRT model object or `draws_rvars` object
 #' @param method (string) Rotation criterion passed to
 #'     [GPArotation::GPFRSorth()]. Defaults to `"varimax"`.
+#' @param random_starts (non-negative integer) Number of random starting
+#'     rotations tried per draw. Defaults to `0`, which starts from the
+#'     identity matrix and is deterministic. Values greater than `0` guard
+#'     against local minima of the rotation criterion, at proportionate
+#'     computational cost.
+#' @param seed (positive integer or `NULL`) Seed for the random starts.
+#'     Defaults to `123`, making results reproducible. Ignored when
+#'     `random_starts = 0`, since the rotation is then deterministic. Set to
+#'     `NULL` to use the ambient random number stream.
 #'
 #' @return A list containing the identified MODGIRT model parameters.
 #'
 #' @import posterior
 #'
 #' @export
-identify_modgirt <- function(x, method = "varimax") {
+identify_modgirt <- function(x, method = "varimax", random_starts = 0, seed = 123) {
     ## Store draws in `rvars` object
     if (posterior::is_draws_rvars(x)) {
         modgirt_rvar <- x
@@ -741,8 +750,10 @@ identify_modgirt <- function(x, method = "varimax") {
     n_factor <- ncol(beta_rvar$beta)
     ## Create draw-specific varimax rotations
     if (n_factor > 1) {
-        vm_rvar <- make_vm_rvar(draws_of_beta, n_iter, n_chain, n_factor,
-                                method = method)
+        vm_rvar <- with_seed(seed, make_vm_rvar(
+            draws_of_beta, n_iter, n_chain, n_factor,
+            method = method, randomStarts = random_starts
+        ))
     } else {
         vm_rvar <- matrix(1)
     }

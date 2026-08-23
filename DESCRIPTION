@@ -42,6 +42,8 @@ Suggests:
     loo,
     rmarkdown,
     testthat (>= 3.0.0)
+Remotes:
+    devincaughey/estsubpop
 Additional_repositories: https://mc-stan.org/r-packages/
 VignetteBuilder: knitr
 Config/testthat/edition: 3

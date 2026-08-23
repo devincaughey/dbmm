@@ -210,34 +210,41 @@ test_that("gen_log_lik = FALSE omits log_lik", {
 ## -------------------------------------------------------- process draws ----
 
 test_that("the identify -> label -> combine pipeline runs and preserves labels", {
-    d <- extract_mixfac_draws(test_fit())
-    id <- identify_mixfac(d, whiten = FALSE)
-    expect_s3_class(id, "mixfac_id")
-    expect_true(posterior::is_draws_rvars(id))
-    expect_false(is.null(attr(id, "time_labels")))
-    expect_false(is.null(attr(id, "rotation matrix")))
-    expect_false(is.null(attr(id, "signed-permutation matrix")))
+    ## ESS caps are expected: the test fixture has too few draws for stable
+    ## ESS estimates.
+        d <- extract_mixfac_draws(test_fit())
+        id <- identify_mixfac(d, whiten = FALSE)
+        expect_s3_class(id, "mixfac_id")
+        expect_true(posterior::is_draws_rvars(id))
+        expect_false(is.null(attr(id, "time_labels")))
+        expect_false(is.null(attr(id, "rotation matrix")))
+        expect_false(is.null(attr(id, "signed-permutation matrix")))
 
-    lab <- label_mixfac(id)
-    expect_s3_class(lab, "mixfac_lab")
-    expect_identical(dimnames(lab$eta)[["unit"]], attr(d, "unit_labels"))
-    expect_identical(dimnames(lab$lambda_metric)[["item"]],
-                     attr(d, "metric_item_labels"))
+        lab <- label_mixfac(id)
+        expect_s3_class(lab, "mixfac_lab")
+        expect_identical(dimnames(lab$eta)[["unit"]], attr(d, "unit_labels"))
+        expect_identical(dimnames(lab$lambda_metric)[["item"]],
+                         attr(d, "metric_item_labels"))
 
-    cmb <- combine_types_mixfac(lab)
-    expect_s3_class(cmb, "mixfac_comb")
-    expect_true(posterior::is_draws_rvars(cmb))
-    expect_true(all(c("eta", "lambda", "alpha") %in% names(cmb)))
-    expect_false(is.null(attr(cmb, "time_labels")))
-    ## combined lambda stacks every item type
-    sdat <- test_shaped_data()
-    expect_identical(dim(cmb$lambda)[1],
-                     sum(sdat$I_binary, sdat$I_trichot,
-                         sdat$I_ordinal, sdat$I_metric))
+        cmb <- combine_types_mixfac(lab)
+        expect_s3_class(cmb, "mixfac_comb")
+        expect_true(posterior::is_draws_rvars(cmb))
+        expect_true(all(c("eta", "lambda", "alpha") %in% names(cmb)))
+        expect_false(is.null(attr(cmb, "time_labels")))
+        ## combined lambda stacks every item type
+        sdat <- test_shaped_data()
+        expect_identical(dim(cmb$lambda)[1],
+                         sum(sdat$I_binary, sdat$I_trichot,
+                             sdat$I_ordinal, sdat$I_metric))
 
-    summ <- summarize_mixfac(cmb)
-    expect_type(summ, "list")
-    expect_true("eta" %in% names(summ))
+        summ <- summarize_mixfac(
+            cmb,
+            summary_functions = list(
+                mean = ~ posterior::E(.),
+                sd   = ~ posterior::sd(.)
+            ))
+        expect_type(summ, "list")
+        expect_true("eta" %in% names(summ))
 })
 
 test_that("identification leaves lp__ unchanged", {

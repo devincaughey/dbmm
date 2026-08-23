@@ -48,9 +48,8 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(estsubpop)
   library(cmdstanr)
+  library(rstan)
 })
-#> Error in `library()`:
-#> ! there is no package called 'estsubpop'
 ```
 
 This vignette uses data from @cavaille_two_2015, cleaned and merged with the
@@ -179,21 +178,20 @@ year.
 ``` r
 head(data)
 #> # A tibble: 6 × 43
-#>   serial  year wtfactor rsex   popq  country agecat3 location hhincqe university index
-#>   <chr>  <dbl>    <dbl> <fct>  <fct> <fct>   <fct>   <fct>    <fct>        <dbl> <dbl>
-#> 1 11284   1986      1   Male   <NA>  England 18-34   Suburban inc_q2           0    NA
-#> 2 10235   1986      0.5 Female <NA>  England 35-59   <NA>     inc_q1           0    NA
-#> 3 10200   1986      1   Male   <NA>  England 60+     Town     inc_q1           0    NA
-#> 4 13852   1986      0.5 Female <NA>  England 35-59   Suburban inc_q4           0    NA
-#> 5 13760   1986      1   Female <NA>  England 18-34   <NA>     <NA>             0    NA
-#> 6 13460   1986      1   Female <NA>  England 60+     <NA>     inc_q1           0    NA
-#> # ℹ 32 more variables: taxspendv2 <dbl>, welfhelpv2 <dbl>, welffeetv2 <dbl>,
-#> #   sochelpv2 <dbl>, richlawv2 <dbl>, redistrbv2 <dbl>, unempjobv2 <dbl>,
-#> #   dolefidlv2 <dbl>, morewelfv2 <dbl>, wealthv2 <dbl>, indust4v2 <dbl>,
-#> #   incomgapv2 <dbl>, dolev2 <dbl>, exclusion_un_only04 <dbl>,
-#> #   welf_chavun_only04 <dbl>, depool_only04 <dbl>, ineq_accv2 <dbl>, damlivesv2 <dbl>,
-#> #   incdiffsv2 <dbl>, ineqrichv2 <dbl>, majtaxv2_only04 <dbl>, soctaxv2_only04 <dbl>,
-#> #   incdiffv2 <dbl>, benfrsecv2_only04 <dbl>, diffsnecv2 <dbl>, …
+#>   serial  year wtfactor rsex   popq  country agecat3 location hhincqe university index taxspendv2 welfhelpv2
+#>   <chr>  <dbl>    <dbl> <fct>  <fct> <fct>   <fct>   <fct>    <fct>        <dbl> <dbl>      <dbl>      <dbl>
+#> 1 11284   1986      1   Male   <NA>  England 18-34   Suburban inc_q2           0    NA          1         NA
+#> 2 10235   1986      0.5 Female <NA>  England 35-59   <NA>     inc_q1           0    NA          1         NA
+#> 3 10200   1986      1   Male   <NA>  England 60+     Town     inc_q1           0    NA          2         NA
+#> 4 13852   1986      0.5 Female <NA>  England 35-59   Suburban inc_q4           0    NA          2         NA
+#> 5 13760   1986      1   Female <NA>  England 18-34   <NA>     <NA>             0    NA          2         NA
+#> 6 13460   1986      1   Female <NA>  England 60+     <NA>     inc_q1           0    NA          2         NA
+#> # ℹ 30 more variables: welffeetv2 <dbl>, sochelpv2 <dbl>, richlawv2 <dbl>, redistrbv2 <dbl>, unempjobv2 <dbl>,
+#> #   dolefidlv2 <dbl>, morewelfv2 <dbl>, wealthv2 <dbl>, indust4v2 <dbl>, incomgapv2 <dbl>, dolev2 <dbl>,
+#> #   exclusion_un_only04 <dbl>, welf_chavun_only04 <dbl>, depool_only04 <dbl>, ineq_accv2 <dbl>,
+#> #   damlivesv2 <dbl>, incdiffsv2 <dbl>, ineqrichv2 <dbl>, majtaxv2_only04 <dbl>, soctaxv2_only04 <dbl>,
+#> #   incdiffv2 <dbl>, benfrsecv2_only04 <dbl>, diffsnecv2 <dbl>, nousesecv2_only04 <dbl>, falseclmv2 <dbl>,
+#> #   redist2v2_only04 <dbl>, socspnd1v2 <dbl>, socspnd4v2 <dbl>, taxraisev2 <dbl>, whyneedv5 <dbl>
 ```
 
 First, we define some constants that are relevant indices for the data. This
@@ -323,7 +321,47 @@ modgirt_out <- fit_modgirt(
 )
 #> Running MCMC with 2 chains, at most 9 in parallel...
 #> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: cholesky_decompose: A is not symmetric. A[1,2] = nan, but A[2,1] = nan (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: cholesky_decompose: A is not symmetric. A[1,2] = nan, but A[2,1] = nan (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: cholesky_decompose: A is not symmetric. A[1,2] = nan, but A[2,1] = nan (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: cholesky_decompose: A is not symmetric. A[1,2] = nan, but A[2,1] = nan (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: cholesky_decompose: A is not symmetric. A[1,2] = nan, but A[2,1] = nan (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: cholesky_decompose: A is not symmetric. A[1,2] = nan, but A[2,1] = nan (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
 #> Chain 1 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: modgirt_probit_model_namespace::log_prob: Sigma_theta is not positive definite. (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 49, column 2 to column 28)
 #> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
 #> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
 #> Chain 1
@@ -342,36 +380,6 @@ modgirt_out <- fit_modgirt(
 #> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
 #> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
 #> Chain 1
-#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
-#> Chain 1 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
-#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
-#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
-#> Chain 1
-#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
-#> Chain 1 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
-#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
-#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
-#> Chain 1
-#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
-#> Chain 1 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
-#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
-#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
-#> Chain 1
-#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
-#> Chain 1 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
-#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
-#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
-#> Chain 1
-#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
-#> Chain 1 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
-#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
-#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
-#> Chain 1
-#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
-#> Chain 1 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
-#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
-#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
-#> Chain 1
 #> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
 #> Chain 2 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
 #> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
@@ -408,7 +416,17 @@ modgirt_out <- fit_modgirt(
 #> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
 #> Chain 2
 #> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
-#> Chain 2 Exception: modgirt_probit_model_namespace::log_prob: Sigma_theta is not positive definite. (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 49, column 2 to column 28)
+#> Chain 2 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: cholesky_decompose: Matrix m is not positive definite (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpckmz3U/model-9c4519411f10.stan', line 55, column 4 to column 43)
 #> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
 #> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
 #> Chain 2
@@ -427,13 +445,13 @@ modgirt_out <- fit_modgirt(
 #> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
 #> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
 #> Chain 2
-#> Chain 1 finished in 293.1 seconds.
-#> Chain 2 finished in 373.8 seconds.
+#> Chain 1 finished in 369.8 seconds.
+#> Chain 2 finished in 417.6 seconds.
 #> 
 #> Both chains finished successfully.
-#> Mean chain execution time: 333.5 seconds.
-#> Total execution time: 374.0 seconds.
-#> Warning: 48 of 500 (10.0%) transitions ended with a divergence.
+#> Mean chain execution time: 393.7 seconds.
+#> Total execution time: 417.8 seconds.
+#> Warning: 1 of 500 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 ```
 
@@ -473,30 +491,32 @@ to apply restrictions 4–5 to the parameter draws.
 ``` r
 # distribution of rvars
 posterior::summarise_draws(modgirt_out$fit) |> summary()
-#>       variable         mean                median                 sd          
-#>  Length   :1830   Min.   :-330738.31   Min.   :-330737.84   Min.   : 0.00000  
-#>  N.unique :1830   1st Qu.:     -0.03   1st Qu.:     -0.06   1st Qu.: 0.03056  
-#>  N.blank  :   0   Median :      0.02   Median :      0.02   Median : 0.12326  
-#>  Min.nchar:   4   Mean   :   -180.30   Mean   :   -180.31   Mean   : 0.35886  
-#>  Max.nchar:  26   3rd Qu.:      0.74   3rd Qu.:      0.71   3rd Qu.: 0.58241  
-#>                   Max.   :      4.35   Max.   :      4.35   Max.   :18.93708  
-#>                                                                               
-#>       mad                 q5                  q95                  rhat      
-#>  Min.   : 0.00000   Min.   :-330768.92   Min.   :-330709.62   Min.   :0.998  
-#>  1st Qu.: 0.03049   1st Qu.:     -1.17   1st Qu.:      0.01   1st Qu.:1.017  
-#>  Median : 0.13426   Median :     -0.08   Median :      0.88   Median :1.072  
-#>  Mean   : 0.42002   Mean   :   -180.82   Mean   :   -179.74   Mean   :1.266  
-#>  3rd Qu.: 0.58853   3rd Qu.:      0.54   3rd Qu.:      1.76   3rd Qu.:1.480  
-#>  Max.   :19.61480   Max.   :      3.99   Max.   :      4.77   Max.   :2.043  
-#>                                                               NAs    :212    
-#>     ess_bulk          ess_tail     
-#>  Min.   :  2.780   Min.   : 11.28  
-#>  1st Qu.:  4.018   1st Qu.: 64.46  
-#>  Median : 21.887   Median :138.51  
-#>  Mean   :109.080   Mean   :163.00  
-#>  3rd Qu.:152.108   3rd Qu.:240.87  
-#>  Max.   :819.692   Max.   :439.00  
-#>  NAs    :212       NAs    :212
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#>       variable         mean                median                 sd                mad          
+#>  Length   :1830   Min.   :-330740.21   Min.   :-330740.44   Min.   : 0.00000   Min.   : 0.00000  
+#>  N.unique :1830   1st Qu.:     -0.13   1st Qu.:     -0.17   1st Qu.: 0.02869   1st Qu.: 0.02686  
+#>  N.blank  :   0   Median :      0.09   Median :      0.09   Median : 0.11697   Median : 0.11715  
+#>  Min.nchar:   4   Mean   :   -180.30   Mean   :   -180.31   Mean   : 0.30170   Mean   : 0.32801  
+#>  Max.nchar:  26   3rd Qu.:      0.83   3rd Qu.:      0.88   3rd Qu.: 0.49056   3rd Qu.: 0.50558  
+#>                   Max.   :      4.38   Max.   :      4.34   Max.   :18.35085   Max.   :18.96987  
+#>                                                                                                  
+#>        q5                  q95                  rhat           ess_bulk           ess_tail     
+#>  Min.   :-330769.45   Min.   :-330710.78   Min.   :0.9965   Min.   :   2.979   Min.   : 22.49  
+#>  1st Qu.:     -1.09   1st Qu.:      0.00   1st Qu.:1.0039   1st Qu.:   5.208   1st Qu.: 81.44  
+#>  Median :     -0.04   Median :      0.67   Median :1.0311   Median : 112.282   Median :212.35  
+#>  Mean   :   -180.76   Mean   :   -179.82   Mean   :1.2020   Mean   : 231.968   Mean   :210.91  
+#>  3rd Qu.:      0.54   3rd Qu.:      1.73   3rd Qu.:1.3141   3rd Qu.: 397.499   3rd Qu.:331.16  
+#>  Max.   :      3.98   Max.   :      4.88   Max.   :1.8698   Max.   :1349.485   Max.   :474.61  
+#>                                            NAs    :212      NAs    :212        NAs    :212
 
 # traceplots
 posterior::as_draws_df(modgirt_out$fit) |>
@@ -513,43 +533,42 @@ mixing well.
 ``` r
 modgirt_id <- identify_modgirt(modgirt_out)
 #> * iteration: 1 
-#>    -----  objective function = 592.544 ----- 
+#>    -----  objective function = 506.546 ----- 
 #> 
 #> * iteration: 2 
-#>    -----  objective function = 143.8 ----- 
+#>    -----  objective function = 47.466 ----- 
 #> 
 #> * iteration: 3 
-#>    -----  objective function = 50.608 ----- 
+#>    -----  objective function = 46.822 ----- 
 #> 
 #> * iteration: 4 
-#>    -----  objective function = 50.585 ----- 
-#> 
-#> * iteration: 5 
-#>    -----  objective function = 50.585 -----
+#>    -----  objective function = 46.822 -----
 
 # distribution of rvars
 posterior::summarise_draws(modgirt_id$modgirt_rvar) |> summary()
-#>       variable         mean                median                 sd          
-#>  Length   :1153   Min.   :-330738.31   Min.   :-330737.84   Min.   : 0.01068  
-#>  N.unique :1153   1st Qu.:     -0.30   1st Qu.:     -0.29   1st Qu.: 0.03210  
-#>  N.blank  :   0   Median :      0.49   Median :      0.49   Median : 0.08816  
-#>  Min.nchar:   4   Mean   :   -286.19   Mean   :   -286.19   Mean   : 0.15948  
-#>  Max.nchar:  17   3rd Qu.:      1.54   3rd Qu.:      1.53   3rd Qu.: 0.21374  
-#>                   Max.   :      4.35   Max.   :      4.35   Max.   :18.93708  
-#>       mad                 q5                  q95                  rhat       
-#>  Min.   : 0.01012   Min.   :-330768.92   Min.   :-330709.62   Min.   :0.9967  
-#>  1st Qu.: 0.03349   1st Qu.:     -0.63   1st Qu.:      0.00   1st Qu.:1.0077  
-#>  Median : 0.08960   Median :      0.26   Median :      0.67   Median :1.0177  
-#>  Mean   : 0.15734   Mean   :   -286.45   Mean   :   -285.93   Mean   :1.0536  
-#>  3rd Qu.: 0.20768   3rd Qu.:      1.19   3rd Qu.:      1.82   3rd Qu.:1.0499  
-#>  Max.   :19.61480   Max.   :      3.99   Max.   :      4.77   Max.   :1.3208  
-#>     ess_bulk          ess_tail     
-#>  Min.   :  5.373   Min.   : 18.28  
-#>  1st Qu.: 38.617   1st Qu.:124.26  
-#>  Median :122.428   Median :223.25  
-#>  Mean   :174.627   Mean   :223.45  
-#>  3rd Qu.:263.031   3rd Qu.:311.71  
-#>  Max.   :819.692   Max.   :502.50
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#>       variable         mean                median                 sd                mad          
+#>  Length   :1153   Min.   :-330740.21   Min.   :-330740.44   Min.   : 0.01105   Min.   : 0.01053  
+#>  N.unique :1153   1st Qu.:     -0.30   1st Qu.:     -0.30   1st Qu.: 0.03033   1st Qu.: 0.02926  
+#>  N.blank  :   0   Median :      0.47   Median :      0.47   Median : 0.08615   Median : 0.08117  
+#>  Min.nchar:   4   Mean   :   -286.20   Mean   :   -286.20   Mean   : 0.15712   Mean   : 0.15209  
+#>  Max.nchar:  17   3rd Qu.:      1.53   3rd Qu.:      1.53   3rd Qu.: 0.20933   3rd Qu.: 0.20723  
+#>                   Max.   :      4.38   Max.   :      4.34   Max.   :18.35085   Max.   :18.96987  
+#>        q5                  q95                  rhat           ess_bulk           ess_tail     
+#>  Min.   :-330769.45   Min.   :-330710.78   Min.   :0.9965   Min.   :   8.742   Min.   : 27.08  
+#>  1st Qu.:     -0.64   1st Qu.:      0.00   1st Qu.:1.0010   1st Qu.: 172.224   1st Qu.:244.26  
+#>  Median :      0.26   Median :      0.65   Median :1.0039   Median : 342.694   Median :332.69  
+#>  Mean   :   -286.45   Mean   :   -285.94   Mean   :1.0176   Mean   : 377.609   Mean   :303.62  
+#>  3rd Qu.:      1.19   3rd Qu.:      1.80   3rd Qu.:1.0092   3rd Qu.: 526.108   3rd Qu.:380.26  
+#>  Max.   :      3.98   Max.   :      4.88   Max.   :1.1837   Max.   :1349.485   Max.   :566.90
 
 # traceplots
 posterior::as_draws_df(modgirt_id$modgirt_rvar) |>
@@ -602,8 +621,9 @@ est_out <- est_subpop(
   seed = 1,
   cores = 1
 )
-#> Error in `est_subpop()`:
-#> ! could not find function "est_subpop"
+#> [1] "1" "2" "3" "4" "5" "6"
+#> 
+#> Warning: Coercing 1 2 3 4 5 6 ... to integer
 
 targets <- get_pi(est_out) |>
   mutate(year = factor(
@@ -616,8 +636,6 @@ targets <- get_pi(est_out) |>
     prop_err = sd(value),
     .by = c(year, group)
   )
-#> Error in `get_pi()`:
-#> ! could not find function "get_pi"
 
 # Create labels
 group_labels <- attr(modgirt_out$stan_data, "unit_labels")
@@ -653,8 +671,6 @@ bar_theta_rvar <- use_rvar |>
     dimension = if_else(dim == "from", "Dimension 1 (Redistribution From)",
                         "Dimension 2 (Redistribution To)")
   )
-#> Error:
-#> ! object 'targets' not found
 
 bar_theta_rvar |>
   ggplot() +
@@ -678,8 +694,14 @@ bar_theta_rvar |>
   scale_fill_grey() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(1900, 2000, 4))
-#> Error:
-#> ! object 'bar_theta_rvar' not found
+#> Warning: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+#> ℹ Please use `linewidth` instead.
+#> ℹ The deprecated feature was likely used in the ggdist package.
+#>   Please report the issue at <https://github.com/mjskay/ggdist/issues>.
+#> This warning is displayed once per session.
+#> Call `lifecycle::last_lifecycle_warnings()` to see where this warning was generated.
 ```
+
+![plot of chunk visualize](visualize-1.png)
 
 # References

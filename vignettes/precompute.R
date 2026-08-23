@@ -11,11 +11,10 @@
 ## Usage, from the package root:
 ##   Rscript vignettes/precompute.R
 
-old <- setwd("vignettes")
-on.exit(setwd(old), add = TRUE)
+withr::with_dir("vignettes", {
+    knitr::knit("dbmm.Rmd.orig", output = "dbmm.Rmd")
+})
 
-knitr::knit("dbmm.Rmd.orig", output = "dbmm.Rmd")
-
-## Figures are written to vignettes/figure/ and must be committed alongside
-## dbmm.Rmd, since they are referenced by the built vignette.
-cat("\nDone. Commit vignettes/dbmm.Rmd and vignettes/figure/.\n")
+## Figures are written to vignettes/ and must be committed alongside dbmm.Rmd,
+## since they are referenced by the built vignette.
+cat("\nDone. Commit vignettes/dbmm.Rmd and vignettes/*.png.\n")
