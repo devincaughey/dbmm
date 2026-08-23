@@ -25,6 +25,11 @@ identify_mixfac(
 an integer in 1:T, 'last', or 'mean'. The latter means that the
 within-unit averages \code{bar_theta} are whitened.}
 
+\item{identify_with_type}{(string) Which loading matrix to use when aligning
+factors across draws: \code{"lambda"}, \code{"binary"}, \code{"trichot"}, \code{"ordinal"},
+or \code{"metric"}. Defaults to the item type with the most items. Forced to
+\code{"lambda"} when \code{x} inherits from \code{"mixfac_comb"}.}
+
 \item{random_starts}{(non-negative integer) Number of random starting
 rotations tried per draw. Defaults to \code{0}, which starts from the
 identity matrix and is deterministic. Values greater than \code{0} guard

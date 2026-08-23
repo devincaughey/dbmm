@@ -8,6 +8,9 @@ identify_modgirt(x, method = "varimax")
 }
 \arguments{
 \item{x}{A fitted MODGIRT model object or \code{draws_rvars} object}
+
+\item{method}{(string) Rotation criterion passed to
+\code{\link[GPArotation:GPFRSorth]{GPArotation::GPFRSorth()}}. Defaults to \code{"varimax"}.}
 }
 \value{
 A list containing the identified MODGIRT model parameters.

@@ -100,6 +100,8 @@ shape_modgirt <- function(long_data,
 #'     dropped. If `periods_to_estimate` includes a period for which there is no
 #'     data, parameter values for that year will be imputed by the dynamic
 #'     model.
+#' @param quiet (logical) Suppress messages reporting how items were
+#'     categorized? Defaults to `FALSE`.
 #'
 #' @return A list formatted for Stan
 #'
@@ -107,17 +109,18 @@ shape_modgirt <- function(long_data,
 #'
 #' @export
 shape_mixfac <- function(long_data,
-                              unit_var,
-                              time_var,
-                              item_var,
-                              value_var,
-                              binary_items = NA,
-                              trichotomous_items = NA,
-                              ordinal_items = NA,
-                              max_cats = 10,
-                              standardize = TRUE,
-                              make_indicator_for_zeros = TRUE,
-                              periods_to_estimate) {
+                         unit_var,
+                         time_var,
+                         item_var,
+                         value_var,
+                         binary_items = NA,
+                         trichotomous_items = NA,
+                         ordinal_items = NA,
+                         max_cats = 10,
+                         standardize = TRUE,
+                         make_indicator_for_zeros = TRUE,
+                         periods_to_estimate,
+                         quiet = FALSE) {
 
     if (missing(periods_to_estimate)) {
         periods_to_estimate <-
@@ -188,21 +191,21 @@ shape_mixfac <- function(long_data,
         }
     }
 
-    if (length(binary_items) > 0) {
-        cat("\nCategorizing the following items as binary:\n")
-        cat(c("  *", paste(binary_items, collapse = "\n  * "), "\n"))
+    if (!quiet && length(binary_items) > 0) {
+        cli::cli_alert_info("Categorizing {length(binary_items)} item{?s} as binary.")
+        cli::cli_ul(binary_items)
     }
-    if (length(trichotomous_items) > 0) {
-        cat("\nCategorizing the following items as trichotomous:\n")
-        cat(c("  *", paste(trichotomous_items, collapse = "\n  * "), "\n"))
+    if (!quiet && length(trichotomous_items) > 0) {
+        cli::cli_alert_info("Categorizing {length(trichotomous_items)} item{?s} as trichotomous.")
+        cli::cli_ul(trichotomous_items)
     }
-    if (length(ordinal_items) > 0) {
-        cat("\nCategorizing the following items as ordinal:\n")
-        cat(c("  *", paste(ordinal_items, collapse = "\n  * "), "\n"))
+    if (!quiet && length(ordinal_items) > 0) {
+        cli::cli_alert_info("Categorizing {length(ordinal_items)} item{?s} as ordinal.")
+        cli::cli_ul(ordinal_items)
     }
-    if (length(metric_items) > 0) {
-        cat("\nCategorizing the following items as metric:\n")
-        cat(c("  *", paste(metric_items, collapse = "\n  * "), "\n"))
+    if (!quiet && length(metric_items) > 0) {
+        cli::cli_alert_info("Categorizing {length(metric_items)} item{?s} as metric.")
+        cli::cli_ul(metric_items)
     }
 
     binary_data <- use_data |>
@@ -288,38 +291,51 @@ shape_mixfac <- function(long_data,
 }
 
 
-#' @export
-make_item_time_grid <- function (shaped_data,
-                                 types = c("binary", "trichotomous",
-                                           "ordinal", "metric")) {
-    types <- c("binary", "trichotomous", "ordinal", "metric")
+#' Build a complete item-by-period grid for each item type
+#'
+#' Expands the item and period indices of a `mixfac_data` object into a full
+#' grid and joins on the observed responses, so that unobserved item-periods
+#' appear explicitly with `value = NA`.
+#'
+#' @param shaped_data (mixfac_data) Output of [shape_mixfac()].
+#' @param types (character vector) Item types to include.
+#'
+#' @return A data frame with columns `item_type`, `item`, `time`, `ITEM`,
+#'     `TIME`, and `value`.
+#'
+#' @keywords internal
+#' @noRd
+make_item_time_grid <- function(shaped_data,
+                                types = c("binary", "trichotomous",
+                                          "ordinal", "metric")) {
+    types <- match.arg(types, several.ok = TRUE)
+    n_time <- shaped_data$T
+    time_labels <- attr(shaped_data, "time_labels")
     grid_ls <- vector("list", length(types))
     names(grid_ls) <- types
     for (n in seq_along(types)) {
         typ <- stringr::str_remove(types[n], "omous")
-        I <- shaped_data[[stringr::str_c("I_", typ)]]
-        N <- shaped_data[[stringr::str_c("N_", typ)]]
-        item_labels <- attr(shaped_data, stringr::str_c(types[n], "_item_labels"))
-        shaped_df <- data.frame(
-            item = shaped_data[[stringr::str_c("ii_", typ)]],
-            time = shaped_data[[stringr::str_c("tt_", typ)]],
-            value = shaped_data[[stringr::str_c("yy_", typ)]]
+        n_item <- shaped_data[[paste0("I_", typ)]]
+        if (is.null(n_item) || n_item == 0L) next
+        item_labels <- attr(shaped_data, paste0(types[n], "_item_labels"))
+        observed <- data.frame(
+            item  = as.integer(shaped_data[[paste0("ii_", typ)]]),
+            time  = as.integer(shaped_data[[paste0("tt_", typ)]]),
+            value = as.numeric(shaped_data[[paste0("yy_", typ)]])
         )
-        grid <-
-            list(item = 1:I, time = 1:shaped_data$T) |>
-            expand.grid() |>
-            mutate(
-                ITEM = factor(
-                    item,
-                    labels = item_labels
-                ),
-                TIME = factor(
-                    time,
-                    labels = attr(shaped_data, c("time_labels"))
-                )
-            ) |>
-            left_join(shaped_df, by = join_by(item, time))
-        grid_ls[[n]] <- grid
+        grid <- expand.grid(
+            item = seq_len(n_item),
+            time = seq_len(n_time)
+        )
+        grid <- dplyr::mutate(
+            grid,
+            ITEM = factor(.data$item, levels = seq_len(n_item),
+                          labels = item_labels),
+            TIME = factor(.data$time, levels = seq_len(n_time),
+                          labels = time_labels)
+        )
+        grid_ls[[n]] <- dplyr::left_join(grid, observed,
+                                         by = c("item", "time"))
     }
-    bind_rows(grid_ls, .id = "item_type")
+    dplyr::bind_rows(grid_ls, .id = "item_type")
 }

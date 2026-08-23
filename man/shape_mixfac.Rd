@@ -16,7 +16,8 @@ shape_mixfac(
   max_cats = 10,
   standardize = TRUE,
   make_indicator_for_zeros = TRUE,
-  periods_to_estimate
+  periods_to_estimate,
+  quiet = FALSE
 )
 }
 \arguments{
@@ -63,6 +64,9 @@ vector. Data from periods not in \code{periods_to_estimate} will be
 dropped. If \code{periods_to_estimate} includes a period for which there is no
 data, parameter values for that year will be imputed by the dynamic
 model.}
+
+\item{quiet}{(logical) Suppress messages reporting how items were
+categorized? Defaults to \code{FALSE}.}
 }
 \value{
 A list formatted for Stan

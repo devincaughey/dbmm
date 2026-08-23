@@ -52,6 +52,10 @@ extract_mixfac_draws <- function(x, drop = .mixfac_drop_default, check = TRUE) {
 #' @param ref_t In what time period should `bar_theta` be whitened? May be
 #'     an integer in 1:T, 'last', or 'mean'. The latter means that the
 #'     within-unit averages `bar_theta` are whitened.
+#' @param identify_with_type (string) Which loading matrix to use when aligning
+#'     factors across draws: `"lambda"`, `"binary"`, `"trichot"`, `"ordinal"`,
+#'     or `"metric"`. Defaults to the item type with the most items. Forced to
+#'     `"lambda"` when `x` inherits from `"mixfac_comb"`.
 #' @param random_starts (non-negative integer) Number of random starting
 #'     rotations tried per draw. Defaults to `0`, which starts from the
 #'     identity matrix and is deterministic. Values greater than `0` guard
@@ -712,6 +716,8 @@ sign_mixfac <- function(x, signs = 1, check = TRUE) {
 #' the posterior distribution.
 #'
 #' @param x A fitted MODGIRT model object or `draws_rvars` object
+#' @param method (string) Rotation criterion passed to
+#'     [GPArotation::GPFRSorth()]. Defaults to `"varimax"`.
 #'
 #' @return A list containing the identified MODGIRT model parameters.
 #'
