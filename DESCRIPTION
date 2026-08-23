@@ -7,7 +7,7 @@ Description: Fits dynamic Bayesian measurement models using Stan via the
     (MODGIRT) model. Both allow for multiple latent factors, and both provide
     helpers for shaping data, imposing post-estimation identification
     restrictions, and summarizing draws.
-Version: 0.0.1
+Version: 0.0.1.9000
 Authors@R:
   c(person("Devin", "Caughey", email = "devin.caughey@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-6419-6805")),
@@ -25,10 +25,9 @@ Imports:
     abind,
     cli,
     cmdstanr,
-    dplyr (>= 1.0.0),
+    dplyr (>= 1.1.0),
     factor.switching,
     GPArotation,
-    magrittr (>= 2.0.0),
     parallel,
     posterior,
     rlang,
@@ -36,10 +35,11 @@ Imports:
     stats,
     stringr (>= 1.5.0),
     survey,
-    tibble,
     tidyr (>= 1.0.0)
 Suggests:
+    bayesplot,
     knitr,
+    loo,
     rmarkdown,
     testthat (>= 3.0.0)
 Additional_repositories: https://mc-stan.org/r-packages/
@@ -47,4 +47,6 @@ VignetteBuilder: knitr
 Config/testthat/edition: 3
 LazyData: TRUE
 Config/roxygen2/version: 8.1.0
-
+URL: https://github.com/devincaughey/dbmm
+BugReports: https://github.com/devincaughey/dbmm/issues
+SystemRequirements: CmdStan (https://mc-stan.org/users/interfaces/cmdstan)

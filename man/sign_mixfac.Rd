@@ -2,26 +2,26 @@
 % Please edit documentation in R/3-process_draws.r
 \name{sign_mixfac}
 \alias{sign_mixfac}
-\title{Set Signs}
+\title{Set the sign of each latent factor}
 \usage{
-sign_mixfac(x, signs = 1)
+sign_mixfac(x, signs = 1, check = TRUE)
 }
 \arguments{
-\item{x}{The model object containing the parameters.}
+\item{x}{A \code{mixfac_comb} object, as returned by \code{\link[=combine_types_mixfac]{combine_types_mixfac()}}.
+Must hold \code{rvar} draws.}
 
-\item{signs}{A vector of signs to be applied to the parameters.
-Scalar values are allowed and will be recycled. Default is 1.}
+\item{signs}{(numeric) Desired sign of the mean loading on each factor,
+either a scalar (recycled) or one value per factor. Defaults to \code{1}.}
+
+\item{check}{(logical) Check the class of \code{x}? Defaults to \code{TRUE}.}
 }
 \value{
-A modified model object with the signs of the parameters updated.
+A \code{mixfac_signed} object. The flips applied are recorded in the
+\code{"sign flips"} attribute.
 }
 \description{
-This function sets the signs of the parameters of a MIXFAC model based on
-user-defined signs.
-}
-\details{
-This function sets the signs of the parameters in the model object
-\code{x} based on the user-defined signs provided in the
-\code{signs} argument. The function applies the sign flips to the parameters
-and returns a modified model object with the updated signs.
+Flips the sign of each factor so that the mean loading on it has the
+requested sign. This is a reparameterization: every linear predictor, and
+hence the likelihood, is unchanged. Item intercepts and thresholds are
+unaffected, since the sign matrix is orthogonal.
 }

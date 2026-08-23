@@ -4,7 +4,12 @@
 \alias{label_mixfac}
 \title{Exported function}
 \usage{
-label_mixfac(x, make_long = FALSE, check = TRUE)
+label_mixfac(x, make_long = FALSE)
+}
+\arguments{
+\item{x}{An \code{draws_rvars} object, such as the output of \code{identify_mixfac()}.}
+
+\item{make_long}{Should the output be a long data frame? (Requires dropping variables)}
 }
 \description{
 Exported function

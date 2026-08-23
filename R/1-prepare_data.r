@@ -103,7 +103,6 @@ shape_modgirt <- function(long_data,
 #'
 #' @return A list formatted for Stan
 #'
-#' @import magrittr
 #' @importFrom rlang .data
 #'
 #' @export
@@ -297,14 +296,14 @@ make_item_time_grid <- function (shaped_data,
     grid_ls <- vector("list", length(types))
     names(grid_ls) <- types
     for (n in seq_along(types)) {
-        typ <- str_remove(types[n], "omous")
-        I <- shaped_data[[str_c("I_", typ)]]
-        N <- shaped_data[[str_c("N_", typ)]]
-        item_labels <- attr(shaped_data, str_c(types[n], "_item_labels"))
+        typ <- stringr::str_remove(types[n], "omous")
+        I <- shaped_data[[stringr::str_c("I_", typ)]]
+        N <- shaped_data[[stringr::str_c("N_", typ)]]
+        item_labels <- attr(shaped_data, stringr::str_c(types[n], "_item_labels"))
         shaped_df <- data.frame(
-            item = shaped_data[[str_c("ii_", typ)]],
-            time = shaped_data[[str_c("tt_", typ)]],
-            value = shaped_data[[str_c("yy_", typ)]]
+            item = shaped_data[[stringr::str_c("ii_", typ)]],
+            time = shaped_data[[stringr::str_c("tt_", typ)]],
+            value = shaped_data[[stringr::str_c("yy_", typ)]]
         )
         grid <-
             list(item = 1:I, time = 1:shaped_data$T) |>
@@ -318,7 +317,7 @@ make_item_time_grid <- function (shaped_data,
                     time,
                     labels = attr(shaped_data, c("time_labels"))
                 )
-            ) %>%
+            ) |>
             left_join(shaped_df, by = join_by(item, time))
         grid_ls[[n]] <- grid
     }

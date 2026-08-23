@@ -294,6 +294,14 @@ test_that("identify_mixfac() agrees whether given a fit or its draws", {
                  tolerance = 1e-6)
 })
 
+test_that("identify_mixfac() works when Omega is absent", {
+    skip_on_cran()
+    d <- posterior::as_draws_rvars(test_fit()$fit$draws())
+    d$Omega <- NULL
+    id <- expect_no_error(identify_mixfac(d))
+    expect_false("Omega" %in% posterior::variables(id))
+})
+
 ## ------------------------------------------------------------ whitening ----
 
 test_that("whitening leaves every linear predictor invariant (P7)", {

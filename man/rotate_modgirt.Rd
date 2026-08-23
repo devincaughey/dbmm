@@ -9,7 +9,7 @@ rotate_modgirt(modgirt_rvar, rotmat)
 \arguments{
 \item{modgirt_rvar}{A \code{draws_rvar} object from a MODGIRT model}
 
-\item{rotat}{An I-by-D rotation matrix}
+\item{rotmat}{An I-by-D rotation matrix}
 }
 \value{
 A \code{draws_rvar} object of rotated draws
@@ -19,7 +19,9 @@ This function applies the given rotation to each draw from the posterior
 distribution of the MODGIRT parameters
 }
 \examples{
-rotmat <- varimax(E(modgirt_signed$beta))$rotmat
+\dontrun{
+rotmat <- varimax(posterior::E(modgirt_signed$beta))$rotmat
 modgirt_rotated <- rotate_modgirt(modgirt_signed, rotmat)
+}
 
 }

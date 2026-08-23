@@ -5,16 +5,12 @@
 #' @param x (`dbmm_fitted` object) A fitted model produced by `fit()`.
 #' @param drop (character vector) A regular expression (or logical scalar).
 #'     Parameters that match any of the regular expressions will be dropped.
-#' @param format (string) The format of the returned draws or point
-#'     estimates. Must be a valid format from the ‘posterior’ package. The
-#'     default is `"df"`, which is what other `dbmm` functions will
-#'     expect, but other options include `"array"`, `"matrix"`, and `"list"`.
 #' @param check (logical)
 #'
 #' @return Draws from the posterior distribution of the selected parameters.
 #'
-#' @import magrittr
 #' @import cmdstanr
+#' @importFrom posterior %**%
 #'
 #' @export
 extract_mixfac_draws <- function(x, drop = .mixfac_drop_default, check = TRUE) {
@@ -48,10 +44,27 @@ extract_mixfac_draws <- function(x, drop = .mixfac_drop_default, check = TRUE) {
 }
 
 
-#' Exported function
+#' Identify mixfac model
+#'
+#' @param x Either a draws_rvars object or a fitted object
+#' @param method Rotation criterion
+#' @param whiten Should `bar_theta` be demeaned, standardized, and made orthogonal?
+#' @param ref_t In what time period should `bar_theta` be whitened? May be
+#'     an integer in 1:T, 'last', or 'mean'. The latter means that the
+#'     within-unit averages `bar_theta` are whitened.
+#' @param random_starts (non-negative integer) Number of random starting
+#'     rotations tried per draw. Defaults to `0`, which starts from the
+#'     identity matrix and is deterministic. Values greater than `0` guard
+#'     against local minima of the rotation criterion, at proportionate
+#'     computational cost.
+#' @param seed (positive integer or `NULL`) Seed for the random starts.
+#'     Defaults to `123`, making results reproducible. Ignored when
+#'     `random_starts = 0`, since the rotation is then deterministic. Set to
+#'     `NULL` to use the ambient random number stream.
 #' @export
 identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
-                            ref_t = "last", identify_with_type) {
+                            ref_t = "last", identify_with_type,
+                            random_starts = 0, seed = 123) {
     ## Accept either a draws_rvars object or a fitted object. Label attributes
     ## live on the cmdstanr fit rather than on the wrapper list, so the source
     ## of the draws and the source of the labels differ in the latter case.
@@ -97,8 +110,11 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
         stop("Invalid `identify_with_type`; must be 'lambda', 'binary', 'trichot', 'ordinal', or 'metric'.")
     )
 
-    omega_rvar <- posterior::subset_draws(draws_rvar, variable = "Omega")
-
+    has_omega <- "Omega" %in% posterior::variables(draws_rvar)
+    omega_rvar <- if (has_omega) {
+                      posterior::subset_draws(draws_rvar, variable = "Omega")
+                  } else NULL
+    
     ## ---------- Optional whitening ----------
     ## eta_norm   = (eta - m) %*% WW
     ## lambda_norm = lambda %*% inv(WW)'
@@ -133,7 +149,6 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
         ## Whitening matrix, and its inverse-transpose for the loadings
         ## (WW is triangular, not orthogonal, so inv(WW)' != WW)
         WW_rvar <- rvar_whiten_matrix(DM)
-        rvar_solve <- posterior::rfun(solve)
         Ginv_rvar <- t(rvar_solve(WW_rvar))
 
         ## --- Transform eta ---
@@ -197,7 +212,10 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
         }
 
         ## --- Transform the innovation covariance ---
-        omega_rvar$Omega <- t(WW_rvar) %**% omega_rvar$Omega %**% WW_rvar
+        if (has_omega) {
+            omega_rvar$Omega <-
+                t(WW_rvar) %**% omega_rvar$Omega %**% WW_rvar
+        }
     }
 
     ## Recompute draws_of_lambda AFTER optional whitening
@@ -207,13 +225,11 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
 
     ## ---------- Varimax ----------
     if (n_factor > 1) {
-        vm_rvar <- make_vm_rvar(
-            draws_of_lambda,
-            n_iter = n_iter,
-            n_chain = n_chain,
-            n_factor = n_factor,
-            method = method
-        )
+        vm_rvar <- with_seed(seed, make_vm_rvar(
+                                       draws_of_lambda,
+                                       n_iter = n_iter, n_chain = n_chain, n_factor = n_factor,
+                                       method = method, randomStarts = random_starts
+                                   ))
     } else {
         vm_rvar <- matrix(1)
     }
@@ -242,15 +258,13 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
 
     ## Rotate eta
     eta_rvar <- posterior::subset_draws(draws_rvar, variable = "eta")
-    for (tt in seq_len(dim(eta_rvar$eta)[1])) {
-        eta_rvar$eta[tt, , ] <- posterior::`%**%`(
-            as.matrix(eta_rvar$eta[tt, , , drop = TRUE]),
-            vm_sp_rvar
-        )
-    }
+    eta_rvar$eta <- rotate_eta_rvar(eta_rvar$eta, vm_sp_rvar)
 
     ## Rotate Omega
-    omega_rvar$Omega <- t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
+    if (has_omega) {
+        omega_rvar$Omega <-
+            t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
+    }
 
     ## ---------- Output ----------
     if (inherits(x, "mixfac_comb")) {
@@ -262,7 +276,7 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
             kappa_ordinal = draws_rvar$kappa_ordinal,
             sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
             sigma_metric = draws_rvar$sigma_metric,
-            Omega = omega_rvar$Omega,
+            Omega = if (has_omega) omega_rvar$Omega else NULL,
             lp__ = draws_rvar$lp__
         )
     } else {
@@ -280,7 +294,7 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
             kappa_ordinal = draws_rvar$kappa_ordinal,
             sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
             sigma_metric = draws_rvar$sigma_metric,
-            Omega = omega_rvar$Omega,
+            Omega = if (has_omega) omega_rvar$Omega else NULL,
             lp__ = draws_rvar$lp__
         )
     }
@@ -299,8 +313,10 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
 
 
 #' Exported function
+#' @param x An `draws_rvars` object, such as the output of `identify_mixfac()`.
+#' @param make_long Should the output be a long data frame? (Requires dropping variables) 
 #' @export
-label_mixfac <- function (x, make_long = FALSE, check = TRUE) {
+label_mixfac <- function (x, make_long = FALSE) {
     stopifnot(is_draws_rvars(x))
     n_factor <- dim(x$eta)[[3]]
     if (length(attr(x, "binary_item_labels")) > 0) {
@@ -375,7 +391,7 @@ label_mixfac <- function (x, make_long = FALSE, check = TRUE) {
     )
     if (make_long) {
         for (i in seq_along(x)) {
-            if (!str_detect(names(x)[i], "^lp|^Omega|^sigma_alpha_evol")) {
+            if (!stringr::str_detect(names(x)[i], "^lp|^Omega|^sigma_alpha_evol")) {
                 x[[i]] <- as.data.frame.table(x[[i]], responseName = "value")
             }
         }
@@ -501,31 +517,33 @@ combine_types_mixfac <- function (x) {
     return(out)
 }
 
-
-#' Exported function
+#' Summarize the draws from a mixfac fit
+#'
+#' @param x mixfac draws
+#' @param summary_functions Functions for summarizing. If missing, defaults will be used.
 #' @export
 summarize_mixfac <- function (x, summary_functions) {
     if (missing(summary_functions)) {
         summary_functions <- list(
             mean = ~posterior::E(.),
-            median = ~posterior:::median.rvar(.),
+            median = ~stats::median(.),
             sd = ~posterior::sd(.),
             mad = ~posterior::mad(.),
-            q5 = ~as.numeric(posterior:::quantile.rvar(., probs = .05)),
-            q95 = ~as.numeric(posterior:::quantile.rvar(., probs = .95)),
+            q5  = ~ as.numeric(stats::quantile(., probs = .05)),
+            q95 = ~ as.numeric(stats::quantile(., probs = .95)),
             rhat = ~posterior::rhat(.),
             ess_bulk = ~posterior::ess_bulk(.),
             ess_tail = ~posterior::ess_tail(.)
         )
     }
-    sfun <- function (y) {
-        y |>
-            mutate(
-                across(value, summary_functions),
-            ) |>
-            select(-value) |>
-            rename_with(~str_remove(., "value_")) |>
-            as_tibble()
+    sfun <- function(y) {
+        dplyr::mutate(
+            y,
+            dplyr::across(
+                dplyr::all_of("value"), summary_functions, .names = "{.fn}"
+            ),
+            .keep = "unused"
+        )
     }
     is_rvar <- sapply(x, inherits, "rvar")
     out_rvar <- out_df <- NULL
@@ -535,15 +553,14 @@ summarize_mixfac <- function (x, summary_functions) {
             if (length(x[is_rvar][[i]]) == 0) {
                 out_rvar[[i]] <- NA
             } else {
-                out_rvar[[i]] <-
-                    x[is_rvar][[i]] |>
-                    summarise_draws() |>
-                    mutate(
-                        variable = str_replace(
-                            variable,
-                            "(^x\\[is_rvar\\]\\[\\[i\\]\\])|(^\\.)",
-                            names(x[is_rvar])[i]
-                        ))
+                nm <- names(x[is_rvar])[i]
+                d <- posterior::as_draws_rvars(
+                    stats::setNames(list(x[is_rvar][[i]]), nm)
+                )
+                out_rvar[[i]] <- do.call(
+                    posterior::summarise_draws,
+                    c(list(d), summary_functions)
+                )
             }
             names(out_rvar)[i] <- names(x[is_rvar])[i]
         }
@@ -772,7 +789,7 @@ identify_modgirt <- function(x, method = "varimax") {
 #' distribution of the MODGIRT parameters
 #'
 #' @param modgirt_rvar A `draws_rvar` object from a MODGIRT model
-#' @param rotat An I-by-D rotation matrix
+#' @param rotmat An I-by-D rotation matrix
 #'
 #' @return A `draws_rvar` object of rotated draws
 #'
@@ -788,7 +805,6 @@ identify_modgirt <- function(x, method = "varimax") {
 rotate_modgirt <- function(modgirt_rvar, rotmat) {
     ## inverse of transpose (needed for oblique rotation)
     if (is_rvar(rotmat)) {
-        rvar_solve <- rfun(solve)
         G <- rvar_solve(t(rotmat))
     } else {
         G <- solve(t(rotmat))
@@ -868,6 +884,9 @@ sign_modgirt <- function(modgirt_rvar, signs = 1) {
     n_time <- dim(modgirt_rvar$bar_theta)[1]
     n_factor <- dim(modgirt_rvar$bar_theta)[3]
     stopifnot(length(signs) == 1 || length(signs) == n_factor)
+    if (!all(signs %in% c(-1, 1))) {
+        stop("`signs` must contain only -1 and 1.")
+    }
     init_signs <- sign(colMeans(E(modgirt_rvar$beta)))
     sign_flips <- ifelse(init_signs == signs, 1, -1)
     if (n_factor == 1) {
@@ -882,8 +901,8 @@ sign_modgirt <- function(modgirt_rvar, signs = 1) {
     } else {
         sm <- diag(sign_flips, nrow = n_factor, ncol = n_factor)
         for (t in seq_len(n_time)) {
-            modgirt_rvar$bar_theta[t, , drop = TRUE] <-
-                modgirt_rvar$bar_theta[t, , drop = TRUE] %**% sm
+            modgirt_rvar$bar_theta[t, , ] <-
+                modgirt_rvar$bar_theta[t, , , drop = TRUE] %**% sm
         }
         posterior::draws_rvars(
                        lp__ = modgirt_rvar$lp__,

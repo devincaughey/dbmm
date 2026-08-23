@@ -8,11 +8,11 @@ create_counts <- function (long_data,
                            item_var = "ITEM",
                            value_var = "value",
                            weight_var = NULL) {
-    xtab_formula <- reformulate(c(time_var, unit_var, item_var, value_var))
+    xtab_formula <- stats::reformulate(c(time_var, unit_var, item_var, value_var))
     if (is.null(weight_var)) {
         weight_formula <- NULL
     } else {
-        weight_formula <- reformulate(weight_var)
+        weight_formula <- stats::reformulate(weight_var)
     }
     des <- survey::svydesign(~1, data = long_data, weights = weight_formula)
     xtab <- survey::svytable(formula = xtab_formula, design = des) 
@@ -57,7 +57,8 @@ make_vm_rvar <- function(loading_draws, n_iter, n_chain, n_factor,
     rotmat_rvar <- posterior::rvar(rotmat_array, with_chains = TRUE)
     return(rotmat_rvar)
 }
-make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
+make_sp_rvar <- function (rsp_out, n_iter, n_chain, n_factor) {
+    stopifnot(nrow(rsp_out$sign_vectors) == n_iter * n_chain)
     sp_array <- array(dim = c(n_iter, n_chain, n_factor, n_factor))
     for (i in seq_len(n_iter)) {
         for (c in seq_len(n_chain)) {
@@ -75,6 +76,20 @@ make_sp_rvar <- function(rsp_out, n_iter, n_chain, n_factor) {
     return(sp_rvar)
 }
 
+#' Maximum-leading-eigenvalue rotation criterion
+#'
+#' Rotation criterion for use with \pkg{GPArotation}, via
+#' `identify_mixfac(method = "maxvar1")`. Maximizes the leading eigenvalue of
+#' `crossprod(L)`, concentrating variance in a single dominant factor.
+#'
+#' @param L (matrix) A loadings matrix.
+#' @param ... Ignored; present for compatibility with \pkg{GPArotation}.
+#'
+#' @return A list with elements `f` (criterion value), `Gq` (gradient), and
+#'     `Method`.
+#'
+#' @keywords internal
+#' @export
 vgQ.maxvar1 <- function(L, ...) {
   L <- as.matrix(L)
   ## t(L) %*% L
@@ -110,7 +125,31 @@ whiten_matrix <- function(DM, eps = 0) {
 
   WW
 }
-rvar_whiten_matrix <- rfun(whiten_matrix)
+
+#' Whitening matrix for an `rvar` data matrix
+#'
+#' Computes the whitening matrix for each posterior draw of `DM`.
+#'
+#' @param DM (rvar) A de-meaned observations-by-variables random matrix.
+#' @param eps (non-negative real) Optional ridge added to the diagonal of the
+#'     covariance matrix before inversion.
+#' @return An `rvar` of dimension `c(p, p)` with the same draws and chains as
+#'     `DM`.
+#' @keywords internal
+#' @noRd
+rvar_whiten_matrix <- function(DM, eps = 0) {
+    stopifnot(posterior::is_rvar(DM), length(dim(DM)) == 2L)
+    a <- posterior::draws_of(DM)                 # S x n x p
+    S <- dim(a)[1L]
+    p <- dim(a)[3L]
+    out <- array(NA_real_, dim = c(S, p, p))
+    for (s in seq_len(S)) {
+        out[s, , ] <- whiten_matrix(a[s, , , drop = TRUE], eps = eps)
+    }
+    dimnames(out) <- list(NULL, dimnames(a)[[3L]], dimnames(a)[[3L]])
+    posterior::rvar(out, nchains = posterior::nchains(DM))
+}
+
 
 
 #' Build a draws_rvars object, dropping absent variables
@@ -195,4 +234,43 @@ rotate_eta_rvar <- function(eta, mat) {
         out[t, , ] <- posterior::`%**%`(E_t, mat)
     }
     out
+}
+
+check_flag <- function(x, arg = rlang::caller_arg(x), call = rlang::caller_env()) {
+    if (!is.logical(x) || length(x) != 1L || is.na(x)) {
+        cli::cli_abort(
+            "{.arg {arg}} must be {.code TRUE} or {.code FALSE}, not {.obj_type_friendly {x}}.",
+            call = call
+        )
+    }
+    as.logical(x)
+}
+
+rvar_solve <- function(A) {
+    a <- posterior::draws_of(A)
+    for (s in seq_len(dim(a)[1L])) a[s, , ] <- solve(a[s, , , drop = TRUE])
+    posterior::rvar(a, nchains = posterior::nchains(A))
+}
+
+#' Evaluate code with a temporary RNG seed
+#'
+#' @param seed (integer or `NULL`) Seed to set. If `NULL`, `code` is evaluated
+#'     with the ambient RNG state untouched.
+#' @param code Code to evaluate.
+#' @keywords internal
+with_seed <- function(seed, code) {
+    if (is.null(seed)) return(code)
+    if (!is.numeric(seed) || length(seed) != 1L || is.na(seed)) {
+        cli::cli_abort("{.arg seed} must be a single integer or {.code NULL}.")
+    }
+    has_old <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+    if (has_old) {
+        old <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+        on.exit(assign(".Random.seed", old, envir = globalenv()), add = TRUE)
+    } else {
+        on.exit(suppressWarnings(rm(".Random.seed", envir = globalenv())),
+                add = TRUE)
+    }
+    set.seed(as.integer(seed))
+    code
 }

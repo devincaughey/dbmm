@@ -2,18 +2,23 @@
 % Please edit documentation in R/3-process_draws.r
 \name{sort_mixfac}
 \alias{sort_mixfac}
-\title{order factors in a model based on sums of squared loadings}
+\title{Order factors by sums of squared loadings}
 \usage{
 sort_mixfac(x, check = TRUE)
 }
 \arguments{
-\item{mixfac_rvar}{A \code{draws_rvar} object from a mixed-factor model}
+\item{x}{A \code{mixfac_comb} object, as returned by \code{\link[=combine_types_mixfac]{combine_types_mixfac()}}.
+Must hold \code{rvar} draws, not the long format produced by
+\code{label_mixfac(make_long = TRUE)}.}
+
+\item{check}{(logical) Check the class of \code{x}? Defaults to \code{TRUE}.}
 }
 \value{
-A \code{draws_rvar} object with factors ordered by explanatory power
+A \code{mixfac_sorted} object with factors ordered by explanatory power.
+The permutation applied is recorded in the \code{"factor order"} attribute.
 }
 \description{
-This function takes a model based on posterior draws and orders the factors
-based on their estimated sums of squares. Factors with larger sums of squares
-will be placed first in the sort model.
+Reorders the latent factors so that those accounting for more variance in
+the loadings come first. This is a reparameterization: every linear
+predictor, and hence the likelihood, is unchanged.
 }

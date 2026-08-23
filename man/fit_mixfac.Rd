@@ -14,7 +14,7 @@ fit_mixfac(
   return_data = TRUE,
   n_dim = 1,
   constant_alpha = FALSE,
-  separate_eta = TRUE,
+  smooth_eta = TRUE,
   whiten_eta = TRUE,
   gen_log_lik = FALSE,
   lambda_zeros = NULL,
@@ -29,6 +29,7 @@ fit_mixfac(
   sd_sigma_eta_evol = 0.1,
   seed = NULL,
   link = "probit",
+  separate_eta = NULL,
   ...
 )
 }
@@ -69,10 +70,13 @@ constant across time periods? If \code{FALSE} (the default), the thresholds
 for a given item will be allowed to shift by a constant amount (governed
 by \code{alpha}) in each time period.}
 
-\item{separate_eta}{(logical) Should units' factor scores (\code{eta}) be assigned
-the same priors in every time period? Defaults to \code{TRUE}. If \code{FALSE}, the
-scores in each period will be given priors centered on their value in the
-previous period, thus smoothing the estimates across periods.}
+\item{smooth_eta}{(logical) Should units' factor scores (\code{eta}) be smoothed
+across time periods? Defaults to \code{TRUE}, in which case the scores in
+each period are given priors centred on their values in the previous
+period, with evolution standard deviation \code{sigma_eta_evol}. If \code{FALSE},
+each period's scores are estimated independently, no random walk is
+fitted, and \code{sigma_eta_evol}, \code{Lcorr_eta}, and a free \code{Omega} are not
+estimated.}
 
 \item{whiten_eta}{(logical) Should units' factor scores (\code{eta}) be whitened
 for identification?  Defaults to \code{TRUE}.}
@@ -135,7 +139,11 @@ for \code{sigma_eta_evol}. Defaults to \code{0.1}.}
 state of Stan’s pseudo-random number generator. Defaults to \code{123}.}
 
 \item{link}{(string) Which link function should be used for binary and
-ordinal outcomes. One of \code{"probit"} (the default) and \code{"logit"}.}
+ordinal outcomes. Currently only \code{"probit"} is supported.}
+
+\item{separate_eta}{(logical) Deprecated. Use \code{smooth_eta} instead, noting
+that the sense is reversed: \code{separate_eta = TRUE} corresponds to
+\code{smooth_eta = FALSE}.}
 
 \item{...}{Additional arguments to \code{cmdstanr::sample()}.}
 }

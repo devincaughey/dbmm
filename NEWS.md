@@ -1,4 +1,4 @@
-# dbmm (development version)
+# dbmm 0.0.1.9000
 
 ## Breaking changes
 
@@ -72,6 +72,14 @@
 * In `modgirt_probit.stan`, the transition covariance `Omega` is fixed to the
   identity and its parameters are not estimated when `T == 1`.
   
+## Improvements
+
+* `summarize_mixfac()` honours `summary_functions` for `rvar` elements and no
+  longer calls unexported posterior functions.
+* Internal whitening and matrix-inversion helpers now operate on
+  `posterior::draws_of()` arrays directly, preserving chain information for
+  convergence diagnostics.
+
 ## Bug fixes
 
 * **`Omega` was reported incorrectly.** It was computed as
@@ -224,3 +232,9 @@ unchanged.
 
 * Adds `as_draws_rvars_safe()`, which drops absent variables when
   constructing a `draws_rvars` object, and `copy_mixfac_attrs()`.
+
+## Licensing
+
+* The package is licensed under GPL-2. The repository previously contained an
+  MIT `LICENSE` file, which conflicted with the `GPL (>= 3)` declaration in
+  `DESCRIPTION`; the intended license is GPL-2.

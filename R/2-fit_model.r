@@ -219,7 +219,6 @@ fit_mixfac <- function(shaped_data,
                        separate_eta = NULL,
                        ...) {
     check_arg_type(arg = shaped_data, typename = "mixfac_data")
-
     ## Deprecated `separate_eta`, whose sense was the reverse of `smooth_eta`
     if (!is.null(separate_eta)) {
         if (!missing(smooth_eta)) {
@@ -233,26 +232,44 @@ fit_mixfac <- function(shaped_data,
                  "The sense is reversed: {.code separate_eta = TRUE} corresponds to",
                  "{.code smooth_eta = FALSE}."
              ))
-        smooth_eta <- !as.logical(separate_eta)
+        smooth_eta <- !check_flag(separate_eta)
     }
 
-    stopifnot(is.logical(smooth_eta), length(smooth_eta) == 1L,
-              !is.na(smooth_eta))
-    if (parallelize_within_chains & !is.null(threads_per_chain)) {
-        check_arg_type(arg = threads_per_chain, typename = "numeric")
-        check_arg_type(arg = chains, typename = "numeric")
+    smooth_eta               <- check_flag(smooth_eta)
+    constant_alpha           <- check_flag(constant_alpha)
+    whiten_eta               <- check_flag(whiten_eta)
+    gen_log_lik              <- check_flag(gen_log_lik)
+    parallelize_within_chains <- check_flag(parallelize_within_chains)
 
-        specified_cores <- threads_per_chain * chains
-        if (parallel::detectCores() <= specified_cores) {
-            w <- paste(
-                "The number of specified cores exceeds",
-                "the number of cores in your computer."
+    check_arg_type(arg = chains, typename = "numeric")
+
+    if (parallelize_within_chains) {
+        if (is.null(threads_per_chain) || !is.numeric(threads_per_chain) ||
+            length(threads_per_chain) != 1L || is.na(threads_per_chain) ||
+            threads_per_chain < 1) {
+            cli::cli_abort(
+                "{.arg threads_per_chain} must be a positive integer when
+                 {.code parallelize_within_chains = TRUE}."
             )
-            cli::cli_alert_warning(w)
         }
+        avail <- parallel::detectCores()
+        if (!is.na(avail) && threads_per_chain * chains > avail) {
+            cli::cli_warn(c(
+                "Requested {threads_per_chain * chains} core{?s} but only
+                 {avail} detected.",
+                "i" = "Oversubscription usually slows sampling."
+            ))
+        }
+    } else if (!is.null(threads_per_chain)) {
+        cli::cli_warn(
+            "{.arg threads_per_chain} is ignored when
+             {.code parallelize_within_chains = FALSE}."
+        )
+        threads_per_chain <- NULL
     }
 
-    stopifnot(!parallelize_within_chains || threads_per_chain > 0)
+    ## Add model options to input shaped_data
+    shaped_data$parallelize <- as.integer(parallelize_within_chains)
 
     ## Add model options to input shaped_data
     shaped_data$parallelize <- as.integer(parallelize_within_chains)

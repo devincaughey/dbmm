@@ -2,16 +2,40 @@
 % Please edit documentation in R/3-process_draws.r
 \name{identify_mixfac}
 \alias{identify_mixfac}
-\title{Exported function}
+\title{Identify mixfac model}
 \usage{
 identify_mixfac(
   x,
   method = "varimax",
   whiten = FALSE,
   ref_t = "last",
-  identify_with_type
+  identify_with_type,
+  random_starts = 0,
+  seed = 123
 )
 }
+\arguments{
+\item{x}{Either a draws_rvars object or a fitted object}
+
+\item{method}{Rotation criterion}
+
+\item{whiten}{Should \code{bar_theta} be demeaned, standardized, and made orthogonal?}
+
+\item{ref_t}{In what time period should \code{bar_theta} be whitened? May be
+an integer in 1:T, 'last', or 'mean'. The latter means that the
+within-unit averages \code{bar_theta} are whitened.}
+
+\item{random_starts}{(non-negative integer) Number of random starting
+rotations tried per draw. Defaults to \code{0}, which starts from the
+identity matrix and is deterministic. Values greater than \code{0} guard
+against local minima of the rotation criterion, at proportionate
+computational cost.}
+
+\item{seed}{(positive integer or \code{NULL}) Seed for the random starts.
+Defaults to \code{123}, making results reproducible. Ignored when
+\code{random_starts = 0}, since the rotation is then deterministic. Set to
+\code{NULL} to use the ambient random number stream.}
+}
 \description{
-Exported function
+Identify mixfac model
 }

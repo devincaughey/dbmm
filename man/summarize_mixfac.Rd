@@ -2,10 +2,15 @@
 % Please edit documentation in R/3-process_draws.r
 \name{summarize_mixfac}
 \alias{summarize_mixfac}
-\title{Exported function}
+\title{Summarize the draws from a mixfac fit}
 \usage{
 summarize_mixfac(x, summary_functions)
 }
+\arguments{
+\item{x}{mixfac draws}
+
+\item{summary_functions}{Functions for summarizing. If missing, defaults will be used.}
+}
 \description{
-Exported function
+Summarize the draws from a mixfac fit
 }
