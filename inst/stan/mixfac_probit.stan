@@ -405,7 +405,7 @@ generated quantities {
   /* In this parameterization the random walk is built directly on the
      whitened period-1 configuration, so the innovation covariance in the
      eta space *is* L_eta L_eta'. No WW rotation is applied. */
-  cov_matrix[D] Omega = multiply_lower_tri_self_transpose(L_eta);
+  matrix[D, D] Omega = multiply_lower_tri_self_transpose(L_eta);
 
   /* Per-observation log likelihood, for loo/waic. Positions run in the
      order the observations were supplied: all binary, then trichotomous,

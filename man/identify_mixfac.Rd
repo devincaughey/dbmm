@@ -11,7 +11,8 @@ identify_mixfac(
   ref_t = "last",
   identify_with_type,
   random_starts = 0,
-  seed = 123
+  seed = 123,
+  quiet = TRUE
 )
 }
 \arguments{
@@ -40,6 +41,9 @@ computational cost.}
 Defaults to \code{123}, making results reproducible. Ignored when
 \code{random_starts = 0}, since the rotation is then deterministic. Set to
 \code{NULL} to use the ambient random number stream.}
+
+\item{quiet}{(logical) Suppress the iteration log printed by
+factor.switching::rsp_exact() Defaults to \code{TRUE}.}
 }
 \description{
 Identify mixfac model

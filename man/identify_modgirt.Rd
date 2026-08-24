@@ -4,7 +4,13 @@
 \alias{identify_modgirt}
 \title{Identify MODGIRT draws}
 \usage{
-identify_modgirt(x, method = "varimax", random_starts = 0, seed = 123)
+identify_modgirt(
+  x,
+  method = "varimax",
+  random_starts = 0,
+  seed = 123,
+  quiet = TRUE
+)
 }
 \arguments{
 \item{x}{A fitted MODGIRT model object or \code{draws_rvars} object}
@@ -22,6 +28,9 @@ computational cost.}
 Defaults to \code{123}, making results reproducible. Ignored when
 \code{random_starts = 0}, since the rotation is then deterministic. Set to
 \code{NULL} to use the ambient random number stream.}
+
+\item{quiet}{(logical) Suppress the iteration log printed by
+factor.switching::rsp_exact() Defaults to \code{TRUE}.}
 }
 \value{
 A list containing the identified MODGIRT model parameters.

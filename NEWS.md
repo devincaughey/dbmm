@@ -82,6 +82,15 @@
 
 ## Bug fixes
 
+* `Omega` is now declared `matrix` rather than `cov_matrix` in the generated
+  quantities block. The positive-definiteness check on the constrained type
+  could fail numerically when the factor evolution standard deviation was
+  small — most often with `n_dim = 1`, where `Omega` is a single element —
+  which caused Stan to write `NaN` for every generated quantity in the
+  affected draws, including all of `log_lik`. The check was redundant, since
+  `multiply_lower_tri_self_transpose()` returns a positive semi-definite
+  matrix by construction.
+
 * **`Omega` was reported incorrectly.** It was computed as
   `quad_form(r_Omega, WW)`, rotating the innovation covariance by the
   period-1 whitening matrix — but the random walk is built directly on the
@@ -177,6 +186,12 @@ unchanged.
   and the unused `tob_*` data arrays, are removed from the Stan program.
 
 ## New features
+
+* `log_lik_draws()`, `loo_mixfac()`, and `loo_influential()` support
+  approximate leave-one-out cross-validation via the **loo** package.
+  Log-likelihoods can be grouped by unit-item dyad (the default), observation,
+  unit, period, item, or item type.
+
 
 * `fit_mixfac()` gains `gen_log_lik`, which adds a per-observation
   `log_lik` to the generated quantities for use with the **loo** package.

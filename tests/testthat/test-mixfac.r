@@ -481,3 +481,84 @@ test_that("sort and sign reject long-format input", {
     expect_error(sign_mixfac(lng), regexp = "rvar")
 })
 
+test_that("log_lik_draws() errors informatively without log_lik", {
+    f <- test_mixfac_fit(gen_log_lik = FALSE)
+    expect_error(log_lik_draws(f), "gen_log_lik")
+})
+
+test_that("log_lik_draws() has one column per observation", {
+    f <- test_mixfac_fit(gen_log_lik = TRUE)
+    ll <- log_lik_draws(f)
+    expect_equal(dim(ll)[3L], nrow(log_lik_index(f$shaped_data)))
+})
+
+test_that("log_lik_draws() preserves the chain structure", {
+    f <- test_mixfac_fit(gen_log_lik = TRUE)
+    expect_equal(dim(log_lik_draws(f))[2L], 2L)
+})
+
+### LOO
+
+test_that("loo_mixfac() returns a loo object", {
+    skip_if_not_installed("loo")
+    l <- loo_mixfac(test_mixfac_fit(gen_log_lik = TRUE))
+    expect_s3_class(l, "loo")
+    expect_equal(attr(l, "dbmm_group"), "dyad")          # was "observation"
+})
+
+test_that("dyad grouping has one column per unit-item pair", {
+    f <- test_mixfac_fit(gen_log_lik = TRUE)
+    idx <- log_lik_index(f$shaped_data)
+    ld <- log_lik_draws(f, group = "dyad")
+    expect_equal(
+        dim(ld)[3L],
+        dplyr::n_distinct(paste(idx$item_type, idx$item, idx$unit))
+    )
+})
+
+test_that("regrouping preserves the total log-likelihood", {
+    f <- test_mixfac_fit(gen_log_lik = TRUE)
+    tot <- function(g) sum(apply(log_lik_draws(f, group = g), c(1, 2), sum))
+    expect_equal(tot("observation"), tot("dyad"),   tolerance = 1e-10)
+    expect_equal(tot("observation"), tot("unit"),   tolerance = 1e-10)
+    expect_equal(tot("observation"), tot("period"), tolerance = 1e-10)
+})
+
+test_that("log_lik_draws() rejects unknown groupings", {
+    f <- test_mixfac_fit(gen_log_lik = TRUE)
+    expect_error(log_lik_draws(f, group = "state"))
+})
+
+test_that("loo_mixfac() errors on non-finite log-likelihoods", {
+    skip_if_not_installed("loo")
+    a <- array(rnorm(20 * 2 * 5, -1), dim = c(20, 2, 5))
+    a[3, 1, ] <- NaN
+    expect_error(check_log_lik_finite(a), "non-finite")
+})
+
+test_that("drop_nonfinite discards affected iterations with a warning", {
+    a <- array(rnorm(20 * 2 * 5, -1), dim = c(20, 2, 5))
+    a[3, 1, ] <- NaN
+    expect_warning(b <- check_log_lik_finite(a, drop = TRUE), "Discarding")
+    expect_equal(dim(b), c(19L, 2L, 5L))
+    expect_true(all(is.finite(b)))
+})
+
+test_that("check_log_lik_finite() passes clean input through unchanged", {
+    a <- array(rnorm(20 * 2 * 5, -1), dim = c(20, 2, 5))
+    expect_identical(check_log_lik_finite(a), a)
+})
+
+test_that("loo_mixfac() computes r_eff", {
+    skip_if_not_installed("loo")
+    l <- loo_mixfac(test_mixfac_fit(gen_log_lik = TRUE))
+    expect_false(anyNA(l$diagnostics$n_eff))
+})
+
+test_that("loo_influential() names the offending groups", {
+    skip_if_not_installed("loo")
+    l <- loo_mixfac(test_mixfac_fit(gen_log_lik = TRUE))
+    inf <- loo_influential(l, threshold = -Inf)
+    expect_equal(nrow(inf), length(loo::pareto_k_values(l)))
+    expect_true(all(diff(inf$pareto_k) <= 0))
+})
