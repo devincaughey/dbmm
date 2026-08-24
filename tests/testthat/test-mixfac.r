@@ -488,13 +488,13 @@ test_that("log_lik_draws() errors informatively without log_lik", {
 
 test_that("log_lik_draws() has one column per observation", {
     f <- test_mixfac_fit(gen_log_lik = TRUE)
-    ll <- log_lik_draws(f)
+    ll <- log_lik_draws(f, group = "observation")
     expect_equal(dim(ll)[3L], nrow(log_lik_index(f$shaped_data)))
 })
 
 test_that("log_lik_draws() preserves the chain structure", {
     f <- test_mixfac_fit(gen_log_lik = TRUE)
-    expect_equal(dim(log_lik_draws(f))[2L], 2L)
+    expect_equal(dim(log_lik_draws(f))[2L], posterior::nchains(f$draws))
 })
 
 ### LOO
@@ -512,7 +512,7 @@ test_that("dyad grouping has one column per unit-item pair", {
     ld <- log_lik_draws(f, group = "dyad")
     expect_equal(
         dim(ld)[3L],
-        dplyr::n_distinct(paste(idx$item_type, idx$item, idx$unit))
+        nrow(dplyr::distinct(idx, item_type, item, unit))
     )
 })
 

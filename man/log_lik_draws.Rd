@@ -21,7 +21,8 @@ from \code{x}, which requires that it was fit with \code{return_data = TRUE};
 supply it explicitly otherwise.}
 }
 \value{
-A \code{draws_array} with dimensions iteration by chain by group.
+A \code{draws_array} with dimensions iteration by chain by group. The
+grouping is recorded in the \code{"dbmm_group"} attribute.
 }
 \description{
 Extract per-observation log-likelihood draws

@@ -61,6 +61,11 @@ Models compared with \code{\link[loo:loo_compare]{loo::loo_compare()}} must be f
 observations and grouped identically. Comparing models that differ in
 \code{n_dim}, \code{smooth_eta}, or \code{constant_alpha} is valid; comparing models fit to
 different items or periods is not.
+
+Non-finite log-likelihoods are an error by default. With drop_nonfinite = TRUE
+the affected iterations are removed from every chain, so that the array stays
+rectangular; because this breaks the chain structure, r_eff is then set to 1
+rather than estimated.
 }
 \examples{
 \dontrun{

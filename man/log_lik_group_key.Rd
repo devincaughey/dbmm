@@ -4,12 +4,14 @@
 \alias{log_lik_group_key}
 \title{Group log-likelihood columns}
 \usage{
-log_lik_group_key(idx, group)
+log_lik_group_key(idx, group, call = rlang::caller_env())
 }
 \arguments{
 \item{idx}{(data frame) Output of \code{\link[=log_lik_index]{log_lik_index()}}.}
 
 \item{group}{(string) Grouping level.}
+
+\item{call}{(environment) Frame to report errors against.}
 }
 \value{
 A factor, in order of first appearance, or \code{NULL} for

@@ -9,7 +9,9 @@ check_log_lik_finite(a, drop = FALSE, call = rlang::caller_env())
 \arguments{
 \item{a}{(array) Iteration by chain by group array of log-likelihoods.}
 
-\item{drop}{(logical) Discard offending iterations rather than aborting?}
+\item{drop}{(logical) Discard offending iterations rather than aborting?
+An iteration is removed from \emph{all} chains if any chain has a non-finite
+value at that position, so that the returned array stays rectangular.}
 
 \item{call}{(environment) Frame to report errors against.}
 }

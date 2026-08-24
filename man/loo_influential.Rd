@@ -10,11 +10,11 @@ loo_influential(l, threshold = 0.7)
 \item{l}{(loo) Output of \code{\link[=loo_mixfac]{loo_mixfac()}}.}
 
 \item{threshold}{(numeric) Report groups with Pareto k above this value.
-Defaults to \code{0.7}.}
+Defaults to \code{0.7}. Groups with a missing k are always reported.}
 }
 \value{
-A data frame of group names and Pareto k values, in decreasing
-order of k.
+A data frame with columns \code{group}, \code{pareto_k}, and, where
+available, \code{elpd_loo} and \code{n_eff}, in decreasing order of k.
 }
 \description{
 Reports the groups whose Pareto k diagnostic exceeds a threshold, and so
