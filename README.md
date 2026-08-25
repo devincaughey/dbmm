@@ -1,177 +1,176 @@
----
-output: github_document
----
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-
-
-# dbmm: Dynamic Bayesian Measurement Models #
+# dbmm: Dynamic Bayesian Measurement Models
 
 <!-- badges: start -->
+
+[![Lifecycle:
+experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 <!-- badges: end -->
+
+**dbmm** estimates latent attributes that evolve over time — the policy
+liberalism of U.S. states, the ideological positions of demographic
+groups, the human rights practices of countries — from indicators that
+need not share a measurement scale. Models are written in
+[Stan](https://mc-stan.org) and fit via
+[**cmdstanr**](https://mc-stan.org/cmdstanr/).
+
+The package implements two models:
+
+- A **dynamic factor model for mixed-type indicators** (`*_mixfac()`),
+  for units observed directly on indicators that may be binary, ordinal,
+  or metric.
+- A **multidimensional ordinal dynamic group-level IRT model**
+  (`*_modgirt()`), for latent traits of groups inferred from the survey
+  responses of their individual members.
+
+Both models allow several latent dimensions, treat temporal dependence
+as a random walk in the latent space, and supply post-estimation
+identification restrictions — rotation, factor ordering, and sign
+normalization — along with helpers for labelling, summarizing, and
+cross-validating the draws.
 
 ## Installation
 
-You can install the development version of **dbmm** from [GitHub](https://github.com/) with:
+**dbmm** requires a working CmdStan installation. If you do not have
+one:
 
 ``` r
-# install.packages("devtools")
-devtools::install_github("devincaughey/dbmm")
+install.packages("cmdstanr",
+                 repos = c("https://mc-stan.org/r-packages/",
+                           getOption("repos")))
+cmdstanr::install_cmdstan()
 ```
 
-You will also need to install **cmdstanr** (for instructions, see [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
+Then:
 
-## Overview ##
+``` r
+# install.packages("pak")
+pak::pak("devincaughey/dbmm")
+```
 
-The R package **dbmm** fits dynamic Bayesian measurement models using the
-programming language [Stan](https://mc-stan.org) via the R package [**cmdstanr**](https://mc-stan.org/cmdstanr/). Currently, the only supported model is a dynamic factor (DF) model for indicators of mixed type (binary, ordinal, or metric). In the future, however, the package will incorporate other models, including the dynamic group-level item response theory (DGIRT) model currently implemented by the R package [**dgo**](https://github.com/jamesdunham/dgo).
+## Quick start
 
-## Workflow ##
+The package ships with `state_policies_2010_2012`, a panel of 111
+policies of the 50 U.S. states observed annually from 2010 through 2012.
+Most policies are binary indicators of whether a state had the policy in
+force; others are ordinal, and some are continuous, such as tax rates
+and per-pupil expenditures.
 
-Using **dbmm** involves the following steps:
+``` r
+library(dbmm)
 
-  1. *Shape* the data into the list format required by **cmdstanr**.
-  2. *Fit* the required model in Stan using.
-  3. *Extract* parameter draws from the fitted model.
-  4. If needed, *identify* the model the model by rotating and/or sign-flipping the draws.
-  5. *Check* the convergence diagnostics of the fitted model.
-  5. *Label* the draws with informative parameter names.
-  6. *Summarize* and *plot* the posterior distributions.
+data("state_policies_2010_2012")
 
-
-### Step 1: Shape data
-
-
-```r
-## Load data on societal attributes of U.S. states in 2020 and 2021
-data("social_outcomes_2020_2021")
-
-## Drop observations with missing values
-social_outcomes_2020_2021 <- na.omit(social_outcomes_2020_2021)
-
-## Shape the data into list form
-shaped_data <- shape_data(
-    long_data = social_outcomes_2020_2021,
-    unit_var = "st",                      
-    time_var = "year",                    
-    item_var = "outcome",                 
-    value_var = "value",                  
-    periods_to_estimate = 2020:2021,      
-    ordinal_items = NA,
-    binary_items = NA,
-    max_cats = 10,
-    standardize = TRUE,
-    make_indicator_for_zeros = TRUE
+shaped <- shape_mixfac(
+    long_data           = subset(state_policies_2010_2012, !is.na(value_real)),
+    unit_var            = "state_abb",
+    time_var            = "year",
+    item_var            = "policy_variable",
+    value_var           = "value_real",
+    periods_to_estimate = 2010:2012,
+    standardize         = TRUE
 )
 ```
 
-### Step 2: Fit the model
+`shape_mixfac()` classifies each item by its number of distinct values —
+here 64 binary, 24 trichotomous, 2 ordinal, and 18 metric items, with 3
+dropped for lack of variation — and reports what it did. The
+classification can be overridden with the `binary_items`,
+`trichotomous_items`, and `ordinal_items` arguments.
 
-You can specify additional arguments for `cmdstanr::sample()`. For details, see [here](https://mc-stan.org/cmdstanr/reference/model-method-sample.html).
-
-
-```r
-options(mc.cores = parallel::detectCores()) # for parallizing across chains
-fitted <- fit(
-    data = shaped_data,
-    n_dim = 2,
-    chains = 2,
-    parallelize_within_chains = FALSE,
-    constant_alpha = FALSE,
-    separate_eta = TRUE,
-    init_kappa = FALSE,
-    force_recompile = FALSE,
-    iter_warmup = 500, 
-    iter_sampling = 500,
-    adapt_delta = .9,
-    refresh = 10,
-    seed = 123
+``` r
+fitted <- fit_mixfac(
+    shaped_data     = shaped,
+    n_dim           = 2,
+    constant_alpha  = TRUE,
+    smooth_eta      = TRUE,
+    gen_log_lik     = TRUE,
+    chains          = 4,
+    parallel_chains = 4,
+    iter_warmup     = 1000,
+    iter_sampling   = 1000,
+    seed            = 123
 )
 ```
 
-### Step 3: Extract draws ###
+Arguments not listed in `?fit_mixfac` are passed through to
+**cmdstanr**’s
+[`$sample()`](https://mc-stan.org/cmdstanr/reference/model-method-sample.html)
+method.
 
+When there are two or more latent dimensions, the likelihood is
+invariant to rotation, reflection, and permutation of the factors, so
+the raw draws are not directly interpretable. **dbmm** leaves the
+sampler unconstrained and resolves the indeterminacy afterwards.
 
-```r
-fitted_draws <- extract_draws(fitted)
-head(fitted_draws)
+``` r
+draws <- extract_mixfac_draws(fitted) |>
+    identify_mixfac(method = "varimax", seed = 123) |>  # rotate and align
+    label_mixfac() |>                                  # attach labels
+    combine_types_mixfac() |>                          # stack item types
+    sort_mixfac() |>                                   # order by variance
+    sign_mixfac(signs = 1)                             # fix orientation
+
+summarize_mixfac(draws)
 ```
 
-### Step 4: Identify the model ###
+Every one of these transformations is orthogonal or a relabelling, so
+the linear predictors — and hence the likelihood — are left exactly
+unchanged.
 
+Approximate leave-one-out cross-validation is available for models fit
+with `gen_log_lik = TRUE`:
 
-```r
-identified_draws <- identify_draws(fitted_draws, rotate = TRUE)
-## (To apply varimax rotation, set `rotate = TRUE`.)
+``` r
+loo::loo_compare(
+    one_factor = loo_mixfac(fitted_1d),
+    two_factor = loo_mixfac(fitted_2d)
+)
 ```
 
-### Step 5: Check convergence of the identified model ###
+## Workflow
 
+Both models follow the same sequence of steps.
 
-```r
-## Basic check
-check_convergence(identified_draws$id_draws)
-## Traceplot of selected parameters
-bayesplot::mcmc_trace(identified_draws$id_draws, pars = "lambda_metric[23,2]")
-## More details 
-summarized_draws <- summary(identified_draws$id_draws)
-summary(summarized_draws)
+| Step               | Dynamic factor model     | Group-level IRT model          |
+|--------------------|--------------------------|--------------------------------|
+| Shape data         | `shape_mixfac()`         | `shape_modgirt()`              |
+| Fit                | `fit_mixfac()`           | `fit_modgirt()`                |
+| Extract draws      | `extract_mixfac_draws()` | *(taken from the fit)*         |
+| Identify           | `identify_mixfac()`      | `identify_modgirt()`           |
+| Label              | `label_mixfac()`         | `label_modgirt()`              |
+| Combine item types | `combine_types_mixfac()` | *(not needed)*                 |
+| Order factors      | `sort_mixfac()`          | `sort_modgirt()`               |
+| Set signs          | `sign_mixfac()`          | `sign_modgirt()`               |
+| Summarize          | `summarize_mixfac()`     | `posterior::summarise_draws()` |
+| Cross-validate     | `loo_mixfac()`           | —                              |
+
+`identify_mixfac()` and `identify_modgirt()` apply a varimax rotation
+and a signed permutation to each posterior draw; `rotate_modgirt()`
+applies a rotation of your own choosing instead.
+
+## Learn more
+
+``` r
+vignette("mixfac", package = "dbmm")   # dynamic factor model, mixed indicators
+vignette("modgirt", package = "dbmm")  # group-level IRT from survey data
 ```
 
-### Step 6: Label parameters ###
+## Status
 
+**dbmm** is experimental. The interface may change without a deprecation
+cycle, and not every function is documented to the standard we would
+like. Bug reports and questions are welcome at
+<https://github.com/devincaughey/dbmm/issues>.
 
-```r
-labeled_draws <- label_draws(identified_draws)
-head(labeled_draws$eta)
-head(labeled_draws$lambda_metric)
+## Citation
+
+``` r
+citation("dbmm")
 ```
 
-### Step 7: Summarizing and plotting the posterior draws
+## License
 
-
-```r
-library(tidyverse)
-
-## Posterior mean and standard deviation of the factor scores and item loadings
-eta_summ <- labeled_draws$eta %>%
-    summarise(
-        est = mean(value),
-        err = sd(value),
-        .by = c(TIME, UNIT, dim)
-    )
-head(eta_summ)
-lambda_metric_summ <- labeled_draws$lambda_metric %>%
-    summarise(
-        est = mean(value),
-        err = sd(value),
-        .by = c(ITEM, dim)
-    )
-head(lambda_metric_summ)
-
-## Plot item loadings
-lambda_metric_summ %>%
-    pivot_wider(
-        id_cols = "ITEM",
-        names_from = "dim",
-        values_from = c("est", "err")
-    ) %>%
-    ggplot() +
-    aes(x = est_1, y = est_2, label = ITEM) +
-    geom_vline(xintercept = 0, linetype = "dotted") +
-    geom_hline(yintercept = 0, linetype = "dotted") +
-    geom_point() +
-    geom_linerange(
-        aes(xmin = est_1 - 1.96*err_1, xmax = est_1 + 1.96*err_1),
-        alpha = 1/4, linewidth = 2
-    ) +
-    geom_linerange(
-        aes(ymin = est_2 - 1.96*err_2, ymax = est_2 + 1.96*err_2),
-        alpha = 1/4, linewidth = 2
-    ) +
-    ggrepel::geom_text_repel() +
-    labs(title = "Item Loadings") +
-    coord_fixed()
-```
-
+GPL (\>= 2)

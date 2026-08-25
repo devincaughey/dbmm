@@ -35,7 +35,7 @@ Imports:
     stats,
     stringr (>= 1.5.0),
     survey,
-    tidyr (>= 1.0.0),
+    tidyr (>= 1.3),
     utils
 Suggests:
     bayesplot,
@@ -43,7 +43,9 @@ Suggests:
     loo,
     rmarkdown,
     testthat (>= 3.0.0),
-    withr
+    withr,
+    ggrepel,
+    ggplot2
 Additional_repositories: https://mc-stan.org/r-packages/
 VignetteBuilder: knitr
 Config/testthat/edition: 3

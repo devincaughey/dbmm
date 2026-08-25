@@ -1,20 +1,20 @@
 ## ------------------------------------------------------------- fixture ----
 
 test_that("the test fixture covers all four item types", {
-    sdat <- test_shaped_data()
-    expect_identical(sdat$I_binary, 2L)
-    expect_identical(sdat$I_trichot, 1L)
+    sdat <- test_mixfac_shaped_data()
+    expect_identical(sdat$I_binary, 4L)
+    expect_identical(sdat$I_trichot, 2L)
     expect_identical(sdat$I_ordinal, 1L)
-    expect_gt(sdat$I_metric, 20L)
-    expect_identical(sdat$K_ordinal, 5L)
-    expect_identical(sdat$J, 50L)
-    expect_identical(sdat$T, 2L)
+    expect_identical(sdat$I_metric, 3L)
+    expect_gt(sdat$K_ordinal, 3L)
+    expect_identical(sdat$J, 20L)
+    expect_identical(sdat$T, 3L)
 })
 
 ## --------------------------------------------------------------- shape ----
 
 test_that("shape_mixfac() returns a mixfac_data object with expected structure", {
-    sdat <- test_shaped_data()
+    sdat <- test_mixfac_shaped_data()
     expect_s3_class(sdat, "mixfac_data")
     expect_true(all(c("J", "T", "N_binary", "I_binary", "N_trichot",
                       "I_trichot", "N_ordinal", "I_ordinal", "K_ordinal",
@@ -42,7 +42,7 @@ test_that("shape_mixfac() returns a mixfac_data object with expected structure",
 })
 
 test_that("shape_mixfac() codes outcomes as Stan expects", {
-    sdat <- test_shaped_data()
+    sdat <- test_mixfac_shaped_data()
     ## binary outcomes are 0/1; ordinal and trichotomous are 1-based
     expect_true(all(sdat$yy_binary %in% c(0L, 1L)))
     expect_identical(min(sdat$yy_trichot), 1L)
@@ -55,17 +55,18 @@ test_that("shape_mixfac() codes outcomes as Stan expects", {
 
 test_that("shape_mixfac() accepts item-type vectors of length > 1", {
     ## Regression: `if (is.na(binary_items))` errored on vectors in R >= 4.2
-    long <- test_long_data()
+    long <- test_mixfac_long_data()
+    two_binary <- utils::head(attr(test_mixfac_shaped_data(), "binary_item_labels"), 2)
     expect_no_error(suppressMessages(
-        shape_mixfac(long, "st", "year", "outcome", "value",
-                     binary_items = c("d_binary1", "d_binary2"),
+        shape_mixfac(long, "state_abb", "year", "policy_variable", "value_real",
+                     binary_items = two_binary,
                      make_indicator_for_zeros = FALSE,
-                     periods_to_estimate = 2020:2021)
+                     periods_to_estimate = 2010:2012)
     ))
 })
 
 test_that("log_lik_index() rows match the total observation count", {
-    sdat <- test_shaped_data()
+    sdat <- test_mixfac_shaped_data()
     idx <- log_lik_index(sdat)
     n_tot <- sum(sdat$N_binary, sdat$N_trichot, sdat$N_ordinal, sdat$N_metric)
     expect_identical(nrow(idx), n_tot)
@@ -82,7 +83,7 @@ test_that("log_lik_index() rows match the total observation count", {
 
 test_that("fit_mixfac() rejects unsupported links", {
     expect_error(
-        fit_mixfac(test_shaped_data(), link = "logit"),
+        fit_mixfac(test_mixfac_shaped_data(), link = "logit"),
         regexp = "probit"
     )
 })
@@ -119,7 +120,7 @@ test_that("smooth_eta defaults to TRUE", {
 
 test_that("deprecated separate_eta maps to the reverse of smooth_eta", {
     skip_if_no_cmdstan()
-    sdat <- test_shaped_data()
+    sdat <- test_mixfac_shaped_data()
     expect_warning(
         out <- suppressMessages(fit_mixfac(
             sdat, n_dim = 1, chains = 1, iter_warmup = 50,
@@ -135,34 +136,30 @@ test_that("deprecated separate_eta maps to the reverse of smooth_eta", {
 
 test_that("supplying both smooth_eta and separate_eta is an error", {
     expect_error(
-        fit_mixfac(test_shaped_data(), smooth_eta = TRUE, separate_eta = FALSE),
+        fit_mixfac(test_mixfac_shaped_data(), smooth_eta = TRUE, separate_eta = FALSE),
         regexp = "not both"
     )
 })
 
-test_that("intercept deviates are estimated only when identified (P3)", {
-    ## constant_alpha = TRUE: no alpha random walk
+test_that("intercept deviates are estimated only when identified", {
+    sdat <- test_mixfac_shaped_data()
     d_const <- extract_mixfac_draws(test_mixfac_fit(constant_alpha = TRUE),
                                     drop = "^nothing$")
     expect_false("sigma_alpha_evol" %in% names(d_const))
     expect_false("z_alpha_trichot" %in% names(d_const))
     expect_false("z_alpha_ordinal" %in% names(d_const))
-    ## one period of binary and metric deviates only
-    expect_identical(dim(d_const$z_alpha_binary), c(1L, 2L))
+    expect_identical(dim(d_const$z_alpha_binary), c(1L, sdat$I_binary))
     expect_identical(dim(d_const$z_alpha_metric)[1], 1L)
-    ## intercepts are nonetheless full [T, I] and constant across periods
     a <- posterior::E(d_const$alpha_binary)
-    expect_identical(nrow(a), 2L)
-    expect_equal(a[1, ], a[2, ], ignore_attr = TRUE)
-    ## trichotomous and ordinal intercepts are pinned to zero
+    expect_identical(nrow(a), sdat$T)
+    for (t in 2:sdat$T) expect_equal(a[1, ], a[t, ], ignore_attr = TRUE)
     expect_true(all(abs(posterior::E(d_const$alpha_trichot)) < 1e-12))
     expect_true(all(abs(posterior::E(d_const$alpha_ordinal)) < 1e-12))
 
-    ## constant_alpha = FALSE: drift is estimated
     d_drift <- extract_mixfac_draws(test_mixfac_fit(constant_alpha = FALSE),
                                     drop = "^nothing$")
     expect_true("sigma_alpha_evol" %in% names(d_drift))
-    expect_identical(dim(d_drift$z_alpha_binary), c(2L, 2L))
+    expect_identical(dim(d_drift$z_alpha_binary), c(sdat$T, sdat$I_binary))
 })
 
 test_that("extract_mixfac_draws() drops internal variables by default", {
@@ -179,7 +176,7 @@ test_that("extract_mixfac_draws() drops internal variables by default", {
 })
 
 test_that("draws have the dimensions implied by the data", {
-    sdat <- test_shaped_data()
+    sdat <- test_mixfac_shaped_data()
     d <- extract_mixfac_draws(test_mixfac_fit(n_dim = 2))
     expect_identical(dim(d$eta), c(sdat$T, sdat$J, 2L))
     expect_identical(dim(d$lambda_binary), c(sdat$I_binary, 2L))
@@ -191,7 +188,7 @@ test_that("draws have the dimensions implied by the data", {
 })
 
 test_that("gen_log_lik = TRUE returns one log_lik element per observation (P6)", {
-    sdat <- test_shaped_data()
+    sdat <- test_mixfac_shaped_data()
     d <- extract_mixfac_draws(test_mixfac_fit(gen_log_lik = TRUE))
     expect_true("log_lik" %in% names(d))
     expect_length(d$log_lik, nrow(log_lik_index(sdat)))
@@ -232,7 +229,7 @@ test_that("the identify -> label -> combine pipeline runs and preserves labels",
         expect_true(all(c("eta", "lambda", "alpha") %in% names(cmb)))
         expect_false(is.null(attr(cmb, "time_labels")))
         ## combined lambda stacks every item type
-        sdat <- test_shaped_data()
+        sdat <- test_mixfac_shaped_data()
         expect_identical(dim(cmb$lambda)[1],
                          sum(sdat$I_binary, sdat$I_trichot,
                              sdat$I_ordinal, sdat$I_metric))
@@ -373,7 +370,7 @@ test_that("whitening works with a single factor", {
 ## ------------------------------------------------------- sort and sign ----
 
 test_that("sort_mixfac() orders factors by sum of squared loadings", {
-    srt <- sort_mixfac(test_comb(n_dim = 2))
+    srt <- sort_mixfac(test_mixfac_comb(n_dim = 2))
     ss <- posterior::E(posterior::rvar_apply(
         srt$lambda, 2, function(y) posterior::rvar_sum(y^2)
     ))
@@ -385,7 +382,7 @@ test_that("sort_mixfac() orders factors by sum of squared loadings", {
 })
 
 test_that("sort_mixfac() and sign_mixfac() retain the thresholds", {
-    cmb <- test_comb()
+    cmb <- test_mixfac_comb()
     for (fn in list(sort_mixfac, sign_mixfac)) {
         out <- fn(cmb)
         expect_true(all(c("kappa_trichot", "kappa_ordinal") %in% names(out)))
@@ -399,7 +396,7 @@ test_that("sort_mixfac() and sign_mixfac() retain the thresholds", {
 })
 
 test_that("sort_mixfac() and sign_mixfac() retain the label attributes", {
-    cmb <- test_comb()
+    cmb <- test_mixfac_comb()
     for (fn in list(sort_mixfac, sign_mixfac)) {
         out <- fn(cmb)
         expect_identical(attr(out, "unit_labels"), attr(cmb, "unit_labels"))
@@ -410,7 +407,7 @@ test_that("sort_mixfac() and sign_mixfac() retain the label attributes", {
 })
 
 test_that("sorting and signing leave every linear predictor invariant", {
-    cmb <- test_comb()
+    cmb <- test_mixfac_comb()
     n_item <- dim(cmb$lambda)[1]
     srt <- sort_mixfac(cmb)
     sgn <- sign_mixfac(cmb)
@@ -427,13 +424,13 @@ test_that("sorting and signing leave every linear predictor invariant", {
 })
 
 test_that("sorting and signing leave lp__ unchanged", {
-    cmb <- test_comb()
+    cmb <- test_mixfac_comb()
     expect_equal(posterior::E(sort_mixfac(cmb)$lp__), posterior::E(cmb$lp__))
     expect_equal(posterior::E(sign_mixfac(cmb)$lp__), posterior::E(cmb$lp__))
 })
 
 test_that("sign_mixfac() produces the requested loading signs", {
-    cmb <- test_comb()
+    cmb <- test_mixfac_comb()
     pos <- sign_mixfac(cmb, signs = 1)
     expect_true(all(colMeans(posterior::E(pos$lambda)) > 0))
     neg <- sign_mixfac(cmb, signs = -1)
@@ -445,13 +442,13 @@ test_that("sign_mixfac() produces the requested loading signs", {
 })
 
 test_that("sign_mixfac() validates its signs argument", {
-    cmb <- test_comb()
+    cmb <- test_mixfac_comb()
     expect_error(sign_mixfac(cmb, signs = 0), regexp = "signs")
     expect_error(sign_mixfac(cmb, signs = c(1, -1, 1)))
 })
 
 test_that("sort and sign work with a single factor", {
-    cmb1 <- test_comb(n_dim = 1)
+    cmb1 <- test_mixfac_comb(n_dim = 1)
     expect_no_error(srt <- sort_mixfac(cmb1))
     expect_identical(dim(srt$eta)[3], 1L)
     expect_identical(dim(srt$lambda)[2], 1L)
@@ -461,7 +458,7 @@ test_that("sort and sign work with a single factor", {
 })
 
 test_that("sort and sign compose", {
-    cmb <- test_comb()
+    cmb <- test_mixfac_comb()
     out <- sign_mixfac(sort_mixfac(cmb))
     expect_s3_class(out, "mixfac_signed")
     expect_s3_class(out, "mixfac_sorted")
@@ -494,16 +491,29 @@ test_that("log_lik_draws() has one column per observation", {
 
 test_that("log_lik_draws() preserves the chain structure", {
     f <- test_mixfac_fit(gen_log_lik = TRUE)
-    expect_equal(dim(log_lik_draws(f))[2L], posterior::nchains(f$draws))
+    expect_equal(dim(log_lik_draws(f))[2L], f$fit$num_chains())
 })
 
 ### LOO
 
 test_that("loo_mixfac() returns a loo object", {
     skip_if_not_installed("loo")
-    l <- loo_mixfac(test_mixfac_fit(gen_log_lik = TRUE))
+    l <- test_mixfac_loo()
     expect_s3_class(l, "loo")
-    expect_equal(attr(l, "dbmm_group"), "dyad")          # was "observation"
+    expect_equal(attr(l, "dbmm_group"), "dyad")
+})
+
+test_that("loo_mixfac() computes r_eff", {
+    skip_if_not_installed("loo")
+    expect_false(anyNA(test_mixfac_loo()$diagnostics$n_eff))
+})
+
+test_that("loo_influential() names the offending groups", {
+    skip_if_not_installed("loo")
+    l <- test_mixfac_loo()
+    inf <- loo_influential(l, threshold = -Inf)
+    expect_equal(nrow(inf), length(loo::pareto_k_values(l)))
+    expect_false(is.unsorted(rev(inf$pareto_k)))
 })
 
 test_that("dyad grouping has one column per unit-item pair", {
@@ -547,18 +557,4 @@ test_that("drop_nonfinite discards affected iterations with a warning", {
 test_that("check_log_lik_finite() passes clean input through unchanged", {
     a <- array(rnorm(20 * 2 * 5, -1), dim = c(20, 2, 5))
     expect_identical(check_log_lik_finite(a), a)
-})
-
-test_that("loo_mixfac() computes r_eff", {
-    skip_if_not_installed("loo")
-    l <- loo_mixfac(test_mixfac_fit(gen_log_lik = TRUE))
-    expect_false(anyNA(l$diagnostics$n_eff))
-})
-
-test_that("loo_influential() names the offending groups", {
-    skip_if_not_installed("loo")
-    l <- loo_mixfac(test_mixfac_fit(gen_log_lik = TRUE))
-    inf <- loo_influential(l, threshold = -Inf)
-    expect_equal(nrow(inf), length(loo::pareto_k_values(l)))
-    expect_true(all(diff(inf$pareto_k) <= 0))
 })

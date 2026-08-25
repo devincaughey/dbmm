@@ -397,10 +397,12 @@ label_mixfac <- function (x, make_long = FALSE) {
             item = attr(x, "metric_item_labels")
         )
     }
-    dimnames(x$Omega) <- list(
-        factor = 1:n_factor,
-        factor = 1:n_factor
-    )
+    if (!is.null(x$Omega)) {
+        dimnames(x$Omega) <- list(
+            factor = 1:n_factor,
+            factor = 1:n_factor
+        )
+    }
     dimnames(x$eta) <- list(
         period = attr(x, "time_labels"),
         unit = attr(x, "unit_labels"),

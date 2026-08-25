@@ -1,64 +1,50 @@
 ## Shared fixtures for mixfac tests. Fitting is slow, so each configuration is
 ## fit at most once per test run and cached in this environment.
 
-skip_if_no_cmdstan <- function() {
-    testthat::skip_if_not_installed("cmdstanr")
-    ok <- tryCatch(!is.null(cmdstanr::cmdstan_version()),
-                   error = function(e) FALSE)
-    testthat::skip_if_not(ok, "CmdStan not available")
+## state_policies_2010_2012 contains binary, ordinal, and continuous policies,
+## so no discretization is needed to exercise the mixed-type code paths. Only a
+## handful of items per type are kept, since fitting all 111 would make the
+## test suite far too slow.
+test_mixfac_long_data <- function(periods = 2010:2012,
+                                  n_per_type = c(binary = 4, trichot = 2,
+                                                 ordinal = 1, metric = 3),
+                                  n_units = 20) {
+    data("state_policies_2010_2012", package = "dbmm", envir = environment())
+    d <- state_policies_2010_2012
+    d <- d[d$year %in% periods & !is.na(d$value_real), ]
+
+    ## A subset of states keeps the fixture fast; alphabetical for determinism
+    d <- d[d$state_abb %in% utils::head(sort(unique(d$state_abb)), n_units), ]
+
+    ## Classify exactly as shape_mixfac() does, on the subset actually used
+    n_u <- tapply(d$value_real, d$policy_variable,
+                  function(x) length(unique(x)))
+    type_of <- cut(n_u, breaks = c(0, 1, 2, 3, 10, Inf),
+                   labels = c("dropped", "binary", "trichot",
+                              "ordinal", "metric"))
+    names(type_of) <- names(n_u)
+
+    pick <- unlist(lapply(names(n_per_type), function(ty) {
+        cand <- names(type_of)[!is.na(type_of) & type_of == ty]
+        ## Fewest categories first: each extra ordinal level costs a threshold
+        cand <- cand[order(n_u[cand], cand)]
+        if (length(cand) < n_per_type[[ty]]) {
+            stop("Only ", length(cand), " ", ty, " item(s) available in the ",
+                 "fixture; ", n_per_type[[ty]], " requested.")
+        }
+        utils::head(cand, n_per_type[[ty]])
+    }), use.names = FALSE)
+
+    d[d$policy_variable %in% pick, ]
 }
 
-## social_outcomes_2020_2021 is long (st, year, outcome, value) and every item
-## is continuous, so on its own it exercises only the metric code path. Four
-## items are replaced by discretized versions -- two binary, one trichotomous,
-## one five-category ordinal -- so that the binary, trichotomous, and ordinal
-## paths (and hence kappa_trichot and kappa_ordinal) are covered.
-test_long_data <- function(periods = 2020:2021) {
-    data("social_outcomes_2020_2021", package = "dbmm", envir = environment())
-    long <- social_outcomes_2020_2021
-    long <- long[long$year %in% periods & !is.na(long$value), ]
-
-    src <- c(binary1 = "x_overall_health",
-             binary2 = "x_employment_rate",
-             trichot = "x_gini_posttax",
-             ordinal = "x_state_co2")
-    n_cat <- c(binary1 = 2L, binary2 = 2L, trichot = 3L, ordinal = 5L)
-    stopifnot(all(src %in% long$outcome))
-
-    ## Quantile-based cuts, so no bin is empty for skewed items
-    qcut <- function(x, k) {
-        br <- stats::quantile(x, probs = seq(0, 1, length.out = k + 1),
-                              na.rm = TRUE, names = FALSE)
-        stopifnot(!anyDuplicated(br))
-        br[1] <- -Inf
-        br[length(br)] <- Inf
-        as.integer(cut(x, breaks = br, include.lowest = TRUE))
-    }
-
-    derived <- list()
-    for (nm in names(src)) {
-        d <- long[long$outcome == src[[nm]], ]
-        d$value <- qcut(d$value, n_cat[[nm]])
-        d$outcome <- paste0("d_", nm)
-        ## Fail loudly here rather than mysteriously in shape_mixfac()
-        stopifnot(length(unique(d$value)) == n_cat[[nm]])
-        derived[[nm]] <- d
-    }
-
-    long <- long[!long$outcome %in% src, ]
-    do.call(rbind, c(list(long), derived))
-}
-
-## make_indicator_for_zeros = FALSE for determinism: several outcomes are rates
-## that may include zeros, which would otherwise spawn unpredictable "_zi"
-## binary items and set the corresponding metric observations to missing.
-test_shaped_data <- function(periods = 2020:2021) {
+test_mixfac_shaped_data <- function(periods = 2010:2012) {
     suppressMessages(shape_mixfac(
-        long_data = test_long_data(periods),
-        unit_var = "st",
+        long_data = test_mixfac_long_data(periods),
+        unit_var = "state_abb",
         time_var = "year",
-        item_var = "outcome",
-        value_var = "value",
+        item_var = "policy_variable",
+        value_var = "value_real",
         standardize = TRUE,
         make_indicator_for_zeros = FALSE,
         periods_to_estimate = periods
@@ -66,21 +52,22 @@ test_shaped_data <- function(periods = 2020:2021) {
 }
 
 ## Cache keyed on the flag settings that matter for the patches under test.
-.fit_cache <- new.env(parent = emptyenv())
+.mixfac_cache <- new.env(parent = emptyenv())
 
 test_mixfac_fit <- function(smooth_eta = TRUE,
                      constant_alpha = TRUE,
                      gen_log_lik = FALSE,
                      n_dim = 2,
-                     periods = 2020:2021) {
+                     periods = 2010:2012) {
     key <- paste(smooth_eta, constant_alpha, gen_log_lik, n_dim,
                  min(periods), max(periods), sep = "_")
-    if (!is.null(.fit_cache[[key]])) return(.fit_cache[[key]])
+    if (!is.null(.mixfac_cache[[key]])) return(.mixfac_cache[[key]])
     skip_if_no_cmdstan()
     out <- suppressMessages(fit_mixfac(
-        shaped_data = test_shaped_data(periods),
+        shaped_data = test_mixfac_shaped_data(periods),
         n_dim = n_dim,
         chains = 2,
+        parallel_chains = 2,
         iter_warmup = 200,
         iter_sampling = 200,
         smooth_eta = smooth_eta,
@@ -89,7 +76,7 @@ test_mixfac_fit <- function(smooth_eta = TRUE,
         refresh = 0,
         seed = 123
     ))
-    .fit_cache[[key]] <- out
+    .mixfac_cache[[key]] <- out
     out
 }
 
@@ -121,12 +108,23 @@ nu_cell_comb <- function(o, t = 1, j = 1, i = 1) {
 }
 
 ## Fully processed combined object, cached
-test_comb <- function(n_dim = 2) {
+test_mixfac_comb <- function(n_dim = 2) {
     key <- paste0("comb_", n_dim)
-    if (!is.null(.fit_cache[[key]])) return(.fit_cache[[key]])
+    if (!is.null(.mixfac_cache[[key]])) return(.mixfac_cache[[key]])
     d <- extract_mixfac_draws(test_mixfac_fit(n_dim = n_dim))
     out <- combine_types_mixfac(label_mixfac(identify_mixfac(d)))
-    .fit_cache[[key]] <- out
+    .mixfac_cache[[key]] <- out
     out
 }
 
+test_mixfac_loo <- function(group = "dyad") {
+    key <- paste0("loo_", group)
+    if (!is.null(.mixfac_cache[[key]])) return(.mixfac_cache[[key]])
+    ## Elevated Pareto k is expected: each dyad bundles several observations
+    ## and the fixture has few draws
+    out <- suppressWarnings(
+        loo_mixfac(test_mixfac_fit(gen_log_lik = TRUE), group = group)
+    )
+    .mixfac_cache[[key]] <- out
+    out
+}
