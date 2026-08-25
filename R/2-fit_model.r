@@ -15,8 +15,78 @@
 #' @param nonzero_loadings The nonzero loadings matrix.
 #' @param link The link function to use (default is "probit").
 #' @param seed The random seed for reproducibility.
+#' @param shape_lkj_theta (positive real) Shape of the LKJ prior on the
+#'     within-group correlation of `theta`. `1` is uniform over correlation
+#'     matrices; larger values shrink toward zero correlation. Defaults to
+#'     `2`. See Details.
+#' @param shape_lkj_bar_theta_evol (positive real) Shape of the LKJ prior on
+#'     the correlation of the random-walk innovations in `bar_theta`.
+#'     Defaults to `2`. See Details.
+#' @param df_sd_theta (positive real) Degrees of freedom of the half
+#'     Student's t prior on `sd_theta`, the within-group standard deviations
+#'     of `theta` in each latent dimension. Defaults to `4`. Set to `1` to
+#'     recover the half Cauchy prior used in earlier versions; larger values
+#'     shrink the tail and, with it, the sampler's excursions into extreme
+#'     within-group dispersions that the data cannot rule out.
+#' @param scale_sd_theta (positive real) Scale of the half Student's t prior
+#'     on `sd_theta`. Defaults to `1`. Because period-1 group means are
+#'     whitened, the between-group standard deviation is fixed at 1 in every
+#'     dimension, so this default places the within-group dispersion of
+#'     `theta` on the same scale as the dispersion between groups.
+#' @param df_sd_bar_theta_evol (positive real) Degrees of freedom of the half
+#'     Student's t prior on `sd_bar_theta_evol`, the standard deviations of
+#'     the random-walk innovations in `bar_theta`. Defaults to `4`. Ignored
+#'     when `T == 1`, since there is then no transition to inform it.
+#' @param scale_sd_bar_theta_evol (positive real) Scale of the half Student's
+#'     t prior on `sd_bar_theta_evol`. Defaults to `0.1`, which shrinks the
+#'     group means toward being constant over time: on the whitened scale of
+#'     period 1, an innovation standard deviation of `0.1` moves a group by
+#'     roughly a tenth of the between-group spread from one period to the
+#'     next. Ignored when `T == 1`.
 #' @param ... Additional arguments to be passed to the Stan sampling function.
 #'
+#' @details
+#' # Regularizing the latent covariances
+#'
+#' `Sigma_theta`, the within-group covariance of `theta`, enters the
+#' likelihood only through the scalars \eqn{\beta_q' \Sigma_\theta \beta_q},
+#' one per item. Its off-diagonal elements are therefore informed only by
+#' items that load on more than one dimension, and are weakly identified in
+#' most applications. Some shrinkage toward zero correlation is usually
+#' advisable, which is what `shape_lkj_theta` controls.
+#'
+#' Two subtleties are worth knowing before raising it well above its default.
+#'
+#' First, zero correlation is a property of the basis, not of the covariance
+#' operator. A matrix that is diagonal in one orthogonal basis is not
+#' diagonal in another unless its variances happen to be equal. Shrinking
+#' correlations toward zero therefore expresses a mild preference for the
+#' basis in which `Sigma_theta` is diagonal — that is, for its eigenbasis,
+#' or equivalently the principal components of the within-group dispersion
+#' of `theta`. At the default value this preference is negligible relative
+#' to the likelihood; it becomes appreciable only for shape parameters an
+#' order of magnitude larger.
+#'
+#' Second, that preferred basis is not the one you end up reporting.
+#' [identify_modgirt()] rotates the draws to a varimax solution defined by
+#' the sparsity of the loadings, which is a different criterion. The prior
+#' consequently affects where the sampler explores, and hence how well it
+#' mixes, more than it affects the identified estimates. Because
+#' identification maps \eqn{\Sigma_\theta \to R' \Sigma_\theta R}, the
+#' reported `Sigma_theta` should not be expected to look near-diagonal even
+#' under strong shrinkage.
+#'
+#' If you want regularization that is genuinely indifferent to rotation, the
+#' target is sphericity (\eqn{\sigma^2 I}) rather than diagonality: shrink
+#' the elements of `sd_theta` toward a common value, via `df_sd_theta` and
+#' `scale_sd_theta`, as well as shrinking the correlations.
+#' 
+#' Both scale defaults are interpretable because the period-1 group means are
+#' de-meaned and whitened, which fixes the between-group covariance of
+#' `bar_theta` to the identity. Latent distances are therefore measured in
+#' units of the period-1 between-group standard deviation, and priors on
+#' `sd_theta` and `sd_bar_theta_evol` can be set on that common scale.
+#' 
 #' @return A list containing the model fit and optionally the input data.
 #'
 #' @export
@@ -30,6 +100,12 @@ fit_modgirt <- function(
     nonzero_loadings,
     link = "probit",
     seed = NULL,
+    shape_lkj_theta = 2,
+    shape_lkj_bar_theta_evol = 2,
+    df_sd_theta = 4,
+    scale_sd_theta = 1,
+    df_sd_bar_theta_evol = 4,
+    scale_sd_bar_theta_evol = 0.1,
     ...
 ) {
     n_item <- stan_data$Q
@@ -54,6 +130,12 @@ fit_modgirt <- function(
     stan_data$D <- n_factor
     stan_data$beta_nonzero <- nonzero_loadings
     stan_data$beta_sign <- signed_loadings
+    stan_data$shape_lkj_theta <- shape_lkj_theta
+    stan_data$shape_lkj_bar_theta_evol <- shape_lkj_bar_theta_evol
+    stan_data$df_sd_theta <- df_sd_theta
+    stan_data$scale_sd_theta <- scale_sd_theta
+    stan_data$df_sd_bar_theta_evol <- df_sd_bar_theta_evol
+    stan_data$scale_sd_bar_theta_evol <- scale_sd_bar_theta_evol
     file <- system.file(
         paste0("stan/modgirt_", link, ".stan"),
         package = "dbmm"
@@ -78,7 +160,7 @@ fit_modgirt <- function(
 make_mixfac_out <- function(fit, shaped_data, return_data = TRUE) {
     if (missing(fit)) stop("`fit` is required.")
     if (missing(shaped_data)) stop("`shaped_data` is required.")
-    fit <- copy_mixfac_attrs(fit, shaped_data)
+    fit <- copy_dbmm_attrs(fit, shaped_data)
     out <- list(fit = fit)
     if (isTRUE(return_data)) {
         out$shaped_data <- shaped_data

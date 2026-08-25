@@ -223,9 +223,6 @@ copy_dbmm_attrs <- function(to, from) {
     to
 }
 
-#' @keywords internal
-copy_mixfac_attrs <- function(to, from) copy_dbmm_attrs(to, from)
-
 #' Right-multiply each period's factor-score matrix by a D-by-D matrix
 #'
 #' `eta` is `[T, J, D]`. Indexing with `drop = TRUE` collapses the factor

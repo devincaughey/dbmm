@@ -14,6 +14,12 @@ fit_modgirt(
   nonzero_loadings,
   link = "probit",
   seed = NULL,
+  shape_lkj_theta = 2,
+  shape_lkj_bar_theta_evol = 2,
+  df_sd_theta = 4,
+  scale_sd_theta = 1,
+  df_sd_bar_theta_evol = 4,
+  scale_sd_bar_theta_evol = 0.1,
   ...
 )
 }
@@ -38,6 +44,40 @@ recompilation of the Stan model (default is FALSE).}
 
 \item{seed}{The random seed for reproducibility.}
 
+\item{shape_lkj_theta}{(positive real) Shape of the LKJ prior on the
+within-group correlation of \code{theta}. \code{1} is uniform over correlation
+matrices; larger values shrink toward zero correlation. Defaults to
+\code{2}. See Details.}
+
+\item{shape_lkj_bar_theta_evol}{(positive real) Shape of the LKJ prior on
+the correlation of the random-walk innovations in \code{bar_theta}.
+Defaults to \code{2}. See Details.}
+
+\item{df_sd_theta}{(positive real) Degrees of freedom of the half
+Student's t prior on \code{sd_theta}, the within-group standard deviations
+of \code{theta} in each latent dimension. Defaults to \code{4}. Set to \code{1} to
+recover the half Cauchy prior used in earlier versions; larger values
+shrink the tail and, with it, the sampler's excursions into extreme
+within-group dispersions that the data cannot rule out.}
+
+\item{scale_sd_theta}{(positive real) Scale of the half Student's t prior
+on \code{sd_theta}. Defaults to \code{1}. Because period-1 group means are
+whitened, the between-group standard deviation is fixed at 1 in every
+dimension, so this default places the within-group dispersion of
+\code{theta} on the same scale as the dispersion between groups.}
+
+\item{df_sd_bar_theta_evol}{(positive real) Degrees of freedom of the half
+Student's t prior on \code{sd_bar_theta_evol}, the standard deviations of
+the random-walk innovations in \code{bar_theta}. Defaults to \code{4}. Ignored
+when \code{T == 1}, since there is then no transition to inform it.}
+
+\item{scale_sd_bar_theta_evol}{(positive real) Scale of the half Student's
+t prior on \code{sd_bar_theta_evol}. Defaults to \code{0.1}, which shrinks the
+group means toward being constant over time: on the whitened scale of
+period 1, an innovation standard deviation of \code{0.1} moves a group by
+roughly a tenth of the between-group spread from one period to the
+next. Ignored when \code{T == 1}.}
+
 \item{...}{Additional arguments to be passed to the Stan sampling function.}
 }
 \value{
@@ -47,3 +87,44 @@ A list containing the model fit and optionally the input data.
 This function fits a MODGIRT model using Stan.
 It takes in the following arguments:
 }
+\section{Regularizing the latent covariances}{
+\code{Sigma_theta}, the within-group covariance of \code{theta}, enters the
+likelihood only through the scalars \eqn{\beta_q' \Sigma_\theta \beta_q},
+one per item. Its off-diagonal elements are therefore informed only by
+items that load on more than one dimension, and are weakly identified in
+most applications. Some shrinkage toward zero correlation is usually
+advisable, which is what \code{shape_lkj_theta} controls.
+
+Two subtleties are worth knowing before raising it well above its default.
+
+First, zero correlation is a property of the basis, not of the covariance
+operator. A matrix that is diagonal in one orthogonal basis is not
+diagonal in another unless its variances happen to be equal. Shrinking
+correlations toward zero therefore expresses a mild preference for the
+basis in which \code{Sigma_theta} is diagonal — that is, for its eigenbasis,
+or equivalently the principal components of the within-group dispersion
+of \code{theta}. At the default value this preference is negligible relative
+to the likelihood; it becomes appreciable only for shape parameters an
+order of magnitude larger.
+
+Second, that preferred basis is not the one you end up reporting.
+\code{\link[=identify_modgirt]{identify_modgirt()}} rotates the draws to a varimax solution defined by
+the sparsity of the loadings, which is a different criterion. The prior
+consequently affects where the sampler explores, and hence how well it
+mixes, more than it affects the identified estimates. Because
+identification maps \eqn{\Sigma_\theta \to R' \Sigma_\theta R}, the
+reported \code{Sigma_theta} should not be expected to look near-diagonal even
+under strong shrinkage.
+
+If you want regularization that is genuinely indifferent to rotation, the
+target is sphericity (\eqn{\sigma^2 I}) rather than diagonality: shrink
+the elements of \code{sd_theta} toward a common value, via \code{df_sd_theta} and
+\code{scale_sd_theta}, as well as shrinking the correlations.
+
+Both scale defaults are interpretable because the period-1 group means are
+de-meaned and whitened, which fixes the between-group covariance of
+\code{bar_theta} to the identity. Latent distances are therefore measured in
+units of the period-1 between-group standard deviation, and priors on
+\code{sd_theta} and \code{sd_bar_theta_evol} can be set on that common scale.
+}
+

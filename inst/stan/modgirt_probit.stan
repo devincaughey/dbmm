@@ -23,6 +23,12 @@ data {
   array[T, G, Q, K] real<lower=0> SSSS; // number of responses (possibly non-integer)
   array[Q, D] int beta_nonzero; // loading point restrictions
   array[Q, D] int beta_sign; // loading sign restrictions
+  real<lower=0> shape_lkj_theta;            // 1 = uniform, >1 = diagonal
+  real<lower=0> shape_lkj_bar_theta_evol;
+  real<lower=0> df_sd_theta;
+  real<lower=0> scale_sd_theta;
+  real<lower=0> df_sd_bar_theta_evol;
+  real<lower=0> scale_sd_bar_theta_evol;
 }
 transformed data {
   /* The transition covariance Omega is identified only if T > 1. When T == 1
@@ -36,27 +42,28 @@ parameters {
   array[Q, D] real<lower=0> beta_pos; // sign-constrained discriminations
   array[T, G, D] real z_bar_theta;
   vector<lower=0>[D] sd_theta; // within-group SD of theta
-  corr_matrix[D] corr_theta;   // within-group correlation of theta across dimensions
+  cholesky_factor_corr[D] L_corr_theta;
   /* Zero-length (hence not estimated) when T == 1 */
-  array[est_Omega] vector<lower=0>[D] sd_bar_theta_evol; // evolution SD of bar_theta
-  array[est_Omega] corr_matrix[D] corr_bar_theta_evol;   // cross-dimension correlation of transition model
+  array[est_Omega] vector<lower=0>[D] sd_bar_theta_evol;
+  array[est_Omega] cholesky_factor_corr[D] L_corr_bar_theta_evol;
 }
 transformed parameters {
   array[T, Q] vector[K - 1] alpha; // thresholds (difficulty)
   array[T, Q] real alpha_drift;     // question-specific time trends
   matrix[Q, D] beta;
   array[T] matrix[G, D] bar_theta; // group ideal point means
-  cov_matrix[D] Sigma_theta; // within-group variance-covariance
-  cov_matrix[D] Omega; // transition variance-covariance
+  matrix[D, D] chol_Sigma_theta = diag_pre_multiply(sd_theta, L_corr_theta);
+  matrix[D, D] Sigma_theta =
+      multiply_lower_tri_self_transpose(chol_Sigma_theta);
   matrix[D, D] chol_Omega;
-  Sigma_theta = quad_form_diag(corr_theta, sd_theta);
+  matrix[D, D] Omega;
   if (est_Omega) {
-    Omega = quad_form_diag(corr_bar_theta_evol[1], sd_bar_theta_evol[1]);
-    chol_Omega = cholesky_decompose(Omega);
+    chol_Omega = diag_pre_multiply(sd_bar_theta_evol[1],
+                                   L_corr_bar_theta_evol[1]);
+    Omega = multiply_lower_tri_self_transpose(chol_Omega);
   } else {
-    /* Single period: no transition to inform Omega, so fix it to I_D */
-    Omega = identity_matrix(D);
     chol_Omega = identity_matrix(D);
+    Omega = identity_matrix(D);
   }
   for (q in 1 : Q) {
     for (d in 1 : D) {
@@ -97,30 +104,26 @@ model {
   for (q in 1 : Q) {
     z_alpha[q][1 : (K - 1)] ~ std_normal();
   }
-  sd_theta ~ cauchy(0, 1);
-  corr_theta ~ lkj_corr(2);
+  sd_theta ~ student_t(df_sd_theta, 0, scale_sd_theta);
+  L_corr_theta ~ lkj_corr_cholesky(shape_lkj_theta);
   if (est_Omega) {
-    sd_bar_theta_evol[1] ~ cauchy(0, .1);
-    corr_bar_theta_evol[1] ~ lkj_corr(2);
+    sd_bar_theta_evol[1] ~ student_t(df_sd_bar_theta_evol, 0,
+                                     scale_sd_bar_theta_evol);
+    L_corr_bar_theta_evol[1] ~ lkj_corr_cholesky(shape_lkj_bar_theta_evol);
   }
   /* Likelihood */
   if (K > 1) {
     /* ordinal outcomes */
-    for (t in 1 : T) {
-      for (q in 1 : Q) {
-        real denom; // denominator of linear predictor
-        vector[K - 1] cuts; // ordered probit cutpoints
-	      real sbs;
-	      sbs = quad_form(Sigma_theta[1 : D, 1 : D], to_vector(beta[q][1 : D]));
-        denom = sqrt(1 + sbs);
-        cuts = alpha[t, q][1 : (K - 1)] / denom;
+    for (q in 1 : Q) {
+      real sbs = dot_self(chol_Sigma_theta' * to_vector(beta[q][1 : D]));
+      real denom = sqrt(1 + sbs);
+      for (t in 1 : T) {
+        vector[K - 1] cuts = alpha[t, q][1 : (K - 1)] / denom;
         for (g in 1 : G) {
-          real eta; // linear predictor
-          eta = to_row_vector(beta[q][1 : D])
-                * to_vector(bar_theta[t, g, 1 : D]) / denom;
+          real eta = to_row_vector(beta[q][1 : D])
+                     * to_vector(bar_theta[t, g, 1 : D]) / denom;
           for (k in 1 : K) {
             if (SSSS[t, g, q, k] > 0) {
-              /* Add SSSS[t, g, q, k] log normalized ordinal probit densities */
               target += SSSS[t, g, q, k] * ordered_probit_lupmf(k | eta, cuts);
             }
           }

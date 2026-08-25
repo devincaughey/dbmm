@@ -1,0 +1,1117 @@
+---
+title: "Dynamic factor models for mixed-type indicators"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+bibliography: dbmm.bib
+vignette: >
+  %\VignetteIndexEntry{Dynamic factor models for mixed-type indicators}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+
+``` r
+library(dbmm)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(posterior)
+library(bayesplot)
+
+bayesplot::color_scheme_set("gray")
+theme_set(theme_minimal(base_size = 11))
+```
+
+# The model
+
+`fit_mixfac()` estimates a **dynamic factor model** for units observed
+repeatedly on indicators that need not share a measurement scale. Let
+$\eta_{tj} \in \mathbb{R}^D$ be the latent position of unit $j$ in period
+$t$, and let $\lambda_i \in \mathbb{R}^D$ be the loadings of item $i$. The
+linear predictor for unit $j$ on item $i$ in period $t$ is
+
+$$
+\nu_{tji} \;=\; \alpha_{ti} + \lambda_i' \eta_{tj},
+$$
+
+where $\alpha_{ti}$ is an item intercept that may either be held constant
+across periods (`constant_alpha = TRUE`) or allowed to evolve. The
+observation model depends on the item's measurement type:
+
+| Type | Response | Model |
+|------|----------|-------|
+| Binary | $y \in \{0, 1\}$ | $\Pr(y = 1) = \Phi(\nu)$ |
+| Trichotomous, ordinal | $y \in \{1, \dots, K\}$ | $\Pr(y \le k) = \Phi(\kappa_{ik} - \nu)$ |
+| Metric | $y \in \mathbb{R}$ | $y \sim \mathcal{N}(\nu, \sigma_i^2)$ |
+
+Latent positions evolve as a multivariate random walk,
+
+$$
+\eta_{tj} \;\sim\; \mathcal{N}\!\left(\eta_{t-1,j},\; \Omega\right),
+$$
+
+with innovation covariance $\Omega$ estimated from the data. Setting
+`smooth_eta = FALSE` removes the random walk and estimates each period
+independently.
+
+Because $\lambda_i' \eta_{tj} = (\lambda_i' R)(R' \eta_{tj})$ for any
+orthogonal $R$, the model is identified only up to rotation, reflection,
+and permutation of the factors when $D > 1$. This package leaves the
+sampler unconstrained and resolves the indeterminacy *after* sampling,
+which is the subject of the identification section below.
+
+# Data
+
+`state_policies_2010_2012` records the policies of the 50 U.S. states from
+2010 through 2012. Most policies are binary — does the state have the
+policy in force or not? — but some are ordinal and some are continuous,
+which makes the data a natural application for a mixed-indicator model.
+
+
+``` r
+data("state_policies_2010_2012")
+
+str(state_policies_2010_2012, vec.len = 2)
+#> 'data.frame':	16500 obs. of  8 variables:
+#>  $ year                     : int  2010 2010 2010 2010 2010 ...
+#>  $ state_abb                : chr  "AK" "AL" ...
+#>  $ state_name               : chr  "Alaska" "Alabama" ...
+#>  $ policy_variable          : chr  "abortion_consent_1992_2014" "abortion_consent_1992_2014" ...
+#>  $ policy_short_description : chr  "Forced counseling before abortions" "Forced counseling before abortions" ...
+#>  $ policy_longer_description: chr  "Does the state mandate counseling before an abortion (post-Casey)?" "Does the state mandate counseling before an abortion (post-Casey)?" ...
+#>  $ value                    : num  1 1 1 0 0 ...
+#>  $ value_real               : num  1 1 1 0 0 ...
+```
+
+The columns we need are the unit (`state_abb`), period (`year`), item
+(`policy_variable`), and response (`value_real`, which expresses monetary
+quantities in constant dollars). Each item also carries a human-readable
+description, which will be useful for labelling plots.
+
+
+``` r
+item_labels <- state_policies_2010_2012 |>
+    distinct(policy_variable, policy_short_description) |>
+    filter(!is.na(policy_short_description))
+
+head(item_labels, 4)
+#>              policy_variable           policy_short_description
+#> 1 abortion_consent_1992_2014 Forced counseling before abortions
+#> 2          abortion_medicaid              Medicaid for Abortion
+#> 3            concealed_carry   Concealed Carry for Guns Allowed
+#> 4               drugs_kegreg  Beer Keg Registration Requirement
+```
+
+## Checking the data before shaping
+
+`shape_mixfac()` takes the long data frame at face value. It drops rows
+with missing responses, but it does not check for repeated
+unit-period-item combinations, and a duplicated response would enter the
+likelihood twice. It costs one line to confirm there are none.
+
+
+``` r
+anyDuplicated(state_policies_2010_2012[c("state_abb", "year",
+                                         "policy_variable")])
+#> [1] 0
+```
+
+
+``` r
+policies <- state_policies_2010_2012 |>
+    filter(!is.na(value_real))
+
+nrow(state_policies_2010_2012) - nrow(policies)
+#> [1] 12
+```
+
+Not every policy is observed in every state-year. Missing observations are
+simply absent from the long data: the model conditions on what is
+observed, and the dynamic prior interpolates the rest.
+
+
+``` r
+policies |>
+    count(policy_variable, name = "n_obs") |>
+    count(n_obs, name = "n_items")
+#>   n_obs n_items
+#> 1    50       1
+#> 2   100       1
+#> 3   147       4
+#> 4   150     105
+```
+
+
+``` r
+policies |>
+    count(policy_variable, year) |>
+    count(policy_variable, name = "n_years") |>
+    filter(n_years < 3)
+#>                  policy_variable n_years
+#> 1 gayrights_ban_localprotections       2
+#> 2       z_tanf_paymentsperfamily       1
+```
+
+Two policies are observed in fewer than all three years. They still inform
+the loadings, but contribute little or nothing to the estimated dynamics.
+
+# Step 1: Shape the data
+
+`shape_mixfac()` converts the long data frame into the list Stan expects,
+sorting observations by item type and recording the labels needed to
+interpret the output. By default it classifies items automatically: two
+distinct values means binary, three means trichotomous, four to `max_cats`
+means ordinal, and anything else is metric.
+
+
+``` r
+shaped <- shape_mixfac(
+    long_data           = policies,
+    unit_var            = "state_abb",
+    time_var            = "year",
+    item_var            = "policy_variable",
+    value_var           = "value_real",
+    periods_to_estimate = 2010:2012,
+    standardize         = TRUE,
+    make_indicator_for_zeros = FALSE
+)
+#> 
+#> Dropping the following items due to lack of variation:
+#>   * genderrights_nofault_divorce
+#>   * regulation_vaccines
+#>   * regulations_lemonlaw
+#> ℹ Categorizing 64 items as binary.
+#> • abortion_consent_1992_2014
+#> • abortion_medicaid
+#> • concealed_carry
+#> • drugs_kegreg
+#> • drugs_medical_marijuana
+#> • drugs_smoking_ban_restaurants
+#> • drugs_smoking_ban_workplaces
+#> • earned_income_taxcredit
+#> • education_charter_schools
+#> • education_corporal_punishment_ban
+#> • education_vouchers
+#> • environment_bottlebill
+#> • environment_ca_car_emissions_standards
+#> • environment_electronic_waste
+#> • environment_ghg_cap
+#> • environment_publicbenefit_funds
+#> • environment_state_nepas
+#> • environment_utility_deregulation
+#> • estate_tax
+#> • gambling_casinos
+#> • gambling_lottery_adoption
+#> • gayrights_ban_localprotections
+#> • gayrights_ban_localprotections_schools
+#> • gayrights_hatecrimes
+#> • gayrights_jointadoption
+#> • genderrights_era_ratification
+#> • genderrights_gender_discrimination_laws_post1964
+#> • genderrights_state_eras
+#> • guncontrol_assaultweapon_ban
+#> • guncontrol_licenses_dealers
+#> • guncontrol_opencarry
+#> • guncontrol_redflag_laws
+#> • guncontrol_satnightspecial_ban
+#> • guncontrol_stand_your_ground
+#> • immigration_driverslicense
+#> • immigration_english_language
+#> • immigration_instate_tuition_illegalimmigrants
+#> • income_taxes
+#> • labor_age_discrimination
+#> • labor_collective_bargaining_stateemployees
+#> • labor_collective_bargaining_teachers
+#> • labor_minimumwage_preemption
+#> • labor_pla_preemption
+#> • labor_prevailing_wage_laws
+#> • labor_prevailingwage_preemption
+#> • labor_right_to_work
+#> • labor_state_disability_insurance
+#> • medicaid_expansion
+#> • race_fair_employment_commissions_post1964
+#> • regulation_bicycle_helmets
+#> • regulation_hate_crimes
+#> • regulation_mandatory_car_insurance
+#> • regulation_mandatory_seatbelts
+#> • regulation_motorcycle_helmets
+#> • regulation_pain_suffering_limits
+#> • regulation_physician_suicide
+#> • regulation_rent_control
+#> • regulation_rfra
+#> • regulation_shield
+#> • tanf_work_requirement
+#> • w_drugs_marijuana_legalization
+#> • w_education_tencommandments
+#> • w_immigration_publicbenefits_undocumented_kids
+#> • w_regulation_contraceptives
+#> ℹ Categorizing 24 items as trichotomous.
+#> • gayrights_conversion_therapy
+#> • w_abortion_parental_notice_1983_2014
+#> • w_abortion_ultrasound
+#> • w_abortion_waiting_period
+#> • w_animal_cruelty_felony
+#> • w_death_penalty
+#> • w_ec_access
+#> • w_education_moment_of_silence
+#> • w_environment_endangered_species
+#> • w_environment_solar_taxcredit
+#> • w_environment_state_rps
+#> • w_gayrights_civilunions_marriage
+#> • w_gayrights_credit_discrimination
+#> • w_gayrights_fosterparents
+#> • w_gayrights_housing_discrimination
+#> • w_gayrights_public_accomodations
+#> • w_guncontrol_bc_privatesales
+#> • w_guncontrol_waitingperiod
+#> • w_immigration_everify
+#> • w_immigration_sanctuary_states
+#> • w_labor_paid_leave
+#> • w_race_disc_public_accommodations2
+#> • w_regulation_ban_the_box
+#> • w5_abortion_laws
+#> ℹ Categorizing 2 items as ordinal.
+#> • w4_gayrights_employment_discrimination
+#> • x_chip_pregnantwomen
+#> ℹ Categorizing 18 items as metric.
+#> • x_capital_gains_rich
+#> • x_chip_children
+#> • x_chip_infants
+#> • x_eitc_refundable_levels
+#> • x_labor_minwage_abovefed
+#> • x_rps_targets_bindingonly
+#> • x_sales_taxes
+#> • x_tax_burden
+#> • x_tax_rate_rich
+#> • x_top_corporateincometaxrate
+#> • z_cigarette_taxes
+#> • z_education_expenditures_per_pupil
+#> • z_education_higher_edu_spending
+#> • z_gasoline_tax
+#> • z_labor_unemployment_compensation
+#> • z_tanf_initialelig
+#> • z_tanf_maxpayment
+#> • z_tanf_paymentsperfamily
+```
+
+
+``` r
+c(units   = shaped$J,
+  periods = shaped$T,
+  binary  = shaped$I_binary,
+  trichot = shaped$I_trichot,
+  ordinal = shaped$I_ordinal,
+  metric  = shaped$I_metric)
+#>   units periods  binary trichot ordinal  metric 
+#>      50       3      64      24       2      18
+```
+
+The classification can be overridden with the `binary_items`,
+`trichotomous_items`, and `ordinal_items` arguments, each of which takes a
+character vector of item names.
+
+Two further options are worth knowing about. `standardize = TRUE` rescales
+each metric item to mean zero and unit variance, putting the loadings of
+metric and non-metric items on a comparable footing.
+`make_indicator_for_zeros = TRUE` — the default, disabled here so that the
+item counts above are easy to follow — treats metric items bounded below at
+zero as zero-inflated: observations at zero are set missing, and a new
+binary item suffixed `_zi` records whether the response exceeded zero. That
+is often the right model for policy instruments many states simply do not
+use, such as a state earned income tax credit.
+
+# Step 2: Fit the model
+
+
+``` r
+fit2 <- fit_mixfac(
+    shaped_data     = shaped,
+    n_dim           = 2,
+    constant_alpha  = TRUE,
+    smooth_eta      = TRUE,
+    gen_log_lik     = TRUE,
+    chains          = 4,
+    parallel_chains = 4,
+    iter_warmup     = n_warmup,
+    iter_sampling   = n_sample,
+    adapt_delta     = 0.9,
+    refresh         = 0,
+    seed            = 123
+)
+#> Running MCMC with 4 parallel chains...
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: bernoulli_logit_lpmf: Logit transformed probability parameter[3149] is nan, but must be not nan! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 318, column 6 to column 73)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: bernoulli_logit_lpmf: Logit transformed probability parameter[3149] is nan, but must be not nan! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 318, column 6 to column 73)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: bernoulli_logit_lpmf: Logit transformed probability parameter[3149] is nan, but must be not nan! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 318, column 6 to column 73)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: ordered_logistic: Location parameter[1201] is inf, but must be finite! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: bernoulli_logit_lpmf: Logit transformed probability parameter[3149] is nan, but must be not nan! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 318, column 6 to column 73)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: bernoulli_logit_lpmf: Logit transformed probability parameter[3151] is nan, but must be not nan! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 318, column 6 to column 73)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -50.1102, but should be greater than the previous element, -50.1102 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -48.5345, but should be greater than the previous element, -48.5345 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -13.1659, but should be greater than the previous element, -13.1659 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 321, column 6 to line 322, column 66)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is 1.06304, but should be greater than the previous element, 1.06304 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is 1.05239, but should be greater than the previous element, 1.05239 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -7.46843, but should be greater than the previous element, -7.46843 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: lkj_corr_cholesky_lpdf: Random variable[2] is 0, but must be positive! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 401, column 4 to column 40)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: lkj_corr_cholesky_lpdf: Random variable[2] is 0, but must be positive! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 401, column 4 to column 40)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is 302.532, but should be greater than the previous element, 302.532 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is 9.53367, but should be greater than the previous element, 9.53367 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -56.0573, but should be greater than the previous element, -56.0573 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -55.4613, but should be greater than the previous element, -55.4613 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -12.2397, but should be greater than the previous element, -12.2397 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: lkj_corr_cholesky_lpdf: Random variable[2] is 0, but must be positive! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 401, column 4 to column 40)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: lkj_corr_cholesky_lpdf: Random variable[2] is 0, but must be positive! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 401, column 4 to column 40)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: lkj_corr_cholesky_lpdf: Random variable[2] is 0, but must be positive! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 401, column 4 to column 40)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: ordered_logistic: Final cut-point is inf, but must be finite! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is 34.3135, but should be greater than the previous element, 34.3135 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is 9.95209, but should be greater than the previous element, 9.95209 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 1 finished in 114.5 seconds.
+#> Chain 2 finished in 127.3 seconds.
+#> Chain 4 finished in 136.3 seconds.
+#> Chain 3 finished in 155.9 seconds.
+#> 
+#> All 4 chains finished successfully.
+#> Mean chain execution time: 133.5 seconds.
+#> Total execution time: 156.2 seconds.
+```
+
+Arguments beyond those documented in `?fit_mixfac` are passed through to
+**cmdstanr**'s `$sample()` method, so `parallel_chains`, `adapt_delta`, and
+`refresh` behave as they do there. `gen_log_lik = TRUE` adds a
+per-observation log likelihood for the cross-validation in the last
+section; it is off by default because it can dominate the size of the
+output.
+
+
+``` r
+fit2$$fit$$time()$total
+#> Error in parse(text = input): <text>:1:6: unexpected '$'
+#> 1: fit2$$
+#>          ^
+```
+
+
+``` r
+fit2$$fit$$diagnostic_summary()
+#> Error in parse(text = input): <text>:1:6: unexpected '$'
+#> 1: fit2$$
+#>          ^
+```
+
+# Step 3: Extract draws
+
+
+``` r
+draws_raw <- extract_mixfac_draws(fit2)
+
+names(draws_raw)
+#>  [1] "lp__"           "kappa_trichot"  "kappa_ordinal"  "sigma_metric"  
+#>  [5] "eta"            "alpha_binary"   "alpha_ordinal"  "alpha_trichot" 
+#>  [9] "alpha_metric"   "lambda_binary"  "lambda_trichot" "lambda_ordinal"
+#> [13] "lambda_metric"  "Omega"          "log_lik"
+```
+
+The log posterior density `lp__` is invariant to the rotational
+indeterminacy discussed above, which makes it the right quantity to check
+first. If the chains agree on `lp__`, they have found the same posterior
+even though their factor solutions may be arbitrarily rotated relative to
+one another.
+
+
+``` r
+summarize_draws(subset_draws(draws_raw, "lp__"))
+#> # A tibble: 1 × 10
+#>   variable   mean median    sd   mad     q5    q95  rhat ess_bulk ess_tail
+#>   <chr>     <dbl>  <dbl> <dbl> <dbl>  <dbl>  <dbl> <dbl>    <dbl>    <dbl>
+#> 1 lp__     -6869. -6869.  20.1  19.8 -6905. -6837.  1.02     204.     358.
+mcmc_trace(as_draws_array(subset_draws(draws_raw, "lp__")))
+```
+
+<div class="figure">
+<img src="mixfac-diagnostics-lp-1.png" alt="plot of chunk diagnostics-lp" width="100%" />
+<p class="caption">plot of chunk diagnostics-lp</p>
+</div>
+
+Individual loadings, by contrast, need not agree at all.
+
+
+``` r
+lambda_raw <- as_draws_array(draws_rvars(lambda = draws_raw$lambda_metric))
+mcmc_trace(lambda_raw, pars = c("lambda[1,1]", "lambda[1,2]"))
+```
+
+<div class="figure">
+<img src="mixfac-diagnostics-raw-1.png" alt="plot of chunk diagnostics-raw" width="100%" />
+<p class="caption">plot of chunk diagnostics-raw</p>
+</div>
+
+The chains are exploring different rotations of the same likelihood, so
+convergence diagnostics computed on the raw draws are meaningless.
+
+
+``` r
+summarize_draws(lambda_raw, "rhat", "ess_bulk") |>
+    summarize(across(c(rhat, ess_bulk), list(min = min, max = max)))
+#> # A tibble: 1 × 4
+#>   rhat_min rhat_max ess_bulk_min ess_bulk_max
+#>      <dbl>    <dbl>        <dbl>        <dbl>
+#> 1     1.39     3.29         4.61         8.84
+```
+
+# Step 4: Identify the model
+
+`identify_mixfac()` resolves the indeterminacy in two steps. It applies a
+**varimax rotation** to each draw's loading matrix, seeking a sparse
+solution in which each item loads strongly on few factors. It then finds
+the **signed permutation** of factors that best aligns each draw with a
+common reference, using `factor.switching::rsp_exact()`. Both
+transformations are orthogonal, so every linear predictor $\nu_{tji}$ — and
+therefore the likelihood — is left exactly unchanged.
+
+
+``` r
+draws_id <- identify_mixfac(draws_raw, method = "varimax", seed = 123)
+```
+
+The rotation is deterministic by default (`random_starts = 0`). Setting
+`random_starts` above zero guards against local minima of the rotation
+criterion at proportionate computational cost; `seed` makes those random
+starts reproducible.
+
+
+``` r
+lambda_id <- as_draws_array(draws_rvars(lambda = draws_id$lambda_metric))
+mcmc_trace(lambda_id, pars = c("lambda[1,1]", "lambda[1,2]"))
+```
+
+<div class="figure">
+<img src="mixfac-identify-1-1.png" alt="plot of chunk identify-1" width="100%" />
+<p class="caption">plot of chunk identify-1</p>
+</div>
+
+
+``` r
+summarize_draws(lambda_id, "rhat", "ess_bulk") |>
+    summarize(across(c(rhat, ess_bulk), list(min = min, max = max)))
+#> # A tibble: 1 × 4
+#>   rhat_min rhat_max ess_bulk_min ess_bulk_max
+#>      <dbl>    <dbl>        <dbl>        <dbl>
+#> 1    0.999     1.02         466.        1285.
+```
+
+The chains now agree. This is the point at which convergence should be
+assessed, and it is worth checking every parameter rather than the
+loadings alone.
+
+
+``` r
+summarize_draws(draws_id) |>
+    summarize(max_rhat = max(rhat, na.rm = TRUE),
+              min_ess  = min(ess_bulk, na.rm = TRUE))
+#> # A tibble: 1 × 2
+#>   max_rhat min_ess
+#>      <dbl>   <dbl>
+#> 1     1.03    204.
+```
+
+## Labelling, combining, ordering, and signing
+
+Four further steps make the draws easier to work with. `label_mixfac()`
+attaches state, year, and item names. `combine_types_mixfac()` stacks the
+type-specific loading and intercept variables into single `lambda` and
+`alpha` variables, prefixing item names with their type. `sort_mixfac()`
+orders factors by their sums of squared loadings, so that the first factor
+is the one explaining the most variation. `sign_mixfac()` flips each factor
+so that its mean loading is positive. The last two are again
+reparameterizations that leave the likelihood untouched.
+
+
+``` r
+draws_final <- draws_id |>
+    label_mixfac() |>
+    combine_types_mixfac() |>
+    sort_mixfac() |>
+    sign_mixfac(signs = 1)
+
+class(draws_final)
+#> [1] "mixfac_signed" "mixfac_sorted" "mixfac_comb"   "draws_rvars"   "draws"        
+#> [6] "list"
+```
+
+
+``` r
+attr(draws_final, "factor order")
+#> NULL
+attr(draws_final, "sign flips")
+#>  1  2 
+#> -1 -1
+```
+
+# Step 5: Summarize
+
+`summarize_mixfac()` applies a standard battery of posterior summaries to
+each variable.
+
+
+``` r
+summ <- summarize_mixfac(draws_final)
+names(summ)
+#> [1] "eta"           "lambda"        "alpha"         "kappa_trichot" "kappa_ordinal"
+#> [6] "sigma_metric"  "Omega"         "lp__"
+
+summ$Omega
+#> # A tibble: 4 × 10
+#>   variable        mean   median      sd     mad       q5     q95  rhat ess_bulk ess_tail
+#>   <chr>          <dbl>    <dbl>   <dbl>   <dbl>    <dbl>   <dbl> <dbl>    <dbl>    <dbl>
+#> 1 Omega[1,1]  0.000827  4.79e-4 1.03e-3 5.33e-4  2.34e-5 2.95e-3  1.02     559.     358.
+#> 2 Omega[2,1] -0.000311 -5.04e-5 8.80e-4 3.45e-4 -1.88e-3 5.46e-4  1.01     651.     574.
+#> 3 Omega[1,2] -0.000311 -5.04e-5 8.80e-4 3.45e-4 -1.88e-3 5.46e-4  1.01     651.     574.
+#> 4 Omega[2,2]  0.000823  4.41e-4 1.12e-3 4.97e-4  1.79e-5 2.75e-3  1.01     524.     493.
+```
+
+The diagonal of $\Omega$ gives the innovation variance of each factor: how
+far a state's latent position is expected to move from one year to the
+next. Over three years of policy data these should be small, since state
+policy is sticky. Comparing them with the cross-sectional spread of `eta`
+indicates how much of the variation is between states rather than within
+them over time.
+
+
+``` r
+eta_e <- E(draws_final$eta)
+
+tibble(
+    factor = 1:2,
+    sd_between_states = apply(eta_e, 3, function(x) sd(apply(x, 2, mean))),
+    sd_innovation     = sqrt(diag(E(draws_final$Omega)))
+)
+#> # A tibble: 2 × 3
+#>   factor sd_between_states sd_innovation
+#>    <int>             <dbl>         <dbl>
+#> 1      1             0.987        0.0288
+#> 2      2             0.985        0.0287
+```
+
+# Step 6: Visualize
+
+Both `lambda` and `eta` hold `rvar` draws, which a small helper turns into
+a data frame of posterior means and standard deviations.
+
+
+``` r
+tidy_rvar <- function(x, name = "value") {
+    out <- as.data.frame.table(x, responseName = name)
+    out$est <- E(out[[name]])
+    out$err <- posterior::sd(out[[name]])
+    out[[name]] <- NULL
+    out
+}
+```
+
+## Item loadings
+
+
+``` r
+lambda_df <- tidy_rvar(draws_final$lambda) |>
+    pivot_wider(id_cols = item, names_from = factor,
+                values_from = c(est, err)) |>
+    separate_wider_delim(item, delim = ": ",
+                         names = c("item_type", "policy_variable")) |>
+    left_join(item_labels, by = "policy_variable")
+
+head(lambda_df, 4)
+#> # A tibble: 4 × 7
+#>   item_type policy_variable              est_1  est_2 err_1 err_2 policy_short_descrip…¹
+#>   <chr>     <chr>                        <dbl>  <dbl> <dbl> <dbl> <chr>                 
+#> 1 binary    abortion_consent_1992_2014 -1.45   -0.307 0.210 0.162 Forced counseling bef…
+#> 2 binary    abortion_medicaid           1.40    0.631 0.242 0.179 Medicaid for Abortion 
+#> 3 binary    concealed_carry             0.309  -0.509 0.184 0.184 Concealed Carry for G…
+#> 4 binary    drugs_kegreg                0.0492  0.182 0.102 0.109 Beer Keg Registration…
+#> # ℹ abbreviated name: ¹​policy_short_description
+```
+
+
+``` r
+label_these <- lambda_df |>
+    slice_max(est_1^2 + est_2^2, n = 12)
+
+ggplot(lambda_df, aes(x = est_1, y = est_2)) +
+    geom_vline(xintercept = 0, linetype = "dotted") +
+    geom_hline(yintercept = 0, linetype = "dotted") +
+    geom_linerange(aes(xmin = est_1 - 1.96 * err_1,
+                       xmax = est_1 + 1.96 * err_1),
+                   alpha = 1/5, linewidth = 1.5) +
+    geom_linerange(aes(ymin = est_2 - 1.96 * err_2,
+                       ymax = est_2 + 1.96 * err_2),
+                   alpha = 1/5, linewidth = 1.5) +
+    geom_point(aes(shape = item_type)) +
+    ggrepel::geom_text_repel(
+        data = label_these,
+        aes(label = coalesce(policy_short_description, policy_variable)),
+        size = 2.6, max.overlaps = 20, min.segment.length = 0
+    ) +
+    labs(x = "Factor 1 loading", y = "Factor 2 loading",
+         shape = "Item type",
+         title = "Policy loadings on two latent dimensions") +
+    coord_fixed()
+```
+
+<div class="figure">
+<img src="mixfac-visualize-loadings-1.png" alt="plot of chunk visualize-loadings" width="100%" />
+<p class="caption">plot of chunk visualize-loadings</p>
+</div>
+
+Interpretation comes from the items at the extremes of each axis. A first
+factor on which most social and economic policies load in the same
+direction is the familiar single dimension of state policy liberalism; a
+second factor separating, say, social-regulatory items from fiscal ones
+would indicate that a single dimension does not suffice.
+
+## Latent positions over time
+
+
+``` r
+eta_df <- tidy_rvar(draws_final$eta) |>
+    mutate(period = as.integer(as.character(period)))
+
+show_states <- c("MA", "NY", "CA", "OR", "TX", "AL", "MS", "UT", "KS", "OH")
+
+eta_df |>
+    filter(unit %in% show_states, factor == 1) |>
+    ggplot(aes(x = period, y = est, group = unit)) +
+    geom_ribbon(aes(ymin = est - 1.96 * err, ymax = est + 1.96 * err),
+                alpha = 1/6) +
+    geom_line() +
+    facet_wrap(~ unit, nrow = 2) +
+    scale_x_continuous(breaks = 2010:2012) +
+    labs(x = NULL, y = "Factor 1",
+         title = "Latent policy positions, 2010-2012")
+```
+
+<div class="figure">
+<img src="mixfac-visualize-eta-1.png" alt="plot of chunk visualize-eta" width="100%" />
+<p class="caption">plot of chunk visualize-eta</p>
+</div>
+
+
+``` r
+eta_df |>
+    filter(period == 2012) |>
+    pivot_wider(id_cols = unit, names_from = factor,
+                values_from = c(est, err)) |>
+    ggplot(aes(x = est_1, y = est_2, label = unit)) +
+    geom_vline(xintercept = 0, linetype = "dotted") +
+    geom_hline(yintercept = 0, linetype = "dotted") +
+    geom_text(size = 3) +
+    labs(x = "Factor 1", y = "Factor 2",
+         title = "State positions in 2012") +
+    coord_fixed()
+```
+
+<div class="figure">
+<img src="mixfac-visualize-scatter-1.png" alt="plot of chunk visualize-scatter" width="100%" />
+<p class="caption">plot of chunk visualize-scatter</p>
+</div>
+
+With only three periods the random walk is weakly identified: there are
+just two transitions per state from which to learn $\Omega$, so the
+posterior for the innovation variance will be dominated by its prior.
+Applications with longer panels will show considerably more movement, and
+`sd_sigma_eta_evol` is the argument that governs how strongly that movement
+is shrunk toward zero.
+
+# Step 7: How many factors?
+
+`loo_mixfac()` computes approximate leave-one-out cross-validation from the
+`log_lik` generated by `gen_log_lik = TRUE`. Log-likelihood contributions
+are aggregated by **unit-item dyad** by default, meaning that all periods
+of one policy for one state are held out together.
+
+That default is deliberate. If single observations were held out, a
+response could be predicted almost perfectly from the same state and policy
+in an adjacent year, because both the item intercepts and the factor scores
+evolve smoothly — the comparison would measure temporal interpolation
+rather than factor structure. Holding out the whole dyad forces prediction
+from the state's responses to *other* policies, which is what the loadings
+govern.
+
+
+``` r
+fit1 <- fit_mixfac(
+    shaped_data = shaped, n_dim = 1, constant_alpha = TRUE,
+    smooth_eta = TRUE, gen_log_lik = TRUE,
+    chains = 4, parallel_chains = 4,
+    iter_warmup = n_warmup, iter_sampling = n_sample,
+    refresh = 0, seed = 123
+)
+#> Running MCMC with 4 parallel chains...
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -35.8281, but should be greater than the previous element, -35.8281 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -37.2565, but should be greater than the previous element, -37.2565 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -7.80241, but should be greater than the previous element, -7.80241 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: ordered_logistic: Final cut-point is inf, but must be finite! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -201.906, but should be greater than the previous element, -201.906 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -28.545, but should be greater than the previous element, -28.545 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -30.0924, but should be greater than the previous element, -30.0924 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -14.7437, but should be greater than the previous element, -14.7437 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: ordered_logistic: Final cut-point is inf, but must be finite! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -174.082, but should be greater than the previous element, -174.082 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -43.0535, but should be greater than the previous element, -43.0535 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -42.8087, but should be greater than the previous element, -42.8087 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -9.37711, but should be greater than the previous element, -9.37711 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is 6350.74, but should be greater than the previous element, 6350.74 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is 179.801, but should be greater than the previous element, 179.801 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -31.9568, but should be greater than the previous element, -31.9568 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -32.0777, but should be greater than the previous element, -32.0777 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -3.20626, but should be greater than the previous element, -3.20626 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: ordered_logistic: Final cut-point is inf, but must be finite! (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 2 is -173.457, but should be greater than the previous element, -173.457 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 319, column 6 to line 320, column 66)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: ordered_logistic: Cut-points is not a valid ordered vector. The element at 8 is 176852, but should be greater than the previous element, 176852 (in '/var/folders/y0/zvly4kr52k73ww89tjtm4_yw0000gn/T/Rtmpn1Jzrg/model-12d5966a7f132.stan', line 321, column 6 to line 322, column 66)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 3 finished in 68.5 seconds.
+#> Chain 1 finished in 73.5 seconds.
+#> Chain 4 finished in 76.2 seconds.
+#> Chain 2 finished in 77.0 seconds.
+#> 
+#> All 4 chains finished successfully.
+#> Mean chain execution time: 73.8 seconds.
+#> Total execution time: 77.2 seconds.
+```
+
+
+``` r
+loo1 <- loo_mixfac(fit1, group = "dyad")
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.
+loo2 <- loo_mixfac(fit2, group = "dyad")
+#> Warning: The ESS has been capped to avoid unstable estimates.
+#> Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.
+
+loo2
+#> 
+#> Computed from 800 by 5396 log-likelihood matrix.
+#> 
+#>          Estimate    SE
+#> elpd_loo  -9518.5 164.2
+#> p_loo      1263.6  40.1
+#> looic     19036.9 328.4
+#> ------
+#> MCSE of elpd_loo is NA.
+#> MCSE and ESS estimates assume MCMC draws (r_eff in [0.3, 2.9]).
+#> 
+#> Pareto k diagnostic values:
+#>                           Count Pct.    Min. ESS
+#> (-Inf, 0.66]   (good)     5149  95.4%   40      
+#>    (0.66, 1]   (bad)       187   3.5%   <NA>    
+#>     (1, Inf)   (very bad)   60   1.1%   <NA>    
+#> See help('pareto-k-diagnostic') for details.
+```
+
+The Pareto $k$ diagnostics indicate whether the importance sampling
+underlying the approximation is reliable. Because each dyad bundles several
+observations, some elevated values are expected.
+
+
+``` r
+table(cut(loo::pareto_k_values(loo2), c(-Inf, 0.5, 0.7, 1, Inf),
+          labels = c("good", "ok", "bad", "very bad")))
+#> 
+#>     good       ok      bad very bad 
+#>     4902      291      143       60
+```
+
+`loo_influential()` names the dyads responsible.
+
+
+``` r
+head(loo_influential(loo2, threshold = 0.7), 8)
+#>                                                            group pareto_k      elpd_loo
+#> 1 binary | genderrights_gender_discrimination_laws_post1964 | WA 3.892871 -1.855771e-08
+#> 2                                     binary | income_taxes | NY 3.827773 -6.843193e-08
+#> 3        binary | race_fair_employment_commissions_post1964 | WA 3.566934 -1.376097e-08
+#> 4        binary | race_fair_employment_commissions_post1964 | AK 2.850821 -6.655488e-07
+#> 5 binary | genderrights_gender_discrimination_laws_post1964 | AK 2.731507 -1.191864e-06
+#> 6                                     binary | income_taxes | NJ 2.518526 -1.110876e-06
+#> 7        binary | race_fair_employment_commissions_post1964 | NV 2.315307 -1.788271e-06
+#> 8        binary | race_fair_employment_commissions_post1964 | NM 2.291829 -2.132232e-06
+#>      n_eff
+#> 1 709.9867
+#> 2 816.6995
+#> 3 819.7958
+#> 4 821.6073
+#> 5 816.9326
+#> 6 812.4683
+#> 7 824.6894
+#> 8 815.6824
+```
+
+
+``` r
+loo::loo_compare(one_factor = loo1, two_factor = loo2)
+#> Error in `loo_compare.default()`:
+#> ! argument "x" is missing, with no default
+```
+
+A difference in `elpd_diff` that is large relative to its standard error
+favours the more complex model. Comparisons are valid only across models
+fit to identical observations and grouped identically: varying `n_dim`,
+`smooth_eta`, or `constant_alpha` is fine, but comparing fits to different
+items or periods is not.
+
+Other groupings are available through the `group` argument:
+`"observation"`, `"unit"`, `"period"`, `"item"`, and `"item_type"`. For
+assessing whether smoothing helps, `group = "observation"` is the more
+direct test, since it asks precisely whether neighbouring periods of the
+same state and policy improve prediction. Note that `group = "unit"` holds
+out a state's entire response history, creating folds so large that
+importance sampling is unreliable; K-fold cross-validation is preferable in
+that case.
+
+# Session information
+
+
+``` r
+sessionInfo()
+#> R version 4.6.1 (2026-06-24)
+#> Platform: aarch64-apple-darwin23
+#> Running under: macOS Tahoe 26.5.2
+#> 
+#> Matrix products: default
+#> BLAS:   /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRblas.0.dylib 
+#> LAPACK: /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.1
+#> 
+#> locale:
+#> [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+#> 
+#> time zone: America/New_York
+#> tzcode source: internal
+#> 
+#> attached base packages:
+#> [1] stats     graphics  grDevices utils     datasets  methods   base     
+#> 
+#> other attached packages:
+#> [1] bayesplot_1.15.0 posterior_1.7.0  ggplot2_4.0.3    tidyr_1.3.2      dplyr_1.2.1     
+#> [6] dbmm_0.0.1.9000  testthat_3.3.2  
+#> 
+#> loaded via a namespace (and not attached):
+#>   [1] DBI_1.3.0            rlang_1.3.0          magrittr_2.0.5      
+#>   [4] rdtools_0.1.0        otel_0.2.0           matrixStats_1.5.0   
+#>   [7] compiler_4.6.1       roxygen2_8.1.0       loo_2.10.1          
+#>  [10] reshape2_1.4.5       callr_3.8.0          vctrs_0.7.3         
+#>  [13] quantreg_6.1         stringr_1.6.0        pkgconfig_2.0.3     
+#>  [16] crayon_1.5.3         fastmap_1.2.0        backports_1.5.1     
+#>  [19] mcmc_0.9-8           ellipsis_0.3.3       labeling_0.4.3      
+#>  [22] utf8_1.2.6           ca_0.71.1            cmdstanr_0.9.0      
+#>  [25] rmarkdown_2.31       sessioninfo_1.2.4    ps_1.9.3            
+#>  [28] MatrixModels_0.5-4   purrr_1.2.2          waldo_0.6.2         
+#>  [31] xfun_0.60            cachem_1.1.0         HDInterval_0.2.4    
+#>  [34] jsonlite_2.0.0       pak_0.11.1           parallel_4.6.1      
+#>  [37] prettyunits_1.2.0    R6_2.6.1             stringi_1.8.9       
+#>  [40] RColorBrewer_1.1-3   pkgload_1.5.3        brio_1.1.5          
+#>  [43] Rcpp_1.1.2           iterators_1.0.14     knitr_1.51          
+#>  [46] usethis_3.2.1        Matrix_1.7-5         splines_4.6.1       
+#>  [49] tidyselect_1.2.1     rstudioapi_0.19.0    abind_1.4-8         
+#>  [52] yaml_2.3.12          TSP_1.2.7            codetools_0.2-20    
+#>  [55] curl_7.1.0           processx_3.9.0       pkgbuild_1.4.8      
+#>  [58] plyr_1.8.9           lattice_0.22-9       tibble_3.3.1        
+#>  [61] S7_0.2.2             withr_3.0.3          coda_0.19-4.1       
+#>  [64] evaluate_1.0.5       desc_1.4.3           survival_3.8-6      
+#>  [67] survey_4.5           xml2_1.6.0           lpSolve_5.6.23      
+#>  [70] pillar_1.11.1        tensorA_0.36.2.1     checkmate_2.3.4     
+#>  [73] foreach_1.5.2        distributional_0.8.1 generics_0.1.4      
+#>  [76] rprojroot_2.1.1      xopen_1.0.1          commonmark_2.0.0    
+#>  [79] scales_1.4.0         glue_1.8.1           tools_4.6.1         
+#>  [82] diffobj_0.3.8        data.table_1.18.4    SparseM_1.84-2      
+#>  [85] factor.switching_1.4 registry_0.5-1       fs_2.1.0            
+#>  [88] grid_4.6.1           MCMCpack_1.7-1       mitools_2.4         
+#>  [91] seriation_1.5.8      devtools_2.5.2       cli_3.6.6           
+#>  [94] rcmdcheck_1.4.0      gtable_0.3.6         digest_0.6.39       
+#>  [97] ggrepel_0.9.8        GPArotation_2026.8-1 farver_2.1.2        
+#> [100] memoise_2.0.1        htmltools_0.5.9      lifecycle_1.0.5     
+#> [103] MASS_7.3-65
+```

@@ -37,7 +37,7 @@ extract_mixfac_draws <- function(x, drop = .mixfac_drop_default, check = TRUE) {
                             )
     }
 
-    draws <- copy_mixfac_attrs(draws, x$fit)
+    draws <- copy_dbmm_attrs(draws, x$fit)
     class(draws) <- c("mixfac_draws", class(draws))
 
     return(draws)
@@ -316,7 +316,7 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
         )
     }
 
-    out <- copy_mixfac_attrs(out, label_src)
+    out <- copy_dbmm_attrs(out, label_src)
     attr(out, "rotation matrix") <- vm_rvar
     attr(out, "signed-permutation matrix") <- sp_rvar
 
@@ -530,7 +530,7 @@ combine_types_mixfac <- function (x) {
         )
     }
 
-    out <- copy_mixfac_attrs(out, x)
+    out <- copy_dbmm_attrs(out, x)
 
     class(out) <- c("mixfac_comb", class(out))
     return(out)
@@ -648,7 +648,7 @@ sort_mixfac <- function(x, check = TRUE) {
         lp__ = x$lp__
     )
 
-    out <- copy_mixfac_attrs(out, x)
+    out <- copy_dbmm_attrs(out, x)
     attr(out, "rotation matrix") <- attr(x, "rotation matrix")
     attr(out, "signed-permutation matrix") <-
         attr(x, "signed-permutation matrix")
@@ -714,7 +714,7 @@ sign_mixfac <- function(x, signs = 1, check = TRUE) {
         lp__ = x$lp__
     )
 
-    out <- copy_mixfac_attrs(out, x)
+    out <- copy_dbmm_attrs(out, x)
     attr(out, "rotation matrix") <- attr(x, "rotation matrix")
     attr(out, "signed-permutation matrix") <-
         attr(x, "signed-permutation matrix")
@@ -1025,3 +1025,26 @@ sign_modgirt <- function(modgirt_rvar, signs = 1) {
     out
 }
 
+#' Save a fitted dbmm model to disk
+#'
+#' `cmdstanr` reads posterior draws from CSV files on demand, so a fitted
+#' object saved with [saveRDS()] will be unusable in a later session once
+#' \R has deleted its temporary directory. This function forces the draws
+#' into memory before serializing.
+#'
+#' @param x A `mixfac_fit` object from [fit_mixfac()], or the list returned
+#'     by [fit_modgirt()].
+#' @param file (string) Path to write to.
+#' @return `file`, invisibly.
+#' @export
+save_dbmm <- function(x, file) {
+    if (is.null(x$fit)) {
+        cli::cli_abort("{.arg x} has no {.field fit} element.")
+    }
+    invisible(x$fit$draws())
+    for (m in c("sampler_diagnostics", "init", "profiles")) {
+        try(invisible(x$fit[[m]]()), silent = TRUE)
+    }
+    saveRDS(x, file)
+    invisible(file)
+}

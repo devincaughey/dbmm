@@ -1,0 +1,521 @@
+---
+title: "Dynamic factor models for mixed-type indicators"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+bibliography: dbmm.bib
+vignette: >
+  %\VignetteIndexEntry{Dynamic factor models for mixed-type indicators}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "mixfac-",
+  fig.width = 7,
+  fig.height = 4.5,
+  dpi = 150,
+  out.width = "100%"
+)
+options(width = 88)
+
+## Bump to 1000 for the released vignette
+n_warmup <- 200
+n_sample <- 200
+```
+
+```{r libraries, message = FALSE}
+library(dbmm)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(posterior)
+library(bayesplot)
+
+bayesplot::color_scheme_set("gray")
+theme_set(theme_minimal(base_size = 11))
+```
+
+# The model
+
+`fit_mixfac()` estimates a **dynamic factor model** for units observed
+repeatedly on indicators that need not share a measurement scale. Let
+$\eta_{tj} \in \mathbb{R}^D$ be the latent position of unit $j$ in period
+$t$, and let $\lambda_i \in \mathbb{R}^D$ be the loadings of item $i$. The
+linear predictor for unit $j$ on item $i$ in period $t$ is
+
+$$
+\nu_{tji} \;=\; \alpha_{ti} + \lambda_i' \eta_{tj},
+$$
+
+where $\alpha_{ti}$ is an item intercept that may either be held constant
+across periods (`constant_alpha = TRUE`) or allowed to evolve. The
+observation model depends on the item's measurement type:
+
+| Type | Response | Model |
+|------|----------|-------|
+| Binary | $y \in \{0, 1\}$ | $\Pr(y = 1) = \Phi(\nu)$ |
+| Trichotomous, ordinal | $y \in \{1, \dots, K\}$ | $\Pr(y \le k) = \Phi(\kappa_{ik} - \nu)$ |
+| Metric | $y \in \mathbb{R}$ | $y \sim \mathcal{N}(\nu, \sigma_i^2)$ |
+
+Latent positions evolve as a multivariate random walk,
+
+$$
+\eta_{tj} \;\sim\; \mathcal{N}\!\left(\eta_{t-1,j},\; \Omega\right),
+$$
+
+with innovation covariance $\Omega$ estimated from the data. Setting
+`smooth_eta = FALSE` removes the random walk and estimates each period
+independently.
+
+Because $\lambda_i' \eta_{tj} = (\lambda_i' R)(R' \eta_{tj})$ for any
+orthogonal $R$, the model is identified only up to rotation, reflection,
+and permutation of the factors when $D > 1$. This package leaves the
+sampler unconstrained and resolves the indeterminacy *after* sampling,
+which is the subject of the identification section below.
+
+# Data
+
+`state_policies_2010_2012` records the policies of the 50 U.S. states from
+2010 through 2012. Most policies are binary — does the state have the
+policy in force or not? — but some are ordinal and some are continuous,
+which makes the data a natural application for a mixed-indicator model.
+
+```{r data}
+data("state_policies_2010_2012")
+
+str(state_policies_2010_2012, vec.len = 2)
+```
+
+The columns we need are the unit (`state_abb`), period (`year`), item
+(`policy_variable`), and response (`value_real`, which expresses monetary
+quantities in constant dollars). Each item also carries a human-readable
+description, which will be useful for labelling plots.
+
+```{r descriptions}
+item_labels <- state_policies_2010_2012 |>
+    distinct(policy_variable, policy_short_description) |>
+    filter(!is.na(policy_short_description))
+
+head(item_labels, 4)
+```
+
+## Checking the data before shaping
+
+`shape_mixfac()` takes the long data frame at face value. It drops rows
+with missing responses, but it does not check for repeated
+unit-period-item combinations, and a duplicated response would enter the
+likelihood twice. It costs one line to confirm there are none.
+
+```{r duplicates}
+anyDuplicated(state_policies_2010_2012[c("state_abb", "year",
+                                         "policy_variable")])
+```
+
+```{r prepare}
+policies <- state_policies_2010_2012 |>
+    filter(!is.na(value_real))
+
+nrow(state_policies_2010_2012) - nrow(policies)
+```
+
+Not every policy is observed in every state-year. Missing observations are
+simply absent from the long data: the model conditions on what is
+observed, and the dynamic prior interpolates the rest.
+
+```{r coverage}
+policies |>
+    count(policy_variable, name = "n_obs") |>
+    count(n_obs, name = "n_items")
+```
+
+```{r coverage-detail}
+policies |>
+    count(policy_variable, year) |>
+    count(policy_variable, name = "n_years") |>
+    filter(n_years < 3)
+```
+
+Two policies are observed in fewer than all three years. They still inform
+the loadings, but contribute little or nothing to the estimated dynamics.
+
+# Step 1: Shape the data
+
+`shape_mixfac()` converts the long data frame into the list Stan expects,
+sorting observations by item type and recording the labels needed to
+interpret the output. By default it classifies items automatically: two
+distinct values means binary, three means trichotomous, four to `max_cats`
+means ordinal, and anything else is metric.
+
+```{r shape}
+shaped <- shape_mixfac(
+    long_data           = policies,
+    unit_var            = "state_abb",
+    time_var            = "year",
+    item_var            = "policy_variable",
+    value_var           = "value_real",
+    periods_to_estimate = 2010:2012,
+    standardize         = TRUE,
+    make_indicator_for_zeros = FALSE
+)
+```
+
+```{r shape-counts}
+c(units   = shaped$J,
+  periods = shaped$T,
+  binary  = shaped$I_binary,
+  trichot = shaped$I_trichot,
+  ordinal = shaped$I_ordinal,
+  metric  = shaped$I_metric)
+```
+
+The classification can be overridden with the `binary_items`,
+`trichotomous_items`, and `ordinal_items` arguments, each of which takes a
+character vector of item names.
+
+Two further options are worth knowing about. `standardize = TRUE` rescales
+each metric item to mean zero and unit variance, putting the loadings of
+metric and non-metric items on a comparable footing.
+`make_indicator_for_zeros = TRUE` — the default, disabled here so that the
+item counts above are easy to follow — treats metric items bounded below at
+zero as zero-inflated: observations at zero are set missing, and a new
+binary item suffixed `_zi` records whether the response exceeded zero. That
+is often the right model for policy instruments many states simply do not
+use, such as a state earned income tax credit.
+
+# Step 2: Fit the model
+
+```{r fit}
+fit2 <- fit_mixfac(
+    shaped_data     = shaped,
+    n_dim           = 2,
+    constant_alpha  = TRUE,
+    smooth_eta      = TRUE,
+    gen_log_lik     = TRUE,
+    chains          = 4,
+    parallel_chains = 4,
+    iter_warmup     = n_warmup,
+    iter_sampling   = n_sample,
+    adapt_delta     = 0.9,
+    refresh         = 0,
+    seed            = 123
+)
+```
+
+Arguments beyond those documented in `?fit_mixfac` are passed through to
+**cmdstanr**'s `$sample()` method, so `parallel_chains`, `adapt_delta`, and
+`refresh` behave as they do there. `gen_log_lik = TRUE` adds a
+per-observation log likelihood for the cross-validation in the last
+section; it is off by default because it can dominate the size of the
+output.
+
+```{r fit-time}
+fit2$$fit$$time()$total
+```
+
+```{r fit-diagnostics}
+fit2$$fit$$diagnostic_summary()
+```
+
+# Step 3: Extract draws
+
+```{r extract}
+draws_raw <- extract_mixfac_draws(fit2)
+
+names(draws_raw)
+```
+
+The log posterior density `lp__` is invariant to the rotational
+indeterminacy discussed above, which makes it the right quantity to check
+first. If the chains agree on `lp__`, they have found the same posterior
+even though their factor solutions may be arbitrarily rotated relative to
+one another.
+
+```{r diagnostics-lp}
+summarize_draws(subset_draws(draws_raw, "lp__"))
+mcmc_trace(as_draws_array(subset_draws(draws_raw, "lp__")))
+```
+
+Individual loadings, by contrast, need not agree at all.
+
+```{r diagnostics-raw}
+lambda_raw <- as_draws_array(draws_rvars(lambda = draws_raw$lambda_metric))
+mcmc_trace(lambda_raw, pars = c("lambda[1,1]", "lambda[1,2]"))
+```
+
+The chains are exploring different rotations of the same likelihood, so
+convergence diagnostics computed on the raw draws are meaningless.
+
+```{r rhat-raw}
+summarize_draws(lambda_raw, "rhat", "ess_bulk") |>
+    summarize(across(c(rhat, ess_bulk), list(min = min, max = max)))
+```
+
+# Step 4: Identify the model
+
+`identify_mixfac()` resolves the indeterminacy in two steps. It applies a
+**varimax rotation** to each draw's loading matrix, seeking a sparse
+solution in which each item loads strongly on few factors. It then finds
+the **signed permutation** of factors that best aligns each draw with a
+common reference, using `factor.switching::rsp_exact()`. Both
+transformations are orthogonal, so every linear predictor $\nu_{tji}$ — and
+therefore the likelihood — is left exactly unchanged.
+
+```{r identify}
+draws_id <- identify_mixfac(draws_raw, method = "varimax", seed = 123)
+```
+
+The rotation is deterministic by default (`random_starts = 0`). Setting
+`random_starts` above zero guards against local minima of the rotation
+criterion at proportionate computational cost; `seed` makes those random
+starts reproducible.
+
+```{r identify-1}
+lambda_id <- as_draws_array(draws_rvars(lambda = draws_id$lambda_metric))
+mcmc_trace(lambda_id, pars = c("lambda[1,1]", "lambda[1,2]"))
+```
+
+```{r rhat-id}
+summarize_draws(lambda_id, "rhat", "ess_bulk") |>
+    summarize(across(c(rhat, ess_bulk), list(min = min, max = max)))
+```
+
+The chains now agree. This is the point at which convergence should be
+assessed, and it is worth checking every parameter rather than the
+loadings alone.
+
+```{r convergence-all}
+summarize_draws(draws_id) |>
+    summarize(max_rhat = max(rhat, na.rm = TRUE),
+              min_ess  = min(ess_bulk, na.rm = TRUE))
+```
+
+## Labelling, combining, ordering, and signing
+
+Four further steps make the draws easier to work with. `label_mixfac()`
+attaches state, year, and item names. `combine_types_mixfac()` stacks the
+type-specific loading and intercept variables into single `lambda` and
+`alpha` variables, prefixing item names with their type. `sort_mixfac()`
+orders factors by their sums of squared loadings, so that the first factor
+is the one explaining the most variation. `sign_mixfac()` flips each factor
+so that its mean loading is positive. The last two are again
+reparameterizations that leave the likelihood untouched.
+
+```{r process}
+draws_final <- draws_id |>
+    label_mixfac() |>
+    combine_types_mixfac() |>
+    sort_mixfac() |>
+    sign_mixfac(signs = 1)
+
+class(draws_final)
+```
+
+```{r attributes}
+attr(draws_final, "factor order")
+attr(draws_final, "sign flips")
+```
+
+# Step 5: Summarize
+
+`summarize_mixfac()` applies a standard battery of posterior summaries to
+each variable.
+
+```{r summarize}
+summ <- summarize_mixfac(draws_final)
+names(summ)
+
+summ$Omega
+```
+
+The diagonal of $\Omega$ gives the innovation variance of each factor: how
+far a state's latent position is expected to move from one year to the
+next. Over three years of policy data these should be small, since state
+policy is sticky. Comparing them with the cross-sectional spread of `eta`
+indicates how much of the variation is between states rather than within
+them over time.
+
+```{r variance-decomposition}
+eta_e <- E(draws_final$eta)
+
+tibble(
+    factor = 1:2,
+    sd_between_states = apply(eta_e, 3, function(x) sd(apply(x, 2, mean))),
+    sd_innovation     = sqrt(diag(E(draws_final$Omega)))
+)
+```
+
+# Step 6: Visualize
+
+Both `lambda` and `eta` hold `rvar` draws, which a small helper turns into
+a data frame of posterior means and standard deviations.
+
+```{r tidy-helper}
+tidy_rvar <- function(x, name = "value") {
+    out <- as.data.frame.table(x, responseName = name)
+    out$est <- E(out[[name]])
+    out$err <- posterior::sd(out[[name]])
+    out[[name]] <- NULL
+    out
+}
+```
+
+## Item loadings
+
+```{r loadings}
+lambda_df <- tidy_rvar(draws_final$lambda) |>
+    pivot_wider(id_cols = item, names_from = factor,
+                values_from = c(est, err)) |>
+    separate_wider_delim(item, delim = ": ",
+                         names = c("item_type", "policy_variable")) |>
+    left_join(item_labels, by = "policy_variable")
+
+head(lambda_df, 4)
+```
+
+```{r visualize-loadings, fig.height = 6}
+label_these <- lambda_df |>
+    slice_max(est_1^2 + est_2^2, n = 12)
+
+ggplot(lambda_df, aes(x = est_1, y = est_2)) +
+    geom_vline(xintercept = 0, linetype = "dotted") +
+    geom_hline(yintercept = 0, linetype = "dotted") +
+    geom_linerange(aes(xmin = est_1 - 1.96 * err_1,
+                       xmax = est_1 + 1.96 * err_1),
+                   alpha = 1/5, linewidth = 1.5) +
+    geom_linerange(aes(ymin = est_2 - 1.96 * err_2,
+                       ymax = est_2 + 1.96 * err_2),
+                   alpha = 1/5, linewidth = 1.5) +
+    geom_point(aes(shape = item_type)) +
+    ggrepel::geom_text_repel(
+        data = label_these,
+        aes(label = coalesce(policy_short_description, policy_variable)),
+        size = 2.6, max.overlaps = 20, min.segment.length = 0
+    ) +
+    labs(x = "Factor 1 loading", y = "Factor 2 loading",
+         shape = "Item type",
+         title = "Policy loadings on two latent dimensions") +
+    coord_fixed()
+```
+
+Interpretation comes from the items at the extremes of each axis. A first
+factor on which most social and economic policies load in the same
+direction is the familiar single dimension of state policy liberalism; a
+second factor separating, say, social-regulatory items from fiscal ones
+would indicate that a single dimension does not suffice.
+
+## Latent positions over time
+
+```{r visualize-eta}
+eta_df <- tidy_rvar(draws_final$eta) |>
+    mutate(period = as.integer(as.character(period)))
+
+show_states <- c("MA", "NY", "CA", "OR", "TX", "AL", "MS", "UT", "KS", "OH")
+
+eta_df |>
+    filter(unit %in% show_states, factor == 1) |>
+    ggplot(aes(x = period, y = est, group = unit)) +
+    geom_ribbon(aes(ymin = est - 1.96 * err, ymax = est + 1.96 * err),
+                alpha = 1/6) +
+    geom_line() +
+    facet_wrap(~ unit, nrow = 2) +
+    scale_x_continuous(breaks = 2010:2012) +
+    labs(x = NULL, y = "Factor 1",
+         title = "Latent policy positions, 2010-2012")
+```
+
+```{r visualize-scatter}
+eta_df |>
+    filter(period == 2012) |>
+    pivot_wider(id_cols = unit, names_from = factor,
+                values_from = c(est, err)) |>
+    ggplot(aes(x = est_1, y = est_2, label = unit)) +
+    geom_vline(xintercept = 0, linetype = "dotted") +
+    geom_hline(yintercept = 0, linetype = "dotted") +
+    geom_text(size = 3) +
+    labs(x = "Factor 1", y = "Factor 2",
+         title = "State positions in 2012") +
+    coord_fixed()
+```
+
+With only three periods the random walk is weakly identified: there are
+just two transitions per state from which to learn $\Omega$, so the
+posterior for the innovation variance will be dominated by its prior.
+Applications with longer panels will show considerably more movement, and
+`sd_sigma_eta_evol` is the argument that governs how strongly that movement
+is shrunk toward zero.
+
+# Step 7: How many factors?
+
+`loo_mixfac()` computes approximate leave-one-out cross-validation from the
+`log_lik` generated by `gen_log_lik = TRUE`. Log-likelihood contributions
+are aggregated by **unit-item dyad** by default, meaning that all periods
+of one policy for one state are held out together.
+
+That default is deliberate. If single observations were held out, a
+response could be predicted almost perfectly from the same state and policy
+in an adjacent year, because both the item intercepts and the factor scores
+evolve smoothly — the comparison would measure temporal interpolation
+rather than factor structure. Holding out the whole dyad forces prediction
+from the state's responses to *other* policies, which is what the loadings
+govern.
+
+```{r loo-fit-1}
+fit1 <- fit_mixfac(
+    shaped_data = shaped, n_dim = 1, constant_alpha = TRUE,
+    smooth_eta = TRUE, gen_log_lik = TRUE,
+    chains = 4, parallel_chains = 4,
+    iter_warmup = n_warmup, iter_sampling = n_sample,
+    refresh = 0, seed = 123
+)
+```
+
+```{r loo-compute}
+loo1 <- loo_mixfac(fit1, group = "dyad")
+loo2 <- loo_mixfac(fit2, group = "dyad")
+
+loo2
+```
+
+The Pareto $k$ diagnostics indicate whether the importance sampling
+underlying the approximation is reliable. Because each dyad bundles several
+observations, some elevated values are expected.
+
+```{r loo-diagnostics}
+table(cut(loo::pareto_k_values(loo2), c(-Inf, 0.5, 0.7, 1, Inf),
+          labels = c("good", "ok", "bad", "very bad")))
+```
+
+`loo_influential()` names the dyads responsible.
+
+```{r loo-influential}
+head(loo_influential(loo2, threshold = 0.7), 8)
+```
+
+```{r loo-compare}
+loo::loo_compare(one_factor = loo1, two_factor = loo2)
+```
+
+A difference in `elpd_diff` that is large relative to its standard error
+favours the more complex model. Comparisons are valid only across models
+fit to identical observations and grouped identically: varying `n_dim`,
+`smooth_eta`, or `constant_alpha` is fine, but comparing fits to different
+items or periods is not.
+
+Other groupings are available through the `group` argument:
+`"observation"`, `"unit"`, `"period"`, `"item"`, and `"item_type"`. For
+assessing whether smoothing helps, `group = "observation"` is the more
+direct test, since it asks precisely whether neighbouring periods of the
+same state and policy improve prediction. Note that `group = "unit"` holds
+out a state's entire response history, creating folds so large that
+importance sampling is unreliable; K-fold cross-validation is preferable in
+that case.
+
+# Session information
+
+```{r session-info}
+sessionInfo()
+```
