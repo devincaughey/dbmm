@@ -7,7 +7,7 @@ Description: Fits dynamic Bayesian measurement models using Stan via the
     (MODGIRT) model. Both allow for multiple latent factors, and both provide
     helpers for shaping data, imposing post-estimation identification
     restrictions, and summarizing draws.
-Version: 0.0.1.9000
+Version: 0.1.0
 Authors@R:
   c(person("Devin", "Caughey", email = "devin.caughey@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-6419-6805")),

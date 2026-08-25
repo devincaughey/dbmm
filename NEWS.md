@@ -1,4 +1,4 @@
-# dbmm 0.0.1.9000
+# dbmm 0.1.0
 
 ## Breaking changes
 
@@ -28,6 +28,13 @@
   `mu_sigma_alpha_evol = 0.5, sd_sigma_alpha_evol = 0.5` (and likewise for
   `*_eta_evol`) to recover the previous behaviour. Priors on `sigma_metric`
   are unchanged.
+
+* The prior on `sd_theta` in `fit_modgirt()` is now a half Student's t with
+  4 degrees of freedom and scale 1, rather than a half Cauchy with scale 1.
+  The Cauchy's heavy tail let the sampler explore extreme within-group
+  dispersions that the data cannot rule out, since `Sigma_theta` enters the
+  likelihood only through the scalars `beta_q' Sigma_theta beta_q`, one per
+  item. Pass `df_sd_theta = 1` to recover the previous prior.
 
 * Several variables are now absent from the posterior draws under flag
   settings in which they do not enter the likelihood:
@@ -71,11 +78,20 @@
 
 * In `modgirt_probit.stan`, the transition covariance `Omega` is fixed to the
   identity and its parameters are not estimated when `T == 1`.
-  
+
+* The example dataset `social_outcomes_2020_2021` is removed, and replaced by
+  `state_policies_2010_2012`: 111 policies of the 50 U.S. states, observed
+  annually from 2010 through 2012. The new data contain binary,
+  trichotomous, ordinal, and metric items natively.
+
+* The vignette formerly named `dbmm` is renamed `modgirt`, so
+  `vignette("dbmm")` no longer works. Use `vignette("modgirt")`.
+
 ## Improvements
 
 * `summarize_mixfac()` honours `summary_functions` for `rvar` elements and no
   longer calls unexported posterior functions.
+
 * Internal whitening and matrix-inversion helpers now operate on
   `posterior::draws_of()` arrays directly, preserving chain information for
   convergence diagnostics.
@@ -83,13 +99,22 @@
 ## Bug fixes
 
 * `Omega` is now declared `matrix` rather than `cov_matrix` in the generated
-  quantities block. The positive-definiteness check on the constrained type
-  could fail numerically when the factor evolution standard deviation was
-  small — most often with `n_dim = 1`, where `Omega` is a single element —
-  which caused Stan to write `NaN` for every generated quantity in the
-  affected draws, including all of `log_lik`. The check was redundant, since
-  `multiply_lower_tri_self_transpose()` returns a positive semi-definite
-  matrix by construction.
+  quantities block of `mixfac_probit.stan`.
+  `multiply_lower_tri_self_transpose()` is positive *semi*-definite by
+  construction, whereas `cov_matrix` requires strict positive definiteness,
+  so validation failed whenever the factor evolution standard deviation
+  approached zero — most often with `n_dim = 1`, where `Omega` is a single
+  element. A failed check causes Stan to write `NaN` for every generated
+  quantity in the affected draws, including all of `log_lik`.
+
+* `Sigma_theta` and `Omega` are no longer declared `cov_matrix` in the
+  `transformed parameters` block of `modgirt_probit.stan`. A constraint
+  violation there rejects the proposal rather than merely producing `NaN`, so
+  draws in which either matrix was numerically singular were being silently
+  excluded from the posterior — and the prior on the evolution standard
+  deviation actively encourages that region. Both are now built from Cholesky
+  factors, as in `mixfac_probit.stan`, rather than by `quad_form_diag()`
+  followed by `cholesky_decompose()`.
 
 * **`Omega` was reported incorrectly.** It was computed as
   `quad_form(r_Omega, WW)`, rotating the innovation covariance by the
@@ -109,9 +134,8 @@
   loadings and applied it to the whitened ones, so the rotation was not the
   varimax solution for the matrix it was applied to.
 
-* `identify_mixfac()` read `n_time` and the whitening anchor from its `x`
-  argument rather than from the extracted draws, so the documented
-  fitted-object input path did not work.
+* `label_mixfac()` set the dimnames of `Omega` unconditionally, so it errored
+  on fits made with `smooth_eta = FALSE`, for which `Omega` is absent.
 
 * `sort_mixfac()` and `sign_mixfac()` referenced a `kappa` variable that
   `combine_types_mixfac()` does not produce (it emits `kappa_trichot` and
@@ -182,6 +206,11 @@ unchanged.
   stored, removing `T * J * D` values per draw and one array from the
   autodiff tape. `WW` is now local to `whiten()`.
 
+* In `modgirt_probit.stan`, the attenuation term is computed as
+  `dot_self(chol_Sigma_theta' * beta_q)` rather than
+  `quad_form(Sigma_theta, beta_q)`, avoiding one matrix product per item and
+  eliminating a positive-definiteness check per leapfrog step.
+
 * The unused functions `p2l_array()`, `num_matches()`, and `which_equal()`,
   and the unused `tob_*` data arrays, are removed from the Stan program.
 
@@ -191,7 +220,6 @@ unchanged.
   approximate leave-one-out cross-validation via the **loo** package.
   Log-likelihoods can be grouped by unit-item dyad (the default), observation,
   unit, period, item, or item type.
-
 
 * `fit_mixfac()` gains `gen_log_lik`, which adds a per-observation
   `log_lik` to the generated quantities for use with the **loo** package.
@@ -203,23 +231,59 @@ unchanged.
 * `log_lik_index()` maps each position of `log_lik` to its item type, item,
   unit, period, and response value.
 
+* `fit_modgirt()` exposes the priors on the latent covariances:
+  `shape_lkj_theta` and `shape_lkj_bar_theta_evol` for the LKJ priors on the
+  correlation matrices, and `df_sd_theta`, `scale_sd_theta`,
+  `df_sd_bar_theta_evol`, and `scale_sd_bar_theta_evol` for the half
+  Student's t priors on the scales. Defaults reproduce previous behaviour
+  apart from `df_sd_theta`, noted above. Because `Sigma_theta` is weakly
+  identified — it enters the likelihood only through one scalar per item —
+  some shrinkage of its correlations toward zero is usually advisable; see
+  `?fit_modgirt` for why raising `shape_lkj_theta` well above its default
+  expresses a mild preference for a particular rotation.
+
 * `identify_mixfac()`'s `ref_t` argument gains a `"mean"` option, anchoring
   the normalization on each unit's average across periods rather than a
   single period. A pooled anchor does not propagate sampling noise from one
   cross-section through the whole series, and it puts periods on a common
   scale when `smooth_eta = FALSE`.
 
+* `identify_mixfac()` and `identify_modgirt()` gain `random_starts` and
+  `seed`, controlling the rotation's random starts, and `quiet`, which
+  suppresses the iteration log printed by `factor.switching::rsp_exact()`.
+
+* `label_modgirt()` attaches unit, period, and item labels to modgirt draws,
+  completing the labelling step for that model.
+
+* `save_dbmm()` writes a fitted model to disk with its posterior draws
+  materialized. **cmdstanr** reads draws from CSV files on demand, so an
+  object saved with `saveRDS()` becomes unusable once R has deleted its
+  temporary directory. The result is read back with `readRDS()`.
+
+* `state_policies_2010_2012`, a panel of state policies with items of all
+  four measurement types.
+
+* A new vignette, `mixfac`, works through the dynamic factor model from
+  shaping data to comparing models by cross-validation.
+
 * Both fit functions now error informatively when no Stan file matches the
   requested `link`, rather than passing an empty path to **cmdstanr**.
-  
+
 ## Reproducibility
 
-* `identify_mixfac()` is now deterministic. The varimax rotation used a
-  random start, so factor order and sign varied between calls on identical
-  draws. Note that factor orientation is only fully pinned down by following
+* `identify_mixfac()` and `identify_modgirt()` are deterministic by default.
+  The varimax rotation previously used a random start, so factor order and
+  sign varied between calls on identical draws. `random_starts` now defaults
+  to `0`, and when it is positive, `seed` makes the starts reproducible. Note
+  that factor orientation is only fully pinned down by following
   `identify_mixfac()` with `sort_mixfac()` and `sign_mixfac()`.
 
 ## Documentation
+
+* The README is rewritten. It previously documented an interface that no
+  longer exists — `shape_data()`, `fit()`, `extract_draws()`,
+  `identify_draws()`, `label_draws()` — and described the group-level IRT
+  model as future work.
 
 * `@param white_eta` in `fit_mixfac()` corrected to `whiten_eta`.
 
@@ -241,15 +305,16 @@ unchanged.
   dimensions, optional `log_lik`, the
   extract–identify–label–combine–sort–sign pipeline, and post-hoc whitening,
   including that every linear predictor and `lp__` are invariant to
-  identification, sorting, and signing. Fixtures discretize four of the
-  continuous outcomes in `social_outcomes_2020_2021` so that all four
-  item-type code paths are exercised.
+  identification, sorting, and signing. Fixtures draw on
+  `state_policies_2010_2012`, which contains binary, trichotomous, ordinal,
+  and metric items natively, so all four item-type code paths are exercised
+  without discretizing anything.
 
 * Adds `as_draws_rvars_safe()`, which drops absent variables when
-  constructing a `draws_rvars` object, and `copy_mixfac_attrs()`.
+  constructing a `draws_rvars` object, and `copy_dbmm_attrs()`.
 
 ## Licensing
 
-* The package is licensed under GPL-2. The repository previously contained an
-  MIT `LICENSE` file, which conflicted with the `GPL (>= 3)` declaration in
-  `DESCRIPTION`; the intended license is GPL-2.
+* The package is licensed under `GPL (>= 2)`. The repository previously
+  contained an MIT `LICENSE` file, which conflicted with the declaration in
+  `DESCRIPTION`.
