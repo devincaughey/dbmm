@@ -558,3 +558,59 @@ test_that("check_log_lik_finite() passes clean input through unchanged", {
     a <- array(rnorm(20 * 2 * 5, -1), dim = c(20, 2, 5))
     expect_identical(check_log_lik_finite(a), a)
 })
+
+test_that("check_mixfac_data() finds duplicated observations", {
+    d <- test_mixfac_long_data()
+    dd <- rbind(d, d[1, ])
+    expect_warning(
+        res <- check_mixfac_data(dd, "state_abb", "year", "policy_variable",
+                                 "value_real", quiet = TRUE),
+        "more than once"
+    )
+    expect_equal(nrow(res$duplicates), 1L)
+    expect_equal(res$duplicates$n, 2L)
+})
+
+test_that("check_mixfac_data() finds unobserved intermediate levels", {
+    d <- test_mixfac_long_data()
+    it <- unique(d$policy_variable)[1]
+    i <- which(d$policy_variable == it)
+    d$value_real[i] <- rep_len(c(1, 2, 4, 5), length(i))
+    expect_warning(
+        res <- check_mixfac_data(d, "state_abb", "year", "policy_variable",
+                                 "value_real", ordinal_items = it,
+                                 min_cat_n = 0, quiet = TRUE),
+        "intermediate"
+    )
+    expect_equal(res$missing_levels$missing, "3")
+})
+
+test_that("check_mixfac_data() finds single-period items", {
+    d <- test_mixfac_long_data()
+    it <- unique(d$policy_variable)[1]
+    d <- d[d$policy_variable != it | d$year == 2012, ]
+    expect_warning(
+        res <- check_mixfac_data(d, "state_abb", "year", "policy_variable",
+                                 "value_real", quiet = TRUE),
+        "one of"
+    )
+    expect_equal(res$single_period$item, it)
+})
+
+test_that("check_mixfac_data() is silent on clean data", {
+    d <- test_mixfac_long_data()
+    expect_silent(
+        res <- check_mixfac_data(d, "state_abb", "year", "policy_variable",
+                                 "value_real", quiet = TRUE, min_cat_n = 0)
+    )
+    expect_true(all(vapply(res, nrow, integer(1)) == 0L))
+})
+
+test_that("min_cat_n = 0 disables the sparse-category check", {
+    d <- test_mixfac_long_data()
+    res <- suppressWarnings(
+        check_mixfac_data(d, "state_abb", "year", "policy_variable",
+                          "value_real", min_cat_n = 0, quiet = TRUE)
+    )
+    expect_equal(nrow(res$sparse_categories), 0L)
+})

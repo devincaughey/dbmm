@@ -44,9 +44,9 @@ disables the check. Defaults to \code{3}.}
 emitted regardless.}
 }
 \value{
-Invisibly, a list of data frames — \code{duplicates}, \code{no_variation},
+Invisibly, a list of data frames: \code{duplicates}, \code{no_variation},
 \code{single_period}, \code{sparse_categories}, \code{missing_levels}, and
-\code{recoded_binary} — each with zero rows if that check found nothing.
+\code{recoded_binary}, each with zero rows if that check found nothing.
 }
 \description{
 Reports data problems that \code{\link[=shape_mixfac]{shape_mixfac()}} would otherwise pass over
@@ -64,7 +64,7 @@ more than once.
 contribute nothing to the estimated dynamics.
 \item \strong{Sparse response categories} in trichotomous and ordinal items.
 \item \strong{Missing intermediate levels.} \code{\link[=shape_mixfac]{shape_mixfac()}} recodes ordered
-responses with \code{as.integer(ordered(value))}, which numbers the \emph{observed}
+responses with \code{as.integer(ordered(value))}, which numbers the observed
 values consecutively. An item coded 1, 2, 4, 5 therefore becomes a
 four-category item, and its second cutpoint separates the original values
 2 and 4 rather than 2 and 3.
@@ -77,7 +77,8 @@ data("state_policies_2010_2012")
 invisible(check_mixfac_data(
     subset(state_policies_2010_2012, !is.na(value_real)),
     unit_var = "state_abb", time_var = "year",
-    item_var = "policy_variable", value_var = "value_real"
+    item_var = "policy_variable", value_var = "value_real",
+    min_cat_n = 0, quiet = TRUE
 ))
 
 }

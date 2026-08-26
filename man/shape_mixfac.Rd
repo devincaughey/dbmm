@@ -13,10 +13,12 @@ shape_mixfac(
   binary_items = NA,
   trichotomous_items = NA,
   ordinal_items = NA,
-  max_cats = 10,
+  max_cats = 5,
   standardize = TRUE,
   make_indicator_for_zeros = TRUE,
   periods_to_estimate,
+  min_cat_n = 3,
+  check = TRUE,
   quiet = FALSE
 )
 }
@@ -40,11 +42,12 @@ trichotomous. If \code{NA} (the default), then any item with 3 unique values
 will be treated as trichotomous.}
 
 \item{ordinal_items}{(character vector) Items that should be treated as
-ordinal. If \code{NA} (the default), then any item with between 3 and
-\code{max_cats} unique values will be treated as ordinal.}
+ordinal. If \code{NA} (the default), then any item with more than 3 and no
+more than \code{max_cats} unique values will be treated as ordinal.}
 
 \item{max_cats}{(positive integer) Maximum number of response categories for
-ordinal items. Defaults to \code{10}.}
+ordinal items. Items with more distinct values than this are treated as
+metric. Defaults to \code{5}.}
 
 \item{standardize}{(logical) Should metric items be standardized? Defaults to
 \code{TRUE}.}
@@ -65,12 +68,25 @@ dropped. If \code{periods_to_estimate} includes a period for which there is no
 data, parameter values for that year will be imputed by the dynamic
 model.}
 
+\item{min_cat_n}{(non-negative integer) Warn when a trichotomous or ordinal
+item has a response category with fewer than this many observations,
+since the cutpoints bounding sparse categories are weakly identified.
+Passed to \code{\link[=check_mixfac_data]{check_mixfac_data()}}. \code{0} disables the check. Defaults to
+\code{3}.}
+
+\item{check}{(logical) Run \code{\link[=check_mixfac_data]{check_mixfac_data()}} on the input? Defaults to
+\code{TRUE}.}
+
 \item{quiet}{(logical) Suppress messages reporting how items were
-categorized? Defaults to \code{FALSE}.}
+categorized? Defaults to \code{FALSE}. Warnings about data problems are
+emitted regardless.}
 }
 \value{
 A list formatted for Stan
 }
 \description{
 Prepare data for dynamic mixed factor model
+}
+\seealso{
+\code{\link[=check_mixfac_data]{check_mixfac_data()}}
 }

@@ -21,10 +21,11 @@ knitr::opts_chunk$set(
   out.width = "100%"
 )
 options(width = 88)
+```
 
-## Bump to 1000 for the released vignette
-n_warmup <- 200
-n_sample <- 200
+```{r iterations}
+n_warmup <- 1000
+n_sample <- 1000
 ```
 
 ```{r libraries, message = FALSE}
@@ -81,8 +82,7 @@ which is the subject of the identification section below.
 
 `state_policies_2010_2012` records the policies of the 50 U.S. states from
 2010 through 2012. Most policies are binary — does the state have the
-policy in force or not? — but some are ordinal and some are continuous,
-which makes the data a natural application for a mixed-indicator model.
+policy in force or not? — but others are ordinal or continuous, which makes the data a natural application for a mixed-indicator model.
 
 ```{r data}
 data("state_policies_2010_2012")
@@ -105,10 +105,12 @@ head(item_labels, 4)
 
 ## Checking the data before shaping
 
-`shape_mixfac()` takes the long data frame at face value. It drops rows
-with missing responses, but it does not check for repeated
-unit-period-item combinations, and a duplicated response would enter the
-likelihood twice. It costs one line to confirm there are none.
+`shape_mixfac()` calls `check_mixfac_data()` on its input, which reports
+problems that would otherwise pass silently: duplicated unit-period-item
+combinations, items with no variation or observed in only one period, sparse
+response categories in ordered items, and unobserved intermediate levels.
+The same function can be run beforehand to inspect data on its own. Here we
+look at a few of them.
 
 ```{r duplicates}
 anyDuplicated(state_policies_2010_2012[c("state_abb", "year",
@@ -141,6 +143,7 @@ policies |>
 
 Two policies are observed in fewer than all three years. They still inform
 the loadings, but contribute little or nothing to the estimated dynamics.
+`check_mixfac_data()` warns about the more extreme case, where an item appears in a single period.
 
 # Step 1: Shape the data
 
@@ -149,6 +152,17 @@ sorting observations by item type and recording the labels needed to
 interpret the output. By default it classifies items automatically: two
 distinct values means binary, three means trichotomous, four to `max_cats`
 means ordinal, and anything else is metric.
+
+The automatic classification counts distinct values, which can misfire. Here
+`x_chip_pregnantwomen` records a CHIP income-eligibility threshold — a
+continuous quantity — but takes nine distinct values across the 50 states.
+Under earlier versions of this package, which classified anything with up to
+ten distinct values as ordinal, it was treated as a nine-category ordinal
+item. Several of those categories held only a handful of observations, the
+cutpoints bounding them drifted to implausible magnitudes, and the resulting
+rejected proposals left the two-dimensional fit badly mixed. The default
+`max_cats = 5` now classifies it as metric, but it is worth naming the
+genuinely ordinal items explicitly even where, as here, the default would have classified it correctly.
 
 ```{r shape}
 shaped <- shape_mixfac(
@@ -159,9 +173,16 @@ shaped <- shape_mixfac(
     value_var           = "value_real",
     periods_to_estimate = 2010:2012,
     standardize         = TRUE,
-    make_indicator_for_zeros = FALSE
+    make_indicator_for_zeros = FALSE,
+    ordinal_items       = "w4_gayrights_employment_discrimination"
 )
 ```
+
+Two trichotomous items have a response category with fewer than three
+observations — a handful of states in a middle or extreme category — which
+`check_mixfac_data()` flags. With only two cutpoints and 150 observations
+apiece the risk is modest, so we proceed, but the check is worth heeding when
+the affected items have many categories.
 
 ```{r shape-counts}
 c(units   = shaped$J,
@@ -201,7 +222,8 @@ fit2 <- fit_mixfac(
     iter_sampling   = n_sample,
     adapt_delta     = 0.9,
     refresh         = 0,
-    seed            = 123
+    seed            = 123,
+    show_exceptions = FALSE
 )
 ```
 
@@ -213,11 +235,17 @@ section; it is off by default because it can dominate the size of the
 output.
 
 ```{r fit-time}
-fit2$$fit$$time()$total
+fit2$fit$time()$total
 ```
 
+During warmup the sampler can propose extreme parameter values, and Stan
+reports the resulting rejected proposals at length. `show_exceptions = FALSE`
+suppresses those messages while leaving genuine warnings — divergences,
+treedepth saturation, low E-BFMI — visible. The diagnostics below are the
+ones to check.
+
 ```{r fit-diagnostics}
-fit2$$fit$$diagnostic_summary()
+fit2$fit$diagnostic_summary()
 ```
 
 # Step 3: Extract draws
@@ -331,19 +359,20 @@ names(summ)
 summ$Omega
 ```
 
-The diagonal of $\Omega$ gives the innovation variance of each factor: how
-far a state's latent position is expected to move from one year to the
-next. Over three years of policy data these should be small, since state
-policy is sticky. Comparing them with the cross-sectional spread of `eta`
-indicates how much of the variation is between states rather than within
-them over time.
+Because `whiten_eta = TRUE` fixes the cross-sectional covariance of the
+period-1 factor scores to the identity, the between-state standard deviation
+is 1 by construction, and latent distances are measured in units of it. The
+innovation standard deviations of roughly 0.03 therefore say that a state
+moves about three per cent of the between-state spread from one year to the
+next: policy is sticky, as expected over three years.
 
 ```{r variance-decomposition}
-eta_e <- E(draws_final$eta)
+## Average each state over periods, then take the SD across states, per factor
+eta_bar <- rvar_apply(draws_final$eta, c(2, 3), rvar_mean)   # [J, D]
 
 tibble(
-    factor = 1:2,
-    sd_between_states = apply(eta_e, 3, function(x) sd(apply(x, 2, mean))),
+    factor            = 1:2,
+    sd_between_states = rvar_apply(eta_bar, 2, rvar_sd),
     sd_innovation     = sqrt(diag(E(draws_final$Omega)))
 )
 ```
@@ -413,7 +442,7 @@ would indicate that a single dimension does not suffice.
 eta_df <- tidy_rvar(draws_final$eta) |>
     mutate(period = as.integer(as.character(period)))
 
-show_states <- c("MA", "NY", "CA", "OR", "TX", "AL", "MS", "UT", "KS", "OH")
+show_states <- c("MA", "NY", "CA", "OR", "TX", "AL", "MS", "UT", "KS", "WI")
 
 eta_df |>
     filter(unit %in% show_states, factor == 1) |>
@@ -421,8 +450,9 @@ eta_df |>
     geom_ribbon(aes(ymin = est - 1.96 * err, ymax = est + 1.96 * err),
                 alpha = 1/6) +
     geom_line() +
+    geom_point() +
     facet_wrap(~ unit, nrow = 2) +
-    scale_x_continuous(breaks = 2010:2012) +
+    scale_x_continuous(breaks = 2010:2012, minor_breaks = NULL) +
     labs(x = NULL, y = "Factor 1",
          title = "Latent policy positions, 2010-2012")
 ```
@@ -469,8 +499,9 @@ fit1 <- fit_mixfac(
     smooth_eta = TRUE, gen_log_lik = TRUE,
     chains = 4, parallel_chains = 4,
     iter_warmup = n_warmup, iter_sampling = n_sample,
-    refresh = 0, seed = 123
+    refresh = 0, seed = 123, show_exceptions = FALSE
 )
+summarize_draws(subset_draws(fit1$fit$draws(), "lp__"))
 ```
 
 ```{r loo-compute}
@@ -495,8 +526,16 @@ table(cut(loo::pareto_k_values(loo2), c(-Inf, 0.5, 0.7, 1, Inf),
 head(loo_influential(loo2, threshold = 0.7), 8)
 ```
 
+Note that high Pareto $k$ has two quite different causes here. The dyads at
+the top of this list have `elpd_loo` values of essentially zero: the model
+predicts them perfectly, because the state never changes its position on the
+item, and the importance ratios are unstable for want of any variation to
+weight. That is a separation artifact rather than a sign of poor fit. Dyads
+with both high $k$ and substantially negative `elpd_loo` are the ones the
+model genuinely struggles with.
+
 ```{r loo-compare}
-loo::loo_compare(one_factor = loo1, two_factor = loo2)
+loo::loo_compare(list(one_factor = loo1, two_factor = loo2))
 ```
 
 A difference in `elpd_diff` that is large relative to its standard error
@@ -518,4 +557,11 @@ that case.
 
 ```{r session-info}
 sessionInfo()
+```
+
+```{r save, include = FALSE}
+if (nzchar(Sys.getenv("DBMM_SAVE_FITS"))) {
+    save_dbmm(fit2, "~/dbmm-vignette-fit2.rds")
+    save_dbmm(fit1, "~/dbmm-vignette-fit1.rds")
+}
 ```

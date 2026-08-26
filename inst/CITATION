@@ -1,0 +1,77 @@
+citHeader("To cite dbmm in publications, please use:")
+
+bibentry(
+    bibtype  = "Manual",
+    title    = "{dbmm}: Dynamic Bayesian Measurement Models",
+    author   = c(
+        person("Devin",       "Caughey"),
+        person("Elissa",      "Berwick"),
+        person("James",       "Dunham"),
+        person("Tomoya",      "Sasaki"),
+        person("Christopher", "Warshaw")
+    ),
+    year     = "2026",
+    note     = sprintf("R package version %s", meta$Version),
+    url      = "https://github.com/devincaughey/dbmm"
+)
+
+citHeader("As relevant, you may also wish to cite the following papers where these methods or their ancestors were described:")
+
+bibentry(
+    bibtype  = "Article",
+    key      = "berwick_caughey25dynam_multid",
+    author   = c(person("Elissa", "Berwick"),
+                 person("Devin",  "Caughey")),
+    title    = "{MODGIRT}: Multidimensional Dynamic Scaling of Aggregate Survey Data",
+    journal  = "Political Analysis",
+    year     = "2025",
+    volume   = "33",
+    number   = "2",
+    pages    = "91--106",
+    doi      = "10.1017/pan.2024.25"
+)
+
+bibentry(
+    bibtype  = "Article",
+    key      = "caughey_ogrady_warshaw19polic_ideol",
+    author   = c(person("Devin",       "Caughey"),
+                 person("Tom",         "O'Grady"),
+                 person("Christopher", "Warshaw")),
+    title    = "Policy Ideology in European Mass Publics, 1981--2016",
+    journal  = "American Political Science Review",
+    year     = "2019",
+    volume   = "113",
+    number   = "3",
+    pages    = "674--693",
+    doi      = "10.1017/S0003055419000157"
+)
+
+bibentry(
+    bibtype  = "Article",
+    key      = "caughey_warshaw16dynam_state",
+    author   = c(person("Devin",       "Caughey"),
+                 person("Christopher", "Warshaw")),
+    title    = "The Dynamics of State Policy Liberalism, 1936--2014",
+    journal  = "American Journal of Political Science",
+    year     = "2016",
+    volume   = "60",
+    number   = "4",
+    pages    = "899--913",
+    doi      = "10.1111/ajps.12219"
+)
+
+bibentry(
+    bibtype  = "Article",
+    key      = "caughey_warshaw15dynam_estim",
+    author   = c(person("Devin",       "Caughey"),
+                 person("Christopher", "Warshaw")),
+    title    = "Dynamic Estimation of Latent Opinion Using a Hierarchical Group-Level {IRT} Model",
+    journal  = "Political Analysis",
+    year     = "2015",
+    volume   = "23",
+    number   = "2",
+    pages    = "197--211",
+    doi      = "10.1093/pan/mpu021"
+)
+
+

@@ -86,6 +86,25 @@
 
 * The vignette formerly named `dbmm` is renamed `modgirt`, so
   `vignette("dbmm")` no longer works. Use `vignette("modgirt")`.
+  
+* `shape_mixfac()`'s `max_cats` now defaults to `5`, previously `10`. Items
+  with more than `max_cats` distinct values are treated as metric rather than
+  ordinal, so items with 6 to 10 distinct values are classified differently.
+  The previous default classified coarsely-measured continuous variables as
+  ordinal, estimating a free cutpoint per category. In the package's own
+  vignette it treated a continuous CHIP eligibility threshold as a
+  nine-category ordinal item; several categories held one or two
+  observations, the cutpoints bounding them drifted above 1e5, and the
+  resulting rejected proposals left the two-factor fit with an R-hat of 1.6
+  on the loadings. Classifying the item as metric brings R-hat to 1.01 with a
+  minimum bulk effective sample size of 1230. Pass `max_cats = 10` to recover
+  the previous behaviour, or name the genuinely ordinal items via
+  `ordinal_items`.
+
+* `shape_mixfac()` now drops units with no observed response. Units were
+  factored before missing responses were dropped, so a unit with no data
+  survived as an empty level, inflating `J` and leaving its factor scores
+  informed only by their prior.
 
 ## Improvements
 
@@ -262,6 +281,13 @@ unchanged.
 
 * `state_policies_2010_2012`, a panel of state policies with items of all
   four measurement types.
+  
+* `check_mixfac_data()` reports data problems that `shape_mixfac()` would
+  otherwise pass over silently: duplicated unit-period-item combinations,
+  items with no variation, items observed in a single period, sparse response
+  categories in ordered items, unobserved intermediate levels, and binary
+  items not coded 0/1. It is called by `shape_mixfac()`, which gains
+  `min_cat_n` and `check` arguments, and can also be run beforehand.
 
 * A new vignette, `mixfac`, works through the dynamic factor model from
   shaping data to comparing models by cross-validation.

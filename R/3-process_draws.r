@@ -719,6 +719,7 @@ sign_mixfac <- function(x, signs = 1, check = TRUE) {
     attr(out, "signed-permutation matrix") <-
         attr(x, "signed-permutation matrix")
     attr(out, "sign flips") <- sign_flips
+    attr(out, "factor order") <- attr(x, "factor order")
 
     class(out) <- unique(c("mixfac_signed", class(x)))
     return(out)

@@ -19,7 +19,7 @@ test_mixfac_long_data <- function(periods = 2010:2012,
     ## Classify exactly as shape_mixfac() does, on the subset actually used
     n_u <- tapply(d$value_real, d$policy_variable,
                   function(x) length(unique(x)))
-    type_of <- cut(n_u, breaks = c(0, 1, 2, 3, 10, Inf),
+    type_of <- cut(n_u, breaks = c(0, 1, 2, 3, 5, Inf),
                    labels = c("dropped", "binary", "trichot",
                               "ordinal", "metric"))
     names(type_of) <- names(n_u)
@@ -39,7 +39,9 @@ test_mixfac_long_data <- function(periods = 2010:2012,
 }
 
 test_mixfac_shaped_data <- function(periods = 2010:2012) {
-    suppressMessages(shape_mixfac(
+    key <- paste0("shaped_", paste(periods, collapse = "-"))
+    if (!is.null(.mixfac_cache[[key]])) return(.mixfac_cache[[key]])
+    out <- suppressMessages(shape_mixfac(
         long_data = test_mixfac_long_data(periods),
         unit_var = "state_abb",
         time_var = "year",
@@ -47,9 +49,15 @@ test_mixfac_shaped_data <- function(periods = 2010:2012) {
         value_var = "value_real",
         standardize = TRUE,
         make_indicator_for_zeros = FALSE,
-        periods_to_estimate = periods
+        periods_to_estimate = periods,
+        ## The fixture is deliberately small, so sparse cells are expected;
+        ## the check itself is exercised in the check_mixfac_data() tests
+        min_cat_n = 0
     ))
+    .mixfac_cache[[key]] <- out
+    out
 }
+
 
 ## Cache keyed on the flag settings that matter for the patches under test.
 .mixfac_cache <- new.env(parent = emptyenv())

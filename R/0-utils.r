@@ -294,3 +294,24 @@ renumber_factor_dimnames <- function(x, dims, n_factor) {
     for (d in dims) dimnames(x)[[d]] <- seq_len(n_factor)
     x
 }
+
+#' Classify items by measurement type
+#'
+#' @param n_unique (named integer vector) Number of distinct observed values
+#'     per item.
+#' @param max_cats (positive integer) Largest number of distinct values for
+#'     which an item is classified as ordinal.
+#' @return A named character vector of `"dropped"`, `"binary"`,
+#'     `"trichotomous"`, `"ordinal"`, or `"metric"`.
+#' @keywords internal
+#' @noRd
+classify_mixfac_items <- function(n_unique, max_cats = 5) {
+    out <- rep(NA_character_, length(n_unique))
+    names(out) <- names(n_unique)
+    out[n_unique <  2L]                        <- "dropped"
+    out[n_unique == 2L]                        <- "binary"
+    out[n_unique == 3L]                        <- "trichotomous"
+    out[n_unique >  3L & n_unique <= max_cats] <- "ordinal"
+    out[n_unique >  max_cats]                  <- "metric"
+    out
+}
