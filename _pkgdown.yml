@@ -1,0 +1,48 @@
+url: https://devincaughey.github.io/dbmm/
+
+template:
+  bootstrap: 5
+
+reference:
+- title: Dynamic factor model
+  desc: For units observed directly on indicators of mixed type.
+  contents:
+  - shape_mixfac
+  - check_mixfac_data
+  - fit_mixfac
+  - extract_mixfac_draws
+  - identify_mixfac
+  - label_mixfac
+  - combine_types_mixfac
+  - sort_mixfac
+  - sign_mixfac
+  - summarize_mixfac
+  - log_lik_draws
+  - log_lik_index
+  - loo_mixfac
+  - loo_influential
+
+- title: Group-level IRT model
+  desc: For latent traits of groups inferred from individual survey responses.
+  contents:
+  - shape_modgirt
+  - fit_modgirt
+  - identify_modgirt
+  - label_modgirt
+  - rotate_modgirt
+  - sort_modgirt
+  - sign_modgirt
+
+- title: Utilities
+  contents:
+  - save_dbmm
+  - rotate_eta_rvar
+  - as_draws_rvars_safe
+  - copy_dbmm_attrs
+  - renumber_factor_dimnames
+  - vgQ.maxvar1
+  - with_seed
+
+- title: Data
+  contents:
+  - state_policies_2010_2012
