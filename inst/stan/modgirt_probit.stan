@@ -13,6 +13,26 @@ functions {
     WW = cholesky_decompose(PP); /* Cholesky decomposition of precision */
     return DM * WW; /* de-meaned and whitened XX */
   }
+  /* Number of group-item-periods with at least one response. Declared as a
+     function so that transformed data can size its index arrays in a single
+     declaration block. */
+  int count_observed_cells(array[,,,] real SS) {
+    int n = 0;
+    for (t in 1 : dims(SS)[1]) {
+      for (g in 1 : dims(SS)[2]) {
+        for (q in 1 : dims(SS)[3]) {
+          real tot = 0;
+          for (k in 1 : dims(SS)[4]) {
+            tot += SS[t, g, q, k];
+          }
+          if (tot > 0) {
+            n += 1;
+          }
+        }
+      }
+    }
+    return n;
+  }
 }
 data {
   int<lower=1> T; // number of periods
@@ -29,12 +49,39 @@ data {
   real<lower=0> scale_sd_theta;
   real<lower=0> df_sd_bar_theta_evol;
   real<lower=0> scale_sd_bar_theta_evol;
+  int<lower=0, upper=1> gen_log_lik; // compute per-cell log_lik?
 }
 transformed data {
   /* The transition covariance Omega is identified only if T > 1. When T == 1
      there is no transition, so Omega is fixed to the identity rather than
      estimated (see transformed parameters). */
   int<lower=0, upper=1> est_Omega = T > 1;
+  /* Group-item-periods with at least one response. Cells with no responses
+     contribute nothing to the likelihood, so giving them a log_lik entry of
+     exactly zero would create degenerate observations for PSIS. */
+  int<lower=0> N_obs = count_observed_cells(SSSS);
+  array[N_obs] int tt_obs;
+  array[N_obs] int gg_obs;
+  array[N_obs] int qq_obs;
+  {
+    int pos = 1;
+    for (t in 1 : T) {
+      for (g in 1 : G) {
+        for (q in 1 : Q) {
+          real tot = 0;
+          for (k in 1 : K) {
+            tot += SSSS[t, g, q, k];
+          }
+          if (tot > 0) {
+            tt_obs[pos] = t;
+            gg_obs[pos] = g;
+            qq_obs[pos] = q;
+            pos += 1;
+          }
+        }
+      }
+    }
+  }
 }
 parameters {
   array[Q] ordered[K - 1] z_alpha; // thresholds (difficulties)
@@ -129,6 +176,40 @@ model {
           }
         }
       }
+    }
+  }
+}
+generated quantities {
+  /* Per-cell log likelihood, for loo/waic. One element per group-item-period
+     with at least one response, in the order period, group, item (item varying
+     fastest); see log_lik_index_modgirt(). Each element is the weighted sum
+     over response categories, so holding one out removes every respondent who
+     answered that item in that group and period. Normalized _lpmf is used,
+     unlike the _lupmf in the model block, so that values are comparable
+     across models. The multinomial coefficient is omitted: it does not depend
+     on the parameters, and is not well defined when SSSS is weighted. */
+  vector[gen_log_lik ? N_obs : 0] log_lik;
+
+  if (gen_log_lik) {
+    vector[Q] denom_q;
+    for (q in 1 : Q) {
+      denom_q[q] =
+        sqrt(1 + dot_self(chol_Sigma_theta' * to_vector(beta[q][1 : D])));
+    }
+    for (n in 1 : N_obs) {
+      int t = tt_obs[n];
+      int g = gg_obs[n];
+      int q = qq_obs[n];
+      vector[K - 1] cuts = alpha[t, q][1 : (K - 1)] / denom_q[q];
+      real eta = to_row_vector(beta[q][1 : D])
+                 * to_vector(bar_theta[t, g, 1 : D]) / denom_q[q];
+      real ll = 0;
+      for (k in 1 : K) {
+        if (SSSS[t, g, q, k] > 0) {
+          ll += SSSS[t, g, q, k] * ordered_probit_lpmf(k | eta, cuts);
+        }
+      }
+      log_lik[n] = ll;
     }
   }
 }

@@ -155,3 +155,81 @@ test_that("label_modgirt() output survives sort and sign", {
     expect_equal(dimnames(s$beta)$item, attr(lab, "item_labels"))
     expect_equal(dimnames(g$bar_theta)$unit, attr(lab, "unit_labels"))
 })
+
+### LOO
+
+test_that("fit_modgirt() returns a classed object", {
+    expect_s3_class(test_modgirt_fit(), "modgirt_fit")
+})
+
+test_that("log_lik_index_modgirt() has one row per observed cell", {
+    sdat <- test_modgirt_shaped_data()
+    idx <- log_lik_index_modgirt(sdat)
+    n_resp <- apply(sdat$SSSS, c(1, 2, 3), sum)
+    expect_identical(nrow(idx), sum(n_resp > 0))
+    expect_identical(idx$position, seq_len(nrow(idx)))
+    expect_true(all(idx$n_responses > 0))
+    expect_false(anyNA(idx$item))
+    expect_false(anyNA(idx$unit))
+    expect_false(anyNA(idx$period))
+})
+
+test_that("gen_log_lik = TRUE emits one element per observed cell", {
+    f <- test_modgirt_fit(gen_log_lik = TRUE)
+    ll <- log_lik_draws(f, group = "observation")
+    expect_equal(dim(ll)[3L], nrow(log_lik_index_modgirt(f$stan_data)))
+    expect_true(all(is.finite(posterior::draws_of(
+        posterior::as_draws_rvars(f$fit$draws("log_lik"))$log_lik))))
+})
+
+test_that("gen_log_lik = FALSE omits log_lik", {
+    f <- test_modgirt_fit(gen_log_lik = FALSE)
+    expect_error(log_lik_draws(f), "gen_log_lik")
+})
+
+test_that("log_lik sums to the model's ordinal contribution", {
+    ## Every cell's contribution is a weighted sum of log probabilities, so
+    ## the total must be negative and finite
+    f <- test_modgirt_fit(gen_log_lik = TRUE)
+    ll <- log_lik_draws(f, group = "observation")
+    tot <- apply(ll, c(1, 2), sum)
+    expect_true(all(is.finite(tot)))
+    expect_true(all(tot < 0))
+})
+
+test_that("regrouping preserves the total log-likelihood", {
+    f <- test_modgirt_fit(gen_log_lik = TRUE)
+    tot <- function(g) sum(apply(log_lik_draws(f, group = g), c(1, 2), sum))
+    expect_equal(tot("observation"), tot("dyad"),   tolerance = 1e-10)
+    expect_equal(tot("observation"), tot("unit"),   tolerance = 1e-10)
+    expect_equal(tot("observation"), tot("period"), tolerance = 1e-10)
+    expect_equal(tot("observation"), tot("item"),   tolerance = 1e-10)
+})
+
+test_that("dyad grouping has one column per group-item pair", {
+    f <- test_modgirt_fit(gen_log_lik = TRUE)
+    idx <- log_lik_index_modgirt(f$stan_data)
+    ld <- log_lik_draws(f, group = "dyad")
+    expect_equal(dim(ld)[3L], nrow(dplyr::distinct(idx, item, unit)))
+})
+
+test_that("item_type grouping is rejected for modgirt", {
+    f <- test_modgirt_fit(gen_log_lik = TRUE)
+    expect_error(log_lik_draws(f, group = "item_type"))
+})
+
+test_that("loo_modgirt() returns a loo object", {
+    skip_if_not_installed("loo")
+    l <- test_modgirt_loo()
+    expect_s3_class(l, "loo")
+    expect_equal(attr(l, "dbmm_group"), "dyad")
+    expect_false(anyNA(l$diagnostics$n_eff))
+})
+
+test_that("loo_influential() works on a modgirt loo object", {
+    skip_if_not_installed("loo")
+    l <- test_modgirt_loo()
+    inf <- loo_influential(l, threshold = -Inf)
+    expect_equal(nrow(inf), length(loo::pareto_k_values(l)))
+    expect_false(is.unsorted(rev(inf$pareto_k)))
+})

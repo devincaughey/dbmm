@@ -20,6 +20,7 @@ fit_modgirt(
   scale_sd_theta = 1,
   df_sd_bar_theta_evol = 4,
   scale_sd_bar_theta_evol = 0.1,
+  gen_log_lik = FALSE,
   ...
 )
 }
@@ -77,6 +78,12 @@ group means toward being constant over time: on the whitened scale of
 period 1, an innovation standard deviation of \code{0.1} moves a group by
 roughly a tenth of the between-group spread from one period to the
 next. Ignored when \code{T == 1}.}
+
+\item{gen_log_lik}{(logical) Should the per-cell log likelihood be computed
+and returned, for use with the \pkg{loo} package? Defaults to \code{FALSE}.
+\code{log_lik} has one element per group-item-period with at least one
+response, per draw, which can dominate the size of the output. See
+\code{\link[=log_lik_index_modgirt]{log_lik_index_modgirt()}} for the mapping from positions to cells.}
 
 \item{...}{Additional arguments to be passed to the Stan sampling function.}
 }

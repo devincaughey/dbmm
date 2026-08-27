@@ -1,3 +1,23 @@
+# dbmm (development version)
+
+## New features
+
+* `fit_modgirt()` gains `gen_log_lik`, and `loo_modgirt()` computes
+  approximate leave-one-out cross-validation for group-level IRT models.
+  `log_lik_index_modgirt()` maps positions of `log_lik` to group-item-periods.
+  `log_lik_draws()` is now generic, with methods for both model families, and
+  supports the same groupings as for mixfac apart from `"item_type"`, which
+  modgirt lacks.
+
+  The finest unit of the MODGIRT likelihood is a group-item-period cell rather
+  than an individual response, so holding one out removes every respondent who
+  answered that item in that group and period. `elpd_loo` is therefore not on
+  the same scale as `loo_mixfac()`'s, and the two cannot be compared. When
+  `shape_modgirt()` was given `weight_var` the counts are non-integer and the
+  quantity cross-validated is a pseudo-likelihood.
+
+* `fit_modgirt()` now returns an object of class `modgirt_fit`.
+
 # dbmm 0.1.0
 
 ## Breaking changes

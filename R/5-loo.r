@@ -1,3 +1,48 @@
+#' Map positions of `log_lik` to group-item-periods
+#'
+#' @param stan_data A list from [shape_modgirt()], as returned in the
+#'     `stan_data` element of [fit_modgirt()].
+#'
+#' @return A data frame with one row per element of `log_lik`, giving the item,
+#'     unit, period, and total (possibly weighted) number of responses.
+#'
+#' @details
+#' Positions run in the order the Stan program fills them: period, then group,
+#' then item, with item varying fastest. Cells with no responses are omitted,
+#' since they contribute nothing to the likelihood.
+#'
+#' @export
+log_lik_index_modgirt <- function(stan_data) {
+    if (is.null(stan_data$SSSS)) {
+        cli::cli_abort("{.arg stan_data} has no {.field SSSS} element.")
+    }
+    dm <- dim(stan_data$SSSS)
+    ## Item varies fastest, matching Stan's for (t) for (g) for (q) ordering
+    grid <- expand.grid(item = seq_len(dm[3L]),
+                        unit = seq_len(dm[2L]),
+                        period = seq_len(dm[1L]),
+                        KEEP.OUT.ATTRS = FALSE)
+    n_resp <- apply(stan_data$SSSS, c(1L, 2L, 3L), sum)   # [T, G, Q]
+    grid$n_responses <-
+        n_resp[cbind(grid$period, grid$unit, grid$item)]
+    grid <- grid[grid$n_responses > 0, , drop = FALSE]
+
+    lab <- function(nm, i) {
+        v <- attr(stan_data, nm)
+        if (is.null(v)) as.character(i) else v[i]
+    }
+    out <- data.frame(
+        item        = lab("item_labels", grid$item),
+        unit        = lab("unit_labels", grid$unit),
+        period      = lab("time_labels", grid$period),
+        n_responses = grid$n_responses,
+        stringsAsFactors = FALSE
+    )
+    out$position <- seq_len(nrow(out))
+    row.names(out) <- NULL
+    out
+}
+
 #' Group log-likelihood columns
 #'
 #' @param idx (data frame) Output of [log_lik_index()].
@@ -23,13 +68,26 @@ log_lik_group_key <- function(idx, group, call = rlang::caller_env()) {
         )
     )
 
+    ## Models with a single response type (modgirt) have no item_type column;
+    ## item labels are then unique on their own
+    if ("item_type" %in% cols && !"item_type" %in% names(idx)) {
+        if (identical(group, "item_type")) {
+            cli::cli_abort(
+                     "{.code group = \"item_type\"} is not available for this model,
+                 which has a single response type.",
+                 call = call
+                 )
+        }
+        cols <- setdiff(cols, "item_type")
+    }
+
     absent <- setdiff(cols, names(idx))
     if (length(absent)) {
         cli::cli_abort(
-            "{.fn log_lik_index} is missing column{?s} {.field {absent}},
+                 "The log-likelihood index is missing column{?s} {.field {absent}},
              needed for {.code group = {.val {group}}}.",
-            call = call
-        )
+             call = call
+             )
     }
 
     parts <- lapply(idx[cols], as.character)
@@ -49,60 +107,43 @@ log_lik_group_key <- function(idx, group, call = rlang::caller_env()) {
     factor(key, levels = unique(key))
 }
 
-#' Extract per-observation log-likelihood draws
+#' Aggregate log-likelihood draws by group
 #'
-#' @param x (mixfac_fit) A fitted model from [fit_mixfac()], fit with
-#'     `gen_log_lik = TRUE`.
-#' @param group (string) Level at which to sum log-likelihoods, giving the
-#'     joint predictive density of each group. One of `"dyad"` (the default;
-#'     unit-by-item, i.e. all periods of one item for one unit),
-#'     `"observation"`, `"unit"`, `"period"`, `"item"`, or `"item_type"`.
-#' @param shaped_data (mixfac_data or `NULL`) The data the model was fit to,
-#'     needed to map positions of `log_lik` to observations. By default taken
-#'     from `x`, which requires that it was fit with `return_data = TRUE`;
-#'     supply it explicitly otherwise.
-#'
-#' @return A `draws_array` with dimensions iteration by chain by group. The
-#'     grouping is recorded in the `"dbmm_group"` attribute.
-#'
-#' @export
-log_lik_draws <- function(x, group = "dyad", shaped_data = NULL) {
-    check_arg_type(arg = x, typename = "mixfac_fit")
-    group <- match.arg(group, c("dyad", "observation", "unit", "period",
-                                "item", "item_type"))
-
-    ## Check for log_lik first: it needs nothing but `x`, and its absence is
-    ## the more fundamental problem to report
-    if (!"log_lik" %in% x$fit$metadata()$stan_variables) {
+#' @param fit A `CmdStanMCMC` object.
+#' @param group (string) Grouping level, already validated.
+#' @param idx (data frame or `NULL`) Log-likelihood index, as returned by
+#'     [log_lik_index()] or [log_lik_index_modgirt()]. `NULL` is an error
+#'     unless `group` is `"observation"`.
+#' @param data_hint (string) Advice to give when `idx` is `NULL`.
+#' @keywords internal
+#' @noRd
+log_lik_draws_impl <- function(fit, group, idx, data_hint) {
+    if (!"log_lik" %in% fit$metadata()$stan_variables) {
         cli::cli_abort(c(
             "{.field log_lik} is not present in the draws.",
             "i" = "Refit with {.code gen_log_lik = TRUE}."
         ))
     }
-    ll <- x$fit$draws("log_lik", format = "draws_array")
+    ll <- fit$draws("log_lik", format = "draws_array")
     if (group == "observation") {
         attr(ll, "dbmm_group") <- group
         return(ll)
     }
 
-    if (is.null(shaped_data)) shaped_data <- x$shaped_data
-    if (is.null(shaped_data) || !length(shaped_data)) {
+    if (is.null(idx)) {
         cli::cli_abort(c(
-            "Cannot group {.field log_lik} without the data {.arg x} was fit to.",
-            "i" = "Refit with {.code return_data = TRUE}, or pass
-                   {.arg shaped_data} directly.",
+            "Cannot group {.field log_lik} without the data the model was
+             fit to.",
+            "i" = data_hint,
             "i" = "{.code group = \"observation\"} needs no data and works
                    without it."
         ))
     }
-    check_arg_type(arg = shaped_data, typename = "mixfac_data")
-
-    idx <- log_lik_index(shaped_data)
     if (nrow(idx) != dim(ll)[3L]) {
         cli::cli_abort(c(
-            "{.fn log_lik_index} returned {nrow(idx)} row{?s} but
+            "The log-likelihood index has {nrow(idx)} row{?s} but
              {.field log_lik} has {dim(ll)[3L]} element{?s}.",
-            "i" = "{.arg shaped_data} may not be the data {.arg x} was fit to."
+            "i" = "The supplied data may not be what the model was fit to."
         ))
     }
     key <- log_lik_group_key(idx, group)
@@ -118,13 +159,115 @@ log_lik_draws <- function(x, group = "dyad", shaped_data = NULL) {
     )
     j_by_group <- split(seq_len(nrow(idx)), key)
     for (g in seq_along(j_by_group)) {
-        ## rowSums(dims = 2) sums over the third margin, and is much faster
-        ## than apply() for the many-column case
         out[, , g] <- rowSums(ll[, , j_by_group[[g]], drop = FALSE], dims = 2L)
     }
 
     out <- posterior::as_draws_array(out)
     attr(out, "dbmm_group") <- group
+    out
+}
+
+#' Extract log-likelihood draws
+#'
+#' @param x A fitted model from [fit_mixfac()] or [fit_modgirt()], fit with
+#'     `gen_log_lik = TRUE`.
+#' @param group (string) Level at which to sum log-likelihoods, giving the
+#'     joint predictive density of each group. One of `"dyad"` (the default),
+#'     `"observation"`, `"unit"`, `"period"`, or `"item"`; mixfac fits also
+#'     accept `"item_type"`.
+#' @param ... Passed to methods.
+#'
+#' @return A `draws_array` with dimensions iteration by chain by group. The
+#'     grouping is recorded in the `"dbmm_group"` attribute.
+#'
+#' @details
+#' For a mixfac fit the finest level is one response, so `"dyad"` sums over
+#' the periods in which a unit was observed on an item. For a modgirt fit the
+#' finest level is a group-item-period cell, and each element is already a sum
+#' over response categories weighted by the number of respondents; `"dyad"`
+#' then sums over periods as well. The two are therefore on different scales,
+#' and their `elpd_loo` values are not comparable.
+#'
+#' @export
+log_lik_draws <- function(x, group = "dyad", ...) {
+    UseMethod("log_lik_draws")
+}
+
+#' @param shaped_data (mixfac_data or `NULL`) The data the model was fit to.
+#'     By default taken from `x`, which requires `return_data = TRUE`.
+#' @rdname log_lik_draws
+#' @export
+log_lik_draws.mixfac_fit <- function(x, group = "dyad", shaped_data = NULL,
+                                     ...) {
+    group <- match.arg(group, c("dyad", "observation", "unit", "period",
+                                "item", "item_type"))
+    if (is.null(shaped_data)) shaped_data <- x$shaped_data
+    idx <- if (!is.null(shaped_data) && length(shaped_data)) {
+               check_arg_type(arg = shaped_data, typename = "mixfac_data")
+               log_lik_index(shaped_data)
+           } else NULL
+    log_lik_draws_impl(
+        x$fit, group, idx,
+        data_hint = "Refit with {.code return_data = TRUE}, or pass
+                     {.arg shaped_data} directly."
+    )
+}
+
+#' @param stan_data (list or `NULL`) The data the model was fit to. By default
+#'     taken from `x`, which requires `return_data = TRUE`.
+#' @rdname log_lik_draws
+#' @export
+log_lik_draws.modgirt_fit <- function(x, group = "dyad", stan_data = NULL,
+                                      ...) {
+    group <- match.arg(group, c("dyad", "observation", "unit", "period",
+                                "item"))
+    if (is.null(stan_data)) stan_data <- x$stan_data
+    idx <- if (!is.null(stan_data$SSSS)) {
+               log_lik_index_modgirt(stan_data)
+           } else NULL
+    log_lik_draws_impl(
+        x$fit, group, idx,
+        data_hint = "Refit with {.code return_data = TRUE}, or pass
+                     {.arg stan_data} directly."
+    )
+}
+
+#' Compute PSIS-LOO from already-grouped log-likelihood draws
+#'
+#' @param ll A `draws_array` from [log_lik_draws()].
+#' @param group (string) Grouping, for the returned attributes.
+#' @param drop_nonfinite (logical) Discard offending iterations?
+#' @param dots (list) Additional arguments for [loo::loo()].
+#' @keywords internal
+#' @noRd
+loo_from_draws <- function(ll, group, drop_nonfinite, dots) {
+    n_iter_before <- dim(ll)[1L]
+    a <- check_log_lik_finite(unclass(ll), drop = drop_nonfinite)
+    dropped <- dim(a)[1L] < n_iter_before
+
+    if (is.null(dots$r_eff)) {
+        if (dropped) {
+            cli::cli_warn(c(
+                "Using {.code r_eff = 1} because iterations were discarded.",
+                "i" = "Dropping iterations breaks the chain structure that
+                       {.fn loo::relative_eff} assumes, so the Pareto k
+                       diagnostics no longer account for autocorrelation."
+            ))
+            dots$r_eff <- rep(1, dim(a)[3L])
+        } else {
+            ## Shift each group to a maximum of zero before exponentiating:
+            ## summed log-likelihoods can fall below
+            ## log(.Machine$double.xmin), where exp() underflows to a column
+            ## of zeros and the ESS is undefined. ESS is invariant to
+            ## per-group rescaling.
+            shift <- apply(a, 3L, max)
+            dots$r_eff <- loo::relative_eff(exp(sweep(a, 3L, shift, "-")))
+        }
+    }
+
+    out <- do.call(loo::loo, c(list(a), dots))
+    attr(out, "dbmm_group") <- group
+    attr(out, "dbmm_groups") <- dimnames(a)[[3L]]
     out
 }
 
@@ -193,41 +336,72 @@ loo_mixfac <- function(x, group = "dyad", shaped_data = NULL,
         cli::cli_abort("Package {.pkg loo} is required to use
                         {.fn loo_mixfac}.")
     }
-    drop_nonfinite <- check_flag(drop_nonfinite)
+    check_arg_type(arg = x, typename = "mixfac_fit")
     ll <- log_lik_draws(x, group = group, shaped_data = shaped_data)
+    loo_from_draws(ll, attr(ll, "dbmm_group"),
+                   check_flag(drop_nonfinite), list(...))
+}
 
-    n_iter_before <- dim(ll)[1L]
-    a <- check_log_lik_finite(unclass(ll), drop = drop_nonfinite)
-    dropped <- dim(a)[1L] < n_iter_before
-
-    dots <- list(...)
-    if (is.null(dots$r_eff)) {
-        if (dropped) {
-            ## relative_eff() estimates autocorrelation from a contiguous
-            ## chain; after dropping iterations the series has holes, so any
-            ## ESS it returns is meaningless. Fall back to the conservative
-            ## assumption of independent draws.
-            cli::cli_warn(c(
-                "Using {.code r_eff = 1} because iterations were discarded.",
-                "i" = "Dropping iterations breaks the chain structure that
-                       {.fn loo::relative_eff} assumes, so the Pareto k
-                       diagnostics no longer account for autocorrelation."
-            ))
-            dots$r_eff <- rep(1, dim(a)[3L])
-        } else {
-            ## Shift each group to a maximum of zero before exponentiating:
-            ## summed log-likelihoods can be far below log(.Machine$double.xmin),
-            ## and exp() would underflow to a column of zeros, making the ESS
-            ## undefined. ESS is invariant to per-group rescaling.
-            shift <- apply(a, 3L, max)
-            dots$r_eff <- loo::relative_eff(exp(sweep(a, 3L, shift, "-")))
-        }
+#' Approximate leave-one-out cross-validation for a MODGIRT model
+#'
+#' Computes PSIS-LOO for a fitted group-level IRT model, using the \pkg{loo}
+#' package.
+#'
+#' @param x A fitted model from [fit_modgirt()], fit with
+#'     `gen_log_lik = TRUE`.
+#' @param group (string) Level at which to sum log-likelihoods. One of
+#'     `"dyad"` (the default; group-by-item, i.e. all periods of one item for
+#'     one group), `"observation"`, `"unit"`, `"period"`, or `"item"`.
+#' @param stan_data (list or `NULL`) The data the model was fit to. By default
+#'     taken from `x`.
+#' @param drop_nonfinite (logical) If `log_lik` contains non-finite values,
+#'     should the affected iterations be discarded rather than triggering an
+#'     error? Defaults to `FALSE`.
+#' @param ... Additional arguments passed to [loo::loo()].
+#'
+#' @return A `loo` object.
+#'
+#' @details
+#' The finest unit of the MODGIRT likelihood is a group-item-period cell: the
+#' responses of one demographic group to one item in one period, aggregated
+#' into counts. Holding out one such cell therefore removes every respondent
+#' who answered that item in that group and period, so this is
+#' leave-a-block-of-respondents-out rather than leave-one-respondent-out. Its
+#' `elpd_loo` is not on the same scale as that of [loo_mixfac()] and the two
+#' cannot be compared.
+#'
+#' When `shape_modgirt()` was given `weight_var`, the counts in `SSSS` are
+#' weighted and generally non-integer, so the quantity being cross-validated
+#' is a pseudo-likelihood. The Pareto k diagnostics remain informative about
+#' the reliability of the importance sampling, but the implied effective
+#' sample sizes should be read loosely.
+#'
+#' As with [loo_mixfac()], `group = "unit"` holds out a group's entire
+#' response history, creating folds over which importance sampling is
+#' unreliable; prefer K-fold cross-validation in that case. Models compared
+#' with [loo::loo_compare()] must be fit to identical data and grouped
+#' identically.
+#'
+#' @seealso [loo_mixfac()], [log_lik_index_modgirt()], [loo_influential()]
+#'
+#' @examples
+#' \dontrun{
+#' f1 <- fit_modgirt(stan_data, n_factor = 1, gen_log_lik = TRUE)
+#' f2 <- fit_modgirt(stan_data, n_factor = 2, gen_log_lik = TRUE)
+#' loo::loo_compare(list(d1 = loo_modgirt(f1), d2 = loo_modgirt(f2)))
+#' }
+#'
+#' @export
+loo_modgirt <- function(x, group = "dyad", stan_data = NULL,
+                        drop_nonfinite = FALSE, ...) {
+    if (!requireNamespace("loo", quietly = TRUE)) {
+        cli::cli_abort("Package {.pkg loo} is required to use
+                        {.fn loo_modgirt}.")
     }
-
-    out <- do.call(loo::loo, c(list(a), dots))
-    attr(out, "dbmm_group") <- group
-    attr(out, "dbmm_groups") <- dimnames(a)[[3L]]
-    out
+    check_arg_type(arg = x, typename = "modgirt_fit")
+    ll <- log_lik_draws(x, group = group, stan_data = stan_data)
+    loo_from_draws(ll, attr(ll, "dbmm_group"),
+                   check_flag(drop_nonfinite), list(...))
 }
 
 #' Identify influential groups in a LOO estimate

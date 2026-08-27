@@ -7,18 +7,16 @@
 loo_mixfac(x, group = "dyad", shaped_data = NULL, drop_nonfinite = FALSE, ...)
 }
 \arguments{
-\item{x}{(mixfac_fit) A fitted model from \code{\link[=fit_mixfac]{fit_mixfac()}}, fit with
+\item{x}{A fitted model from \code{\link[=fit_mixfac]{fit_mixfac()}} or \code{\link[=fit_modgirt]{fit_modgirt()}}, fit with
 \code{gen_log_lik = TRUE}.}
 
 \item{group}{(string) Level at which to sum log-likelihoods, giving the
-joint predictive density of each group. One of \code{"dyad"} (the default;
-unit-by-item, i.e. all periods of one item for one unit),
-\code{"observation"}, \code{"unit"}, \code{"period"}, \code{"item"}, or \code{"item_type"}.}
+joint predictive density of each group. One of \code{"dyad"} (the default),
+\code{"observation"}, \code{"unit"}, \code{"period"}, or \code{"item"}; mixfac fits also
+accept \code{"item_type"}.}
 
-\item{shaped_data}{(mixfac_data or \code{NULL}) The data the model was fit to,
-needed to map positions of \code{log_lik} to observations. By default taken
-from \code{x}, which requires that it was fit with \code{return_data = TRUE};
-supply it explicitly otherwise.}
+\item{shaped_data}{(mixfac_data or \code{NULL}) The data the model was fit to.
+By default taken from \code{x}, which requires \code{return_data = TRUE}.}
 
 \item{drop_nonfinite}{(logical) If \code{log_lik} contains non-finite values,
 should the affected iterations be discarded rather than triggering an

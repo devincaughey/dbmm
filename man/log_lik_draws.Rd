@@ -2,28 +2,45 @@
 % Please edit documentation in R/5-loo.r
 \name{log_lik_draws}
 \alias{log_lik_draws}
-\title{Extract per-observation log-likelihood draws}
+\alias{log_lik_draws.mixfac_fit}
+\alias{log_lik_draws.modgirt_fit}
+\title{Extract log-likelihood draws}
 \usage{
-log_lik_draws(x, group = "dyad", shaped_data = NULL)
+log_lik_draws(x, group = "dyad", ...)
+
+\method{log_lik_draws}{mixfac_fit}(x, group = "dyad", shaped_data = NULL, ...)
+
+\method{log_lik_draws}{modgirt_fit}(x, group = "dyad", stan_data = NULL, ...)
 }
 \arguments{
-\item{x}{(mixfac_fit) A fitted model from \code{\link[=fit_mixfac]{fit_mixfac()}}, fit with
+\item{x}{A fitted model from \code{\link[=fit_mixfac]{fit_mixfac()}} or \code{\link[=fit_modgirt]{fit_modgirt()}}, fit with
 \code{gen_log_lik = TRUE}.}
 
 \item{group}{(string) Level at which to sum log-likelihoods, giving the
-joint predictive density of each group. One of \code{"dyad"} (the default;
-unit-by-item, i.e. all periods of one item for one unit),
-\code{"observation"}, \code{"unit"}, \code{"period"}, \code{"item"}, or \code{"item_type"}.}
+joint predictive density of each group. One of \code{"dyad"} (the default),
+\code{"observation"}, \code{"unit"}, \code{"period"}, or \code{"item"}; mixfac fits also
+accept \code{"item_type"}.}
 
-\item{shaped_data}{(mixfac_data or \code{NULL}) The data the model was fit to,
-needed to map positions of \code{log_lik} to observations. By default taken
-from \code{x}, which requires that it was fit with \code{return_data = TRUE};
-supply it explicitly otherwise.}
+\item{...}{Passed to methods.}
+
+\item{shaped_data}{(mixfac_data or \code{NULL}) The data the model was fit to.
+By default taken from \code{x}, which requires \code{return_data = TRUE}.}
+
+\item{stan_data}{(list or \code{NULL}) The data the model was fit to. By default
+taken from \code{x}, which requires \code{return_data = TRUE}.}
 }
 \value{
 A \code{draws_array} with dimensions iteration by chain by group. The
 grouping is recorded in the \code{"dbmm_group"} attribute.
 }
 \description{
-Extract per-observation log-likelihood draws
+Extract log-likelihood draws
+}
+\details{
+For a mixfac fit the finest level is one response, so \code{"dyad"} sums over
+the periods in which a unit was observed on an item. For a modgirt fit the
+finest level is a group-item-period cell, and each element is already a sum
+over response categories weighted by the number of respondents; \code{"dyad"}
+then sums over periods as well. The two are therefore on different scales,
+and their \code{elpd_loo} values are not comparable.
 }

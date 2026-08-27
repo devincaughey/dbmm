@@ -43,6 +43,11 @@
 #'     period 1, an innovation standard deviation of `0.1` moves a group by
 #'     roughly a tenth of the between-group spread from one period to the
 #'     next. Ignored when `T == 1`.
+#' @param gen_log_lik (logical) Should the per-cell log likelihood be computed
+#'     and returned, for use with the \pkg{loo} package? Defaults to `FALSE`.
+#'     `log_lik` has one element per group-item-period with at least one
+#'     response, per draw, which can dominate the size of the output. See
+#'     [log_lik_index_modgirt()] for the mapping from positions to cells.
 #' @param ... Additional arguments to be passed to the Stan sampling function.
 #'
 #' @details
@@ -106,6 +111,7 @@ fit_modgirt <- function(
     scale_sd_theta = 1,
     df_sd_bar_theta_evol = 4,
     scale_sd_bar_theta_evol = 0.1,
+    gen_log_lik = FALSE,
     ...
 ) {
     n_item <- stan_data$Q
@@ -136,6 +142,7 @@ fit_modgirt <- function(
     stan_data$scale_sd_theta <- scale_sd_theta
     stan_data$df_sd_bar_theta_evol <- df_sd_bar_theta_evol
     stan_data$scale_sd_bar_theta_evol <- scale_sd_bar_theta_evol
+    stan_data$gen_log_lik <- as.integer(check_flag(gen_log_lik))
     file <- system.file(
         paste0("stan/modgirt_", link, ".stan"),
         package = "dbmm"
@@ -154,6 +161,7 @@ fit_modgirt <- function(
     if (return_data) {
         out$stan_data <- stan_data
     }
+    class(out) <- c("modgirt_fit", class(out))
     return(out)
 }
 

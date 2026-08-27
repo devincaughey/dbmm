@@ -68,19 +68,32 @@ test_modgirt_shaped_data <- function(...) {
 
 .modgirt_cache <- new.env(parent = emptyenv())
 
-test_modgirt_fit <- function(n_factor = 2, n_dim_data = n_factor) {
-    key <- paste0("fit_", n_factor, "_", n_dim_data)
+test_modgirt_fit <- function(n_factor = 2, n_dim_data = n_factor,
+                             gen_log_lik = FALSE) {
+    key <- paste0("fit_", n_factor, "_", n_dim_data, "_", gen_log_lik)
     if (!is.null(.modgirt_cache[[key]])) return(.modgirt_cache[[key]])
     skip_if_no_cmdstan()
     out <- suppressMessages(fit_modgirt(
         stan_data = test_modgirt_shaped_data(n_factor = n_dim_data),
         n_factor = n_factor,
+        gen_log_lik = gen_log_lik,
         chains = 2,
+        parallel_chains = 2,
         iter_warmup = 200,
         iter_sampling = 200,
         refresh = 0,
         seed = 123
     ))
+    .modgirt_cache[[key]] <- out
+    out
+}
+
+test_modgirt_loo <- function(group = "dyad") {
+    key <- paste0("loo_", group)
+    if (!is.null(.modgirt_cache[[key]])) return(.modgirt_cache[[key]])
+    out <- suppressWarnings(
+        loo_modgirt(test_modgirt_fit(gen_log_lik = TRUE), group = group)
+    )
     .modgirt_cache[[key]] <- out
     out
 }
