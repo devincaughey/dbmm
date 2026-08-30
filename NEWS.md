@@ -18,6 +18,15 @@
 
 * `fit_modgirt()` now returns an object of class `modgirt_fit`.
 
+## Bug fixes
+
+* `identify_modgirt()` failed when given draws it had already identified, or
+  the output of `label_modgirt()`. Both assign item labels to `beta`'s
+  dimnames, so flattening produced column names like `x[1,abortion_n]`, which
+  `rename_loading_matrix()` left unchanged and `factor.switching::rsp_exact()`
+  then rejected. `rename_loading_matrix()` now aborts on unmatched names
+  rather than passing them through.
+
 # dbmm 0.1.0
 
 ## Breaking changes
