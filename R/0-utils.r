@@ -33,13 +33,26 @@ check_arg_type <- function(arg, typename, message = NULL) {
 }
 
 rename_loading_matrix <- function(loading_matrix) {
-    colnames(loading_matrix) <- gsub(
-        pattern = "x\\[([0-9]+),([0-9]+)\\]",
+    nm <- colnames(loading_matrix)
+    new <- gsub(
+        pattern = "^x\\[([0-9]+),([0-9]+)\\]$",
         replacement = "LambdaV\\2_\\1",
-        x = colnames(loading_matrix)
+        x = nm
     )
-    return(loading_matrix)
+    if (any(new == nm)) {
+        cli::cli_abort(c(
+            "Cannot rename loading columns for
+             {.fn factor.switching::rsp_exact}.",
+            "x" = "Unmatched name{?s}: {.val {utils::head(nm[new == nm], 3)}}",
+            "i" = "Column names must look like {.val x[i,d]} with numeric
+                   indices. Strip {.fn dimnames} from the loadings before
+                   flattening them."
+        ))
+    }
+    colnames(loading_matrix) <- new
+    loading_matrix
 }
+
 make_vm_rvar <- function(loading_draws, n_iter, n_chain, n_factor,
                          method = "varimax", maxit = 1000, randomStarts = 0) {
     ## `loading_draws` should be a `draws_of` of an `draws_rvar` object

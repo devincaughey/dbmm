@@ -233,3 +233,21 @@ test_that("loo_influential() works on a modgirt loo object", {
     expect_equal(nrow(inf), length(loo::pareto_k_values(l)))
     expect_false(is.unsorted(rev(inf$pareto_k)))
 })
+
+test_that("identify_modgirt() can be applied to its own output", {
+    id <- test_modgirt_id(2)
+    expect_no_error(id2 <- identify_modgirt(id))
+    expect_s3_class(id2, "modgirt_id")
+    ## A second identification of already-identified draws should be close to
+    ## the identity, since varimax is idempotent up to signed permutation
+    expect_equal(dim(id2$beta), dim(id$beta))
+})
+
+test_that("identify_modgirt() accepts labelled draws", {
+    lab <- label_modgirt(test_modgirt_id(2))
+    expect_no_error(identify_modgirt(lab))
+})
+test_that("identify_mixfac() accepts combined labelled draws", {
+    cmb <- test_mixfac_comb()
+    expect_no_error(identify_mixfac(cmb))
+})

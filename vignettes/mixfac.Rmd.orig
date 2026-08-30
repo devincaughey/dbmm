@@ -70,7 +70,9 @@ $$
 
 with innovation covariance $\Omega$ estimated from the data. Setting
 `smooth_eta = FALSE` removes the random walk and estimates each period
-independently.
+independently. This is appropriate when one wishes to be sensitive to
+within-unit changes across time period, even if this comes at the expense
+of the precision with which any given unit-period is estimated.
 
 Because $\lambda_i' \eta_{tj} = (\lambda_i' R)(R' \eta_{tj})$ for any
 orthogonal $R$, the model is identified only up to rotation, reflection,
@@ -476,7 +478,8 @@ just two transitions per state from which to learn $\Omega$, so the
 posterior for the innovation variance will be dominated by its prior.
 Applications with longer panels will show considerably more movement, and
 `sd_sigma_eta_evol` is the argument that governs how strongly that movement
-is shrunk toward zero.
+is shrunk toward zero. As noted above, a study focused on within-unit change
+over time would probably want to use `smooth_eta = FALSE`.
 
 # Step 7: How many factors?
 

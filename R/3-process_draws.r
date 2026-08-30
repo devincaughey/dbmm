@@ -818,9 +818,15 @@ identify_modgirt <- function(x, method = "varimax", random_starts = 0, seed = 12
     }
     ## Apply varimax rotations to `beta`
     beta_rvar$beta <- posterior::`%**%`(beta_rvar$beta, vm_rvar)
-    ## Create draw-specific signed permutations
-    beta_matrix <- posterior::as_draws_matrix(t(beta_rvar$beta))
+    ## Strip dimnames before flattening: rsp_exact() requires positional
+    ## LambdaVd_q names, and rename_loading_matrix()'s pattern matches only
+    ## numeric indices. Item labels are present whenever `x` is itself the
+    ## output of identify_modgirt() or label_modgirt().
+    beta_unnamed <- beta_rvar$beta
+    dimnames(beta_unnamed) <- NULL
+    beta_matrix <- posterior::as_draws_matrix(t(beta_unnamed))
     lambda_matrix <- rename_loading_matrix(beta_matrix)
+    ## Create draw-specific signed permutations
     if (quiet) {
         invisible(
             utils::capture.output(
