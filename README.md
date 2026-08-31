@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# dbmm: Dynamic Bayesian Measurement Models
+# dbmm: Dynamic Bayesian Measurement Models <img src="man/figures/logo.png" align="right" height="139" alt="" />
 
 <!-- badges: start -->
 
@@ -145,7 +145,7 @@ Both models follow the same sequence of steps.
 | Order factors      | `sort_mixfac()`          | `sort_modgirt()`               |
 | Set signs          | `sign_mixfac()`          | `sign_modgirt()`               |
 | Summarize          | `summarize_mixfac()`     | `posterior::summarise_draws()` |
-| Cross-validate     | `loo_mixfac()`           | —                              |
+| Cross-validate     | `loo_mixfac()`           | `loo_modgirt()`                |
 
 `identify_mixfac()` and `identify_modgirt()` apply a varimax rotation
 and a signed permutation to each posterior draw; `rotate_modgirt()`
