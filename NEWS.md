@@ -39,6 +39,15 @@
 
 * `fit_modgirt()` now returns an object of class `modgirt_fit`.
 
+## Improvements
+
+* `fit_mixfac()` computes linear predictors in one vectorized step instead of
+  one observation at a time, which cuts the cost of each gradient by about
+  60% (on the 109th Senate roll calls, from 10.2 to 4.3 ms). The model is
+  unchanged: the log density is identical, and gradients differ only by
+  floating-point rounding (relative differences below 1e-12), so draws with
+  a given seed are not reproduced exactly.
+
 ## Bug fixes
 
 * `identify_modgirt()` failed when given draws it had already identified, or

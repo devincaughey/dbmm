@@ -28,81 +28,61 @@ functions {
     return DM * WW;
   }
 
+  /* Linear predictors for a block of observations: alpha_flat holds the
+     intercepts flattened period by period, LL the item loadings, and EE the
+     factors stacked period by period (row (t - 1) * J + j). ti and tj give
+     each observation's position in alpha_flat and its row in EE. */
+  vector linear_predictor(vector alpha_flat, matrix LL, matrix EE,
+                          array[] int ti, array[] int ii, array[] int tj) {
+    return alpha_flat[ti] + rows_dot_product(LL[ii], EE[tj]);
+  }
+
   real bprobit_partial_sum_lpmf(array[] int yy_b_slice,
                                int start,
                                int end,
-                               array[,] real alpha_b,
-                               array[,] real lambda_b,
-                               array[,,] real eta,
-                               array[] int tt_b,
+                               vector alpha_b,
+                               matrix lambda_b,
+                               matrix eta_mat,
+                               array[] int ti_b,
                                array[] int ii_b,
-                               array[] int jj_b) {
-    int D = dims(eta)[3];
-    int N_slice = end - start + 1;
-    array[N_slice] int tt_slice = tt_b[start:end];
-    array[N_slice] int jj_slice = jj_b[start:end];
-    array[N_slice] int ii_slice = ii_b[start:end];
-    vector[N_slice] nu_slice;
-    for (n in 1:N_slice) {
-      real a_n = alpha_b[tt_slice[n], ii_slice[n]];
-      row_vector[D] l_n = to_row_vector(lambda_b[ii_slice[n], 1:D]);
-      vector[D] e_n = to_vector(eta[tt_slice[n], jj_slice[n], 1:D]);
-      nu_slice[n] = a_n + l_n * e_n;
-    }
+                               array[] int tj_b) {
+    vector[end - start + 1] nu_slice =
+      linear_predictor(alpha_b, lambda_b, eta_mat, ti_b[start:end],
+                       ii_b[start:end], tj_b[start:end]);
     return bernoulli_logit_lupmf(yy_b_slice | p2l_vector(nu_slice));
   }
 
   real oprobit_partial_sum_lpmf(array[] int yy_o_slice,
                                int start,
                                int end,
-                               array[,] real alpha_o,
-                               array[,] real lambda_o,
-                               array[,,] real eta,
-                               array[] int tt_o,
+                               vector alpha_o,
+                               matrix lambda_o,
+                               matrix eta_mat,
+                               array[] int ti_o,
                                array[] int ii_o,
-                               array[] int jj_o,
+                               array[] int tj_o,
                                array[] vector kappa) {
-    int D = dims(eta)[3];
-    int K = size(kappa[1]);
-    int N_slice = end - start + 1;
-    array[N_slice] int tt_slice = tt_o[start:end];
-    array[N_slice] int jj_slice = jj_o[start:end];
-    array[N_slice] int ii_slice = ii_o[start:end];
-    vector[N_slice] nu_slice;
-    array[N_slice] vector[K] kappa_slice = kappa[ii_slice];
-    for (n in 1:N_slice) {
-      real a_n = alpha_o[tt_slice[n], ii_slice[n]];
-      row_vector[D] l_n = to_row_vector(lambda_o[ii_slice[n], 1:D]);
-      vector[D] e_n = to_vector(eta[tt_slice[n], jj_slice[n], 1:D]);
-      nu_slice[n] = a_n + l_n * e_n;
-    }
-    return ordered_logistic_lupmf(yy_o_slice | p2l_vector(nu_slice), kappa_slice);
+    vector[end - start + 1] nu_slice =
+      linear_predictor(alpha_o, lambda_o, eta_mat, ti_o[start:end],
+                       ii_o[start:end], tj_o[start:end]);
+    return ordered_logistic_lupmf(yy_o_slice | p2l_vector(nu_slice),
+                                  kappa[ii_o[start:end]]);
   }
 
   real normal_partial_sum_lpdf(array[] real yy_m_slice,
                                int start,
                                int end,
-                               array[,] real alpha_m,
-                               array[,] real lambda_m,
-                               array[,,] real eta,
-                               array[] int tt_m,
+                               vector alpha_m,
+                               matrix lambda_m,
+                               matrix eta_mat,
+                               array[] int ti_m,
                                array[] int ii_m,
-                               array[] int jj_m,
-                               array[] real sigma) {
-    int D = dims(eta)[3];
-    int N_slice = end - start + 1;
-    array[N_slice] int tt_slice = tt_m[start:end];
-    array[N_slice] int jj_slice = jj_m[start:end];
-    array[N_slice] int ii_slice = ii_m[start:end];
-    array[N_slice] real nu_slice;
-    array[N_slice] real sigma_slice = sigma[ii_slice];
-    for (n in 1:N_slice) {
-      real a_n = alpha_m[tt_slice[n], ii_slice[n]];
-      row_vector[D] l_n = to_row_vector(lambda_m[ii_slice[n], 1:D]);
-      vector[D] e_n = to_vector(eta[tt_slice[n], jj_slice[n], 1:D]);
-      nu_slice[n] = a_n + l_n * e_n;
-    }
-    return normal_lupdf(yy_m_slice | nu_slice, sigma_slice);
+                               array[] int tj_m,
+                               vector sigma) {
+    vector[end - start + 1] nu_slice =
+      linear_predictor(alpha_m, lambda_m, eta_mat, ti_m[start:end],
+                       ii_m[start:end], tj_m[start:end]);
+    return normal_lupdf(yy_m_slice | nu_slice, sigma[ii_m[start:end]]);
   }
 }
 data {
@@ -184,6 +164,33 @@ transformed data {
      thresholds absorb the item level), so they need deviates only when the
      intercepts are allowed to drift. */
   int<lower=0> T_alpha_k = constant_alpha == 1 ? 0 : T;
+  /* Each observation's row in the stacked (T * J) x D factor matrix (tj) and
+     the position of its intercept in the flattened [T, I] intercepts (ti),
+     so linear predictors can be computed in one vectorized step. */
+  array[N_binary] int tj_binary;
+  array[N_binary] int ti_binary;
+  array[N_trichot] int tj_trichot;
+  array[N_trichot] int ti_trichot;
+  array[N_ordinal] int tj_ordinal;
+  array[N_ordinal] int ti_ordinal;
+  array[N_metric] int tj_metric;
+  array[N_metric] int ti_metric;
+  for (n in 1:N_binary) {
+    tj_binary[n] = (tt_binary[n] - 1) * J + jj_binary[n];
+    ti_binary[n] = (tt_binary[n] - 1) * I_binary + ii_binary[n];
+  }
+  for (n in 1:N_trichot) {
+    tj_trichot[n] = (tt_trichot[n] - 1) * J + jj_trichot[n];
+    ti_trichot[n] = (tt_trichot[n] - 1) * I_trichot + ii_trichot[n];
+  }
+  for (n in 1:N_ordinal) {
+    tj_ordinal[n] = (tt_ordinal[n] - 1) * J + jj_ordinal[n];
+    ti_ordinal[n] = (tt_ordinal[n] - 1) * I_ordinal + ii_ordinal[n];
+  }
+  for (n in 1:N_metric) {
+    tj_metric[n] = (tt_metric[n] - 1) * J + jj_metric[n];
+    ti_metric[n] = (tt_metric[n] - 1) * I_metric + ii_metric[n];
+  }
 }
 parameters {
   array[T, J, D] real z_eta;                     /* latent factors (deviate) */
@@ -318,99 +325,93 @@ for (t in 1:T) {
 }
 model {
   // Likelihood //
-  if (parallelize == 0) {
-    // Linear predictors //
-    vector[N_binary] nu_binary;
-    vector[N_trichot] nu_trichot;
-    vector[N_ordinal] nu_ordinal;
-    vector[N_metric] nu_metric;
-    profile("linear_predictor") {
-      // compute each nu once
-      for (n in 1:N_binary) {
-        int tt = tt_binary[n];
-        int ii = ii_binary[n];
-        int jj = jj_binary[n];
-        nu_binary[n] = alpha_binary[tt, ii] +
-          dot_product(lambda_binary[ii, 1:D],
-                      eta[tt, jj, 1:D]);
+  {
+    /* Matrix copies of the factors, loadings, and intercepts. Arrays are
+       kept as the transformed parameters so the output is unchanged; the
+       flattening is row-major, matching tj and ti. */
+    matrix[T * J, D] eta_mat = to_matrix(to_array_1d(eta), T * J, D, 0);
+    matrix[I_binary, D] L_binary =
+      to_matrix(to_array_1d(lambda_binary), I_binary, D, 0);
+    matrix[I_trichot, D] L_trichot =
+      to_matrix(to_array_1d(lambda_trichot), I_trichot, D, 0);
+    matrix[I_ordinal, D] L_ordinal =
+      to_matrix(to_array_1d(lambda_ordinal), I_ordinal, D, 0);
+    matrix[I_metric, D] L_metric =
+      to_matrix(to_array_1d(lambda_metric), I_metric, D, 0);
+    vector[T * I_binary] a_binary = to_vector(to_array_1d(alpha_binary));
+    vector[T * I_trichot] a_trichot = to_vector(to_array_1d(alpha_trichot));
+    vector[T * I_ordinal] a_ordinal = to_vector(to_array_1d(alpha_ordinal));
+    vector[T * I_metric] a_metric = to_vector(to_array_1d(alpha_metric));
+
+    if (parallelize == 0) {
+      // Linear predictors //
+      vector[N_binary] nu_binary;
+      vector[N_trichot] nu_trichot;
+      vector[N_ordinal] nu_ordinal;
+      vector[N_metric] nu_metric;
+      profile("linear_predictor") {
+        nu_binary = linear_predictor(a_binary, L_binary, eta_mat,
+                                     ti_binary, ii_binary, tj_binary);
+        nu_trichot = linear_predictor(a_trichot, L_trichot, eta_mat,
+                                      ti_trichot, ii_trichot, tj_trichot);
+        nu_ordinal = linear_predictor(a_ordinal, L_ordinal, eta_mat,
+                                      ti_ordinal, ii_ordinal, tj_ordinal);
+        nu_metric = linear_predictor(a_metric, L_metric, eta_mat,
+                                     ti_metric, ii_metric, tj_metric);
       }
-      for (n in 1:N_trichot) {
-        int tt = tt_trichot[n];
-        int ii = ii_trichot[n];
-        int jj = jj_trichot[n];
-        nu_trichot[n] = alpha_trichot[tt, ii] +
-          dot_product(lambda_trichot[ii, 1:D],
-                      eta[tt, jj, 1:D]);
-      }
-      for (n in 1:N_ordinal) {
-        int tt = tt_ordinal[n];
-        int ii = ii_ordinal[n];
-        int jj = jj_ordinal[n];
-        nu_ordinal[n] = alpha_ordinal[tt, ii] +
-          dot_product(lambda_ordinal[ii, 1:D],
-                      eta[tt, jj, 1:D]);
-      }
-      for (n in 1:N_metric) {
-        int tt = tt_metric[n];
-        int ii = ii_metric[n];
-        int jj = jj_metric[n];
-        nu_metric[n] = alpha_metric[tt, ii] +
-          dot_product(lambda_metric[ii, 1:D],
-                      eta[tt, jj, 1:D]);
+      profile("likelihood") {
+        target += bernoulli_logit_lupmf(yy_binary | p2l_vector(nu_binary));
+        target += ordered_logistic_lupmf(yy_trichot | p2l_vector(nu_trichot),
+                                         kappa_trichot[ii_trichot]);
+        target += ordered_logistic_lupmf(yy_ordinal | p2l_vector(nu_ordinal),
+                                         kappa_ordinal[ii_ordinal]);
+        target += normal_lupdf(yy_metric | nu_metric,
+                               sigma_metric[ii_metric]);
       }
     }
-    profile("likelihood") {
-      target += bernoulli_logit_lupmf(yy_binary | p2l_vector(nu_binary));
-      target += ordered_logistic_lupmf(yy_trichot | p2l_vector(nu_trichot),
-                                       kappa_trichot[ii_trichot]);
-      target += ordered_logistic_lupmf(yy_ordinal | p2l_vector(nu_ordinal),
-                                       kappa_ordinal[ii_ordinal]);
-      target += normal_lupdf(yy_metric | nu_metric,
-                             sigma_metric[ii_metric]);
-    }
-  }
-  if (parallelize == 1) {
-    profile("parallel") {
-      int grainsize = 1;
-      target += reduce_sum(bprobit_partial_sum_lpmf,
-                           to_array_1d(yy_binary),
-                           grainsize,
-                           alpha_binary,
-                           lambda_binary,
-                           eta,
-                           tt_binary,
-                           ii_binary,
-                           jj_binary);
-      target += reduce_sum(oprobit_partial_sum_lpmf,
-                           to_array_1d(yy_trichot),
-                           grainsize,
-                           alpha_trichot,
-                           lambda_trichot,
-                           eta,
-                           tt_trichot,
-                           ii_trichot,
-                           jj_trichot,
-                           kappa_trichot);
-      target += reduce_sum(oprobit_partial_sum_lpmf,
-                           to_array_1d(yy_ordinal),
-                           grainsize,
-                           alpha_ordinal,
-                           lambda_ordinal,
-                           eta,
-                           tt_ordinal,
-                           ii_ordinal,
-                           jj_ordinal,
-                           kappa_ordinal);
-      target += reduce_sum(normal_partial_sum_lpdf,
-                           to_array_1d(yy_metric),
-                           grainsize,
-                           alpha_metric,
-                           lambda_metric,
-                           eta,
-                           tt_metric,
-                           ii_metric,
-                           jj_metric,
-                           to_array_1d(sigma_metric));
+    if (parallelize == 1) {
+      profile("parallel") {
+        int grainsize = 1;
+        target += reduce_sum(bprobit_partial_sum_lpmf,
+                             to_array_1d(yy_binary),
+                             grainsize,
+                             a_binary,
+                             L_binary,
+                             eta_mat,
+                             ti_binary,
+                             ii_binary,
+                             tj_binary);
+        target += reduce_sum(oprobit_partial_sum_lpmf,
+                             to_array_1d(yy_trichot),
+                             grainsize,
+                             a_trichot,
+                             L_trichot,
+                             eta_mat,
+                             ti_trichot,
+                             ii_trichot,
+                             tj_trichot,
+                             kappa_trichot);
+        target += reduce_sum(oprobit_partial_sum_lpmf,
+                             to_array_1d(yy_ordinal),
+                             grainsize,
+                             a_ordinal,
+                             L_ordinal,
+                             eta_mat,
+                             ti_ordinal,
+                             ii_ordinal,
+                             tj_ordinal,
+                             kappa_ordinal);
+        target += reduce_sum(normal_partial_sum_lpdf,
+                             to_array_1d(yy_metric),
+                             grainsize,
+                             a_metric,
+                             L_metric,
+                             eta_mat,
+                             ti_metric,
+                             ii_metric,
+                             tj_metric,
+                             sigma_metric);
+      }
     }
   }
 
