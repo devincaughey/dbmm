@@ -157,8 +157,18 @@ data {
   real<lower=0> sd_sigma_metric;
   real<lower=0> sd_sigma_alpha_evol;
   real<lower=0> sd_sigma_eta_evol;
+  // Shrinkage prior on each factor's loadings //
+  int<lower=0, upper=2> loading_prior; /* 0 = normal, 1 = reg. horseshoe, 2 = lasso */
+  real<lower=0> tau0;                  /* horseshoe global scale */
+  real<lower=0> slab_scale;            /* horseshoe slab scale */
+  real<lower=0> slab_df;               /* horseshoe slab degrees of freedom */
 }
 transformed data {
+  /* Shrinkage parameters have zero length unless their prior is chosen, so
+     fits with the default normal prior are unchanged. */
+  int<lower=0, upper=1> est_hs = loading_prior == 1;
+  int<lower=0, upper=1> est_lasso = loading_prior == 2;
+  int<lower=0, upper=1> est_shrink = loading_prior > 0;
   /* The evolution covariance is identified only if an actual random walk in
      eta is used: T > 1 and periods are not estimated separately. Otherwise
      sigma_eta_evol / Lcorr_eta would be sampled from their priors alone, so
@@ -191,6 +201,15 @@ parameters {
   vector<lower=0>[I_metric] sigma_metric;        /* metric residual sd */
   array[est_Omega] vector<lower=0>[D] sigma_eta_evol; /* evolution SD of eta */
   array[est_Omega] cholesky_factor_corr[D] Lcorr_eta; /* evolution corr. (chol.) */
+  /* Regularized horseshoe: half-Cauchy local and global scales, written as
+     tan() of uniforms for better sampling, plus an inverse-gamma slab. */
+  vector<lower=0, upper=pi() / 2>[est_hs ? D : 0] hs_local_raw;
+  array[est_hs] real<lower=0, upper=pi() / 2> hs_global_raw;
+  array[est_hs] real<lower=0> hs_slab_aux;
+  /* Bayesian lasso on each factor's loading scale */
+  vector[est_lasso ? D : 0] lasso_omega;
+  vector<lower=0>[est_lasso ? D : 0] lasso_tau;
+  array[est_lasso] real<lower=0> lasso_rate;
 }
 transformed parameters {
   array[T, J, D] real eta;		   /* latent factors (final) */
@@ -202,11 +221,37 @@ transformed parameters {
   array[I_trichot, D] real lambda_trichot; /* trichot loadings */
   array[I_ordinal, D] real lambda_ordinal; /* ordinal loadings */
   array[I_metric, D] real lambda_metric;   /* metric loadings */
+  /* Per-factor loading scale. One scale per factor is shared by every item
+     type, since a factor is one latent dimension. */
+  vector[est_shrink ? D : 0] load_scale;
 
-  lambda_binary = to_array_2d(z_lambda_binary .* nonzero_binary);
-  lambda_trichot = to_array_2d(z_lambda_trichot .* nonzero_trichot);
-  lambda_ordinal = to_array_2d(z_lambda_ordinal .* nonzero_ordinal);
-  lambda_metric = to_array_2d(z_lambda_metric .* nonzero_metric);
+  if (est_hs) {
+    real hs_tau = tau0 * tan(hs_global_raw[1]);
+    vector[D] hs_local = tan(hs_local_raw);
+    real c2 = square(slab_scale) * hs_slab_aux[1];
+    /* Caps each factor's scale near slab_scale (Piironen & Vehtari 2017) */
+    load_scale = hs_tau * sqrt(c2 * square(hs_local)
+                               ./ (c2 + square(hs_tau) * square(hs_local)));
+  }
+  if (est_lasso) {
+    load_scale = lasso_omega;
+  }
+
+  if (est_shrink) {
+    lambda_binary = to_array_2d(z_lambda_binary .* nonzero_binary
+                                .* rep_matrix(load_scale', I_binary));
+    lambda_trichot = to_array_2d(z_lambda_trichot .* nonzero_trichot
+                                 .* rep_matrix(load_scale', I_trichot));
+    lambda_ordinal = to_array_2d(z_lambda_ordinal .* nonzero_ordinal
+                                 .* rep_matrix(load_scale', I_ordinal));
+    lambda_metric = to_array_2d(z_lambda_metric .* nonzero_metric
+                                .* rep_matrix(load_scale', I_metric));
+  } else {
+    lambda_binary = to_array_2d(z_lambda_binary .* nonzero_binary);
+    lambda_trichot = to_array_2d(z_lambda_trichot .* nonzero_trichot);
+    lambda_ordinal = to_array_2d(z_lambda_ordinal .* nonzero_ordinal);
+    lambda_metric = to_array_2d(z_lambda_metric .* nonzero_metric);
+  }
 
   // build cholesky factor for evolution: L_eta = diag(sigma) * Lcorr_eta
   matrix[D, D] L_eta;
@@ -399,6 +444,17 @@ model {
                                   mu_sigma_eta_evol,
                                   sd_sigma_eta_evol);
     Lcorr_eta[1] ~ lkj_corr_cholesky(2);
+  }
+  if (est_hs) {
+    hs_local_raw ~ uniform(0, pi() / 2);   /* tan() of these is half-Cauchy */
+    hs_global_raw[1] ~ uniform(0, pi() / 2);
+    hs_slab_aux[1] ~ inv_gamma(0.5 * slab_df, 0.5 * slab_df);
+  }
+  if (est_lasso) {
+    /* As in multiIRT. The gamma(0.001, 0.001) hyperprior is very weak. */
+    lasso_omega ~ normal(0, sqrt(lasso_tau));
+    lasso_tau ~ exponential(lasso_rate[1] / 2);
+    lasso_rate[1] ~ gamma(0.001, 0.001);
   }
 }
 generated quantities {

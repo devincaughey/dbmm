@@ -2,6 +2,27 @@
 
 ## New features
 
+* `fit_mixfac()` gains `loading_prior`, which puts a shrinkage prior on the
+  scale of each factor's loadings so that factors the data do not support
+  shrink toward zero. `"horseshoe"` is a regularized horseshoe (Piironen and
+  Vehtari 2017), set by `p0` (or `tau0`), `slab_scale`, and `slab_df`;
+  `"lasso"` is a Bayesian lasso. One scale per factor is shared by every item
+  type. The default, `"normal"`, leaves existing fits unchanged. Shrinkage
+  priors are not yet tested with smoothed factor scores, and `fit_mixfac()`
+  warns when they are combined with `smooth_eta = TRUE` and more than one
+  period.
+
+* `identify_mixfac()` gains `method = "none"`, which aligns only the signs and
+  order of the factors. It is now the default for shrinkage fits, since
+  rotation would spread a shrunk factor across the others; `"varimax"`
+  remains the default otherwise. The per-factor scales are carried through
+  as `load_scale` by `identify_mixfac()`, `label_mixfac()`,
+  `combine_types_mixfac()`, `sort_mixfac()`, and `sign_mixfac()`.
+
+* `summarize_shrinkage()` reports, for each factor, the norm of its loadings,
+  its share of the summed squared loadings, and (for shrinkage fits) its
+  loading scale.
+
 * `fit_modgirt()` gains `gen_log_lik`, and `loo_modgirt()` computes
   approximate leave-one-out cross-validation for group-level IRT models.
   `log_lik_index_modgirt()` maps positions of `log_lik` to group-item-periods.

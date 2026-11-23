@@ -186,6 +186,27 @@ as_draws_rvars_safe <- function(...) {
     do.call(posterior::draws_rvars, args[keep])
 }
 
+## Apply draw-specific signed permutations (a D x D rvar) to a length-D rvar
+## of per-factor loading scales, returning their absolute values. Draws of
+## both objects are in the same chain-major order.
+permute_load_scale <- function(scale, sp_rvar, n_chain) {
+    S <- posterior::draws_of(scale)
+    if (is.null(dim(S))) S <- matrix(S, ncol = 1L)
+    n_factor <- ncol(S)
+    P <- posterior::draws_of(sp_rvar)
+    if (is.null(dim(P)) || length(dim(P)) == 1L) {
+        P <- array(P, dim = c(nrow(S), n_factor, n_factor))
+    }
+    out <- matrix(NA_real_, nrow = nrow(S), ncol = n_factor)
+    for (s in seq_len(nrow(S))) {
+        Ps <- matrix(P[s, , ], nrow = n_factor, ncol = n_factor)
+        out[s, ] <- abs(S[s, , drop = FALSE] %*% Ps)
+    }
+    out <- posterior::rvar(out, nchains = n_chain)
+    dimnames(out) <- list(factor = seq_len(n_factor))
+    out
+}
+
 #' Map positions of `log_lik` to observations
 #'
 #' @param shaped_data A `mixfac_data` object from [shape_mixfac()].

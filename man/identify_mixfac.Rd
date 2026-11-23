@@ -6,7 +6,7 @@
 \usage{
 identify_mixfac(
   x,
-  method = "varimax",
+  method = NULL,
   whiten = FALSE,
   ref_t = "last",
   identify_with_type,
@@ -18,7 +18,11 @@ identify_mixfac(
 \arguments{
 \item{x}{Either a draws_rvars object or a fitted object}
 
-\item{method}{Rotation criterion}
+\item{method}{Rotation criterion passed to \code{\link[GPArotation:GPFRSorth]{GPArotation::GPFRSorth()}}, or
+\code{"none"} to skip rotation and align only the signs and order of the
+factors. If \code{NULL} (the default), \code{"none"} is used for fits with a
+shrinkage \code{loading_prior} (see \code{\link[=fit_mixfac]{fit_mixfac()}}), since rotation would
+spread a shrunk factor across the others, and \code{"varimax"} otherwise.}
 
 \item{whiten}{Should \code{bar_theta} be demeaned, standardized, and made orthogonal?}
 

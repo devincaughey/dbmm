@@ -21,3 +21,4 @@ build/
 .Rcheck/
 dbmm.Rcheck/
 *.Rcheck/
+validation/output/
