@@ -99,6 +99,23 @@ for (prior in c("horseshoe", "lasso")) {
     })
 }
 
+for (prior in c("horseshoe", "lasso")) {
+    test_that(paste("the", prior, "prior keeps a weak second factor"), {
+        id <- identify_mixfac(extract_mixfac_draws(
+            test_shrinkage_fit(prior, n_true = 2)
+        ))
+        s <- summarize_shrinkage(id)
+        s <- s[order(-s$norm_mean), ]
+        ## Both true factors survive and the weak one keeps a real share;
+        ## the extra factor's 95% upper bound stays below the weak factor's
+        ## 5% lower bound
+        expect_gt(sum(s$share_mean[1:2]), 0.9)
+        expect_gt(s$share_mean[2], 0.1)
+        expect_lt(s$share_mean[3], 0.05)
+        expect_lt(s$norm_hi[3], s$norm_lo[2])
+    })
+}
+
 test_that("identification without rotation leaves lp__ unchanged", {
     d <- extract_mixfac_draws(test_shrinkage_fit("horseshoe"))
     id <- identify_mixfac(d)
