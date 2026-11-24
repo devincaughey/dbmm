@@ -20,4 +20,5 @@
 ^dbmm_.*\.tar\.gz$
 ^inst/stan/mixfac_probit$
 ^inst/stan/modgirt_probit$
-^inst/stan/.*\.(exe|hpp|o|d)$^validation$
+^inst/stan/.*\.(exe|hpp|o|d)$
+^validation$
