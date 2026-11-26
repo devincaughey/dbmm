@@ -267,6 +267,29 @@ make_mixfac_out <- function(fit, shaped_data, return_data = TRUE) {
 #'     state of Stan’s pseudo-random number generator. Defaults to `123`.
 #' @param link (string) Which link function should be used for binary and
 #'     ordinal outcomes. Currently only `"probit"` is supported.
+#' @param loading_prior (string) Prior on the scale of each factor's
+#'     loadings. `"normal"` (the default) gives every loading a standard
+#'     normal prior. `"horseshoe"` (a regularized horseshoe) and `"lasso"` (a
+#'     Bayesian lasso) multiply all of a factor's loadings, across every item
+#'     type, by a factor-specific scale with a shrinkage prior, so that
+#'     factors the data do not support shrink toward zero. Use this to judge
+#'     how many factors the data support; see [summarize_shrinkage()]. With a
+#'     shrinkage prior, identify the draws with `identify_mixfac(method =
+#'     "none")`, since rotation would spread a shrunk factor across the
+#'     others.
+#' @param p0 (positive real) Prior guess of the number of factors the data
+#'     support, used to set `tau0` when `loading_prior = "horseshoe"`. Must be
+#'     smaller than `n_dim`. Ignored if `tau0` is supplied.
+#' @param tau0 (positive real or `NULL`) Scale of the half-Cauchy prior on the
+#'     horseshoe's global scale. If `NULL` (the default), it is set to `p0 /
+#'     (n_dim - p0) / sqrt(n_items)`, where `n_items` counts items of every
+#'     type, following Piironen and Vehtari (2017) with the probit scale's
+#'     pseudo-standard deviation of 1.
+#' @param slab_scale (positive real) Scale of the regularized horseshoe's slab,
+#'     which caps the loading scale of strongly supported factors. Defaults to
+#'     `2`. A very large value approximates the plain horseshoe.
+#' @param slab_df (positive real) Degrees of freedom of the slab. Defaults to
+#'     `4`.
 #' @param ... Additional arguments to `cmdstanr::sample()`.
 #'
 #' @return A dbmm object containing
@@ -307,8 +330,14 @@ fit_mixfac <- function(shaped_data,
                        seed = NULL,
                        link = "probit",
                        separate_eta = NULL,
+                       loading_prior = c("normal", "horseshoe", "lasso"),
+                       p0 = NULL,
+                       tau0 = NULL,
+                       slab_scale = 2,
+                       slab_df = 4,
                        ...) {
     check_arg_type(arg = shaped_data, typename = "mixfac_data")
+    loading_prior <- match.arg(loading_prior)
     ## Deprecated `separate_eta`, whose sense was the reverse of `smooth_eta`
     if (!is.null(separate_eta)) {
         if (!missing(smooth_eta)) {
@@ -377,6 +406,26 @@ fit_mixfac <- function(shaped_data,
     shaped_data$sd_sigma_metric <- sd_sigma_metric
     shaped_data$sd_sigma_alpha_evol <- sd_sigma_alpha_evol
     shaped_data$sd_sigma_eta_evol <- sd_sigma_eta_evol
+
+    shrink <- mixfac_shrinkage_data(
+        loading_prior = loading_prior,
+        n_dim = n_dim,
+        n_items = shaped_data$I_binary + shaped_data$I_trichot +
+            shaped_data$I_ordinal + shaped_data$I_metric,
+        p0 = p0,
+        tau0 = tau0,
+        slab_scale = slab_scale,
+        slab_df = slab_df
+    )
+    shaped_data[names(shrink)] <- shrink
+    if (loading_prior != "normal" && smooth_eta && shaped_data$T > 1) {
+        cli::cli_warn(c(
+            "Shrinkage priors are not yet tested with smoothed factor scores.",
+            "i" = "A factor shrunk to zero leaves its evolution parameters
+                   informed only by their priors, which can cause divergences.
+                   Consider {.code smooth_eta = FALSE} or a single period."
+        ))
+    }
 
     nonzero_binary <- matrix(
         data = 1,
@@ -481,5 +530,58 @@ fit_mixfac <- function(shaped_data,
         shaped_data = shaped_data,
         return_data = return_data
     )
+    attr(out, "loading_prior") <- loading_prior
     return(out)
+}
+
+
+## Stan data for the loading prior. Unused entries get placeholder values,
+## since Stan requires every data variable to be supplied.
+mixfac_shrinkage_data <- function(loading_prior, n_dim, n_items, p0 = NULL,
+                                  tau0 = NULL, slab_scale = 2, slab_df = 4) {
+    code <- match(loading_prior, c("normal", "horseshoe", "lasso")) - 1L
+    if (is.na(code)) {
+        cli::cli_abort("Unknown {.arg loading_prior}: {.val {loading_prior}}.")
+    }
+    is_pos_scalar <- function(v) {
+        is.numeric(v) && length(v) == 1L && !is.na(v) && is.finite(v) && v > 0
+    }
+    if (loading_prior == "horseshoe") {
+        if (is.null(tau0)) {
+            if (is.null(p0)) {
+                cli::cli_abort(
+                    "Supply {.arg p0} (or {.arg tau0}) when
+                     {.code loading_prior = \"horseshoe\"}."
+                )
+            }
+            if (!is_pos_scalar(p0) || p0 >= n_dim) {
+                cli::cli_abort(
+                    "{.arg p0} must be a positive number smaller than
+                     {.arg n_dim} ({n_dim})."
+                )
+            }
+            tau0 <- p0 / (n_dim - p0) / sqrt(n_items)
+        } else if (!is_pos_scalar(tau0)) {
+            cli::cli_abort("{.arg tau0} must be a positive number.")
+        }
+        if (!is_pos_scalar(slab_scale) || !is_pos_scalar(slab_df)) {
+            cli::cli_abort(
+                "{.arg slab_scale} and {.arg slab_df} must be positive numbers."
+            )
+        }
+    } else {
+        if (!is.null(p0) || !is.null(tau0)) {
+            cli::cli_warn(
+                "{.arg p0} and {.arg tau0} are ignored unless
+                 {.code loading_prior = \"horseshoe\"}."
+            )
+        }
+        tau0 <- 1
+    }
+    list(
+        loading_prior = code,
+        tau0 = tau0,
+        slab_scale = slab_scale,
+        slab_df = slab_df
+    )
 }

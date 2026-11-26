@@ -30,6 +30,11 @@ fit_mixfac(
   seed = NULL,
   link = "probit",
   separate_eta = NULL,
+  loading_prior = c("normal", "horseshoe", "lasso"),
+  p0 = NULL,
+  tau0 = NULL,
+  slab_scale = 2,
+  slab_df = 4,
   ...
 )
 }
@@ -144,6 +149,32 @@ ordinal outcomes. Currently only \code{"probit"} is supported.}
 \item{separate_eta}{(logical) Deprecated. Use \code{smooth_eta} instead, noting
 that the sense is reversed: \code{separate_eta = TRUE} corresponds to
 \code{smooth_eta = FALSE}.}
+
+\item{loading_prior}{(string) Prior on the scale of each factor's
+loadings. \code{"normal"} (the default) gives every loading a standard
+normal prior. \code{"horseshoe"} (a regularized horseshoe) and \code{"lasso"} (a
+Bayesian lasso) multiply all of a factor's loadings, across every item
+type, by a factor-specific scale with a shrinkage prior, so that
+factors the data do not support shrink toward zero. Use this to judge
+how many factors the data support; see \code{\link[=summarize_shrinkage]{summarize_shrinkage()}}. With a
+shrinkage prior, identify the draws with \code{identify_mixfac(method = "none")}, since rotation would spread a shrunk factor across the
+others.}
+
+\item{p0}{(positive real) Prior guess of the number of factors the data
+support, used to set \code{tau0} when \code{loading_prior = "horseshoe"}. Must be
+smaller than \code{n_dim}. Ignored if \code{tau0} is supplied.}
+
+\item{tau0}{(positive real or \code{NULL}) Scale of the half-Cauchy prior on the
+horseshoe's global scale. If \code{NULL} (the default), it is set to \code{p0 / (n_dim - p0) / sqrt(n_items)}, where \code{n_items} counts items of every
+type, following Piironen and Vehtari (2017) with the probit scale's
+pseudo-standard deviation of 1.}
+
+\item{slab_scale}{(positive real) Scale of the regularized horseshoe's slab,
+which caps the loading scale of strongly supported factors. Defaults to
+\code{2}. A very large value approximates the plain horseshoe.}
+
+\item{slab_df}{(positive real) Degrees of freedom of the slab. Defaults to
+\code{4}.}
 
 \item{...}{Additional arguments to \code{cmdstanr::sample()}.}
 }

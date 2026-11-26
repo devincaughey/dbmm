@@ -47,7 +47,11 @@ extract_mixfac_draws <- function(x, drop = .mixfac_drop_default, check = TRUE) {
 #' Identify mixfac model
 #'
 #' @param x Either a draws_rvars object or a fitted object
-#' @param method Rotation criterion
+#' @param method Rotation criterion passed to [GPArotation::GPFRSorth()], or
+#'     `"none"` to skip rotation and align only the signs and order of the
+#'     factors. If `NULL` (the default), `"none"` is used for fits with a
+#'     shrinkage `loading_prior` (see [fit_mixfac()]), since rotation would
+#'     spread a shrunk factor across the others, and `"varimax"` otherwise.
 #' @param whiten Should `bar_theta` be demeaned, standardized, and made orthogonal?
 #' @param ref_t In what time period should `bar_theta` be whitened? May be
 #'     an integer in 1:T, 'last', or 'mean'. The latter means that the
@@ -68,7 +72,7 @@ extract_mixfac_draws <- function(x, drop = .mixfac_drop_default, check = TRUE) {
 #' @param quiet (logical) Suppress the iteration log printed by
 #'     factor.switching::rsp_exact() Defaults to `TRUE`.
 #' @export
-identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
+identify_mixfac <- function(x, method = NULL, whiten = FALSE,
                             ref_t = "last", identify_with_type,
                             random_starts = 0, seed = 123,
                             quiet = TRUE) {
@@ -116,6 +120,33 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
         metric = "lambda_metric",
         stop("Invalid `identify_with_type`; must be 'lambda', 'binary', 'trichot', 'ordinal', or 'metric'.")
     )
+
+    ## Shrinkage fits carry a per-factor loading scale
+    has_scale <- "load_scale" %in% posterior::variables(draws_rvar)
+    if (is.null(method)) {
+        method <- if (has_scale) "none" else "varimax"
+        if (has_scale && !quiet) {
+            cli::cli_inform(
+                "Shrinkage prior detected: aligning signs and order only
+                 ({.code method = \"none\"})."
+            )
+        }
+    }
+    if (!is.character(method) || length(method) != 1L || is.na(method)) {
+        stop("`method` must be a single string, or NULL.")
+    }
+    ## The scales stay attached to their factors only under signed
+    ## permutations, so drop them when the loadings are rotated or whitened
+    keep_scale <- has_scale && identical(method, "none") && !whiten
+    if (has_scale && !keep_scale) {
+        cli::cli_warn(c(
+            "Rotating or whitening a shrinkage fit mixes shrunk and retained
+             factors.",
+            "i" = "{.var load_scale} is dropped from the output. Use
+                   {.code method = \"none\"} and {.code whiten = FALSE} to
+                   keep it."
+        ))
+    }
 
     has_omega <- "Omega" %in% posterior::variables(draws_rvar)
     omega_rvar <- if (has_omega) {
@@ -231,7 +262,9 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
         abind::abind(along = 3)
 
     ## ---------- Varimax ----------
-    if (n_factor > 1) {
+    if (identical(method, "none")) {
+        vm_rvar <- diag(n_factor)
+    } else if (n_factor > 1) {
         vm_rvar <- with_seed(seed, make_vm_rvar(
                                        draws_of_lambda,
                                        n_iter = n_iter, n_chain = n_chain, n_factor = n_factor,
@@ -283,6 +316,13 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
             t(vm_sp_rvar) %**% omega_rvar$Omega %**% vm_sp_rvar
     }
 
+    ## Permute the loading scales with their factors. Signs are dropped:
+    ## the horseshoe scale is positive, and a lasso scale's sign is absorbed
+    ## by the sign flip of its loadings.
+    scale_rvar <- if (keep_scale) {
+        permute_load_scale(draws_rvar$load_scale, sp_rvar, n_chain)
+    } else NULL
+
     ## ---------- Output ----------
     if (inherits(x, "mixfac_comb")) {
         out <- as_draws_rvars_safe(
@@ -294,6 +334,7 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
             sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
             sigma_metric = draws_rvar$sigma_metric,
             Omega = if (has_omega) omega_rvar$Omega else NULL,
+            load_scale = scale_rvar,
             lp__ = draws_rvar$lp__
         )
     } else {
@@ -312,6 +353,7 @@ identify_mixfac <- function(x, method = "varimax", whiten = FALSE,
             sigma_alpha_evol = draws_rvar$sigma_alpha_evol,
             sigma_metric = draws_rvar$sigma_metric,
             Omega = if (has_omega) omega_rvar$Omega else NULL,
+            load_scale = scale_rvar,
             lp__ = draws_rvar$lp__
         )
     }
@@ -402,6 +444,9 @@ label_mixfac <- function (x, make_long = FALSE) {
             factor = 1:n_factor,
             factor = 1:n_factor
         )
+    }
+    if (!is.null(x$load_scale)) {
+        dimnames(x$load_scale) <- list(factor = 1:n_factor)
     }
     dimnames(x$eta) <- list(
         period = attr(x, "time_labels"),
@@ -526,6 +571,7 @@ combine_types_mixfac <- function (x) {
             sigma_alpha_evol = x$sigma_alpha_evol,
             sigma_metric = x$sigma_metric,
             Omega = x$Omega,
+            load_scale = x$load_scale,
             lp__ = x$lp__
         )
     }
@@ -628,6 +674,7 @@ sort_mixfac <- function(x, check = TRUE) {
     eta <- x$eta[, , fo, drop = FALSE]
     lambda <- x$lambda[, fo, drop = FALSE]
     Omega <- x$Omega[fo, fo, drop = FALSE]
+    load_scale <- if (is.null(x$load_scale)) NULL else x$load_scale[fo]
 
     ## Factor labels are positional, so renumber rather than permute them
     if (!is.null(dimnames(eta))) dimnames(eta)[[3]] <- seq_along(fo)
@@ -645,6 +692,7 @@ sort_mixfac <- function(x, check = TRUE) {
         sigma_alpha_evol = x$sigma_alpha_evol,
         sigma_metric = x$sigma_metric,
         Omega = Omega,
+        load_scale = load_scale,
         lp__ = x$lp__
     )
 
@@ -711,6 +759,7 @@ sign_mixfac <- function(x, signs = 1, check = TRUE) {
         sigma_alpha_evol = x$sigma_alpha_evol,
         sigma_metric = x$sigma_metric,
         Omega = Omega,
+        load_scale = x$load_scale,
         lp__ = x$lp__
     )
 
@@ -723,6 +772,62 @@ sign_mixfac <- function(x, signs = 1, check = TRUE) {
 
     class(out) <- unique(c("mixfac_signed", class(x)))
     return(out)
+}
+
+
+#' Summarize how strongly each factor is supported
+#'
+#' For each factor, summarizes the posterior of the norm of its loadings
+#' across all items, `sqrt(sum(lambda^2))`, and that factor's share of the
+#' summed squared loadings. For fits with a shrinkage `loading_prior` (see
+#' [fit_mixfac()]), also summarizes the factor's loading scale `load_scale`.
+#' Factors the data do not support have norms and scales near zero.
+#'
+#' @param x Identified draws, as returned by [identify_mixfac()], optionally
+#'     after [label_mixfac()], [combine_types_mixfac()], [sort_mixfac()], or
+#'     [sign_mixfac()]. Must hold `rvar` draws.
+#' @param probs (numeric) Lower and upper quantiles to report. Defaults to
+#'     `c(0.05, 0.95)`.
+#'
+#' @return A data frame with one row per factor.
+#'
+#' @export
+summarize_shrinkage <- function(x, probs = c(0.05, 0.95)) {
+    if (!posterior::is_draws_rvars(x)) {
+        stop("`x` must hold rvar draws, such as the output of ",
+             "`identify_mixfac()`.")
+    }
+    stopifnot(is.numeric(probs), length(probs) == 2L)
+    lambda_nms <- grep("^lambda(_|$)", names(x), value = TRUE)
+    if (length(lambda_nms) == 0) {
+        stop("No loadings (`lambda` or `lambda_*`) found in `x`.")
+    }
+    ## Summed squared loadings per draw and factor, across item types
+    ss <- NULL
+    for (nm in lambda_nms) {
+        L <- posterior::draws_of(x[[nm]])
+        if (length(L) == 0) next
+        ss_k <- apply(L^2, c(1, 3), sum)
+        ss <- if (is.null(ss)) ss_k else ss + ss_k
+    }
+    norm <- sqrt(ss)
+    share <- ss / rowSums(ss)
+    q <- function(m, p) apply(m, 2, stats::quantile, probs = p, names = FALSE)
+    out <- data.frame(
+        factor = seq_len(ncol(ss)),
+        norm_mean = colMeans(norm),
+        norm_lo = q(norm, probs[1]),
+        norm_hi = q(norm, probs[2]),
+        share_mean = colMeans(share)
+    )
+    if (!is.null(x$load_scale)) {
+        S <- posterior::draws_of(x$load_scale)
+        if (is.null(dim(S))) S <- matrix(S, ncol = 1L)
+        out$scale_mean <- colMeans(S)
+        out$scale_lo <- q(S, probs[1])
+        out$scale_hi <- q(S, probs[2])
+    }
+    out
 }
 
 

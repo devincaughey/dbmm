@@ -17,6 +17,7 @@ reference:
   - sort_mixfac
   - sign_mixfac
   - summarize_mixfac
+  - summarize_shrinkage
   - log_lik_draws
   - log_lik_index
   - loo_mixfac
