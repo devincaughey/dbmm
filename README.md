@@ -38,7 +38,7 @@ one:
 
 ``` r
 install.packages("cmdstanr",
-                 repos = c("https://mc-stan.org/r-packages/",
+                 repos = c("https://stan-dev.r-universe.dev/",
                            getOption("repos")))
 cmdstanr::install_cmdstan()
 ```
